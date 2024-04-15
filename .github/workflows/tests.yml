@@ -5,7 +5,8 @@ on:
   - pull_request
 
 jobs:
-  build:
+  tests:
+    name: "Python ${{ matrix.python-version }} on ${{ matrix.platform }}"
     runs-on: ${{ matrix.platform }}
     strategy:
       matrix:
@@ -26,10 +27,27 @@ jobs:
       run: tox
       env:
         PLATFORM: ${{ matrix.platform }}
-      # working-directory: ${{ github.workspace }}
+  
+  coverage:
+    name: "Coverage"
+    needs: tests
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: 3.11
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        python -m pip install coverage
+    - name: Combine coverage data
+      run: |
+        coverage combine
+        coverage xml
     - name: Coveralls GitHub Action
-      if: matrix.platform == 'ubuntu-latest' && matrix.python-version == '3.11'
       uses: coverallsapp/github-action@v2.2.3
       with:
-        file: ${{ github.workspace }}/coverage.xml
+        file: coverage.xml
       
