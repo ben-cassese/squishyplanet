@@ -3,7 +3,7 @@ import jax
 jax.config.update("jax_enable_x64", True)
 import jax.numpy as jnp
 
-from bulge.engine.skypos import skypos
+from squishyplanet.engine.skypos import skypos
 
 
 def _t_00(

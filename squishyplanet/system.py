@@ -3,13 +3,13 @@ import jax
 jax.config.update("jax_enable_x64", True)
 import jax.numpy as jnp
 
-from bulge.engine.planet_3d import planet_3d_coeffs
-from bulge.engine.planet_2d import planet_2d_coeffs
-from bulge.engine.parametric_ellipse import poly_to_parametric
-from bulge.engine.greens_basis_transform import generate_change_of_basis_matrix
-from bulge.engine.kepler import kepler, skypos
-from bulge.engine.polynomial_limb_darkened_transit import lightcurve
-from bulge.engine.phase_curve_utils import (
+from squishyplanet.engine.planet_3d import planet_3d_coeffs
+from squishyplanet.engine.planet_2d import planet_2d_coeffs
+from squishyplanet.engine.parametric_ellipse import poly_to_parametric
+from squishyplanet.engine.greens_basis_transform import generate_change_of_basis_matrix
+from squishyplanet.engine.kepler import kepler, skypos
+from squishyplanet.engine.polynomial_limb_darkened_transit import lightcurve
+from squishyplanet.engine.phase_curve_utils import (
     generate_sample_radii_thetas,
     sample_surface,
     planet_surface_normal,

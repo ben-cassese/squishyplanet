@@ -5,13 +5,13 @@ import jax.numpy as jnp
 
 from quadax import quadgk
 
-from bulge.engine.planet_3d import planet_3d_coeffs
-from bulge.engine.planet_2d import planet_2d_coeffs
-from bulge.engine.parametric_ellipse import (
+from squishyplanet.engine.planet_3d import planet_3d_coeffs
+from squishyplanet.engine.planet_2d import planet_2d_coeffs
+from squishyplanet.engine.parametric_ellipse import (
     poly_to_parametric,
     cartesian_intersection_to_parametric_angle,
 )
-from bulge.engine.kepler import kepler, skypos
+from squishyplanet.engine.kepler import kepler, skypos
 
 epsabs = epsrel = 1e-12
 

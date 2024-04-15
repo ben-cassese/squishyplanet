@@ -3,8 +3,8 @@ import jax
 jax.config.update("jax_enable_x64", True)
 import jax.numpy as jnp
 
-from bulge.engine.parametric_ellipse import poly_to_parametric_helper
-from bulge.engine.planet_2d import planet_2d_coeffs
+from squishyplanet.engine.parametric_ellipse import poly_to_parametric_helper
+from squishyplanet.engine.planet_2d import planet_2d_coeffs
 
 ########################################################################################
 # General helpers

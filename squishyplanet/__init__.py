@@ -1,2 +1,2 @@
-from bulge.system import *
+from squishyplanet.system import *
 print("imported!")
