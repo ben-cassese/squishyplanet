@@ -26,13 +26,13 @@ jobs:
       run: tox
       env:
         PLATFORM: ${{ matrix.platform }}
-    - name: Generate code coverage report
-      if: matrix.platform == 'ubuntu-latest' && matrix.python-version == '3.11'
-      run: |
-        python -m pip install pytest
-        python -m pip install coverage
-        coverage run --source squishyplanet --module pytest
-        coverage xml
+    # - name: Generate code coverage report
+    #   if: matrix.platform == 'ubuntu-latest' && matrix.python-version == '3.11'
+    #   run: |
+    #     python -m pip install pytest
+    #     python -m pip install coverage
+    #     coverage run --source squishyplanet --module pytest
+    #     coverage xml
     - name: Coveralls GitHub Action
       if: matrix.platform == 'ubuntu-latest' && matrix.python-version == '3.11'
       uses: coverallsapp/github-action@v2.2.3
