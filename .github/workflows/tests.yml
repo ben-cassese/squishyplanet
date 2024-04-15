@@ -34,7 +34,7 @@ jobs:
     - name: Test with pytest
       run: |
         # pytest --cov=.
-        coverage run --source=${{ github.workspace }} --module=pytest
+        coverage run --source=${{ github.workspace }} --module pytest
       # env:
       #   PLATFORM: ${{ matrix.platform }}
 
