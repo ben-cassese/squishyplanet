@@ -29,4 +29,3 @@ jobs:
     - name: Coveralls GitHub Action
       if: ${{ matrix.python-version }} == '3.12' && ${{ matrix.platform }} == 'ubuntu-latest'
       uses: coverallsapp/github-action@v2.2.3
-    
