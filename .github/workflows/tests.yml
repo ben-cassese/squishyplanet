@@ -26,9 +26,10 @@ jobs:
       run: tox
       env:
         PLATFORM: ${{ matrix.platform }}
+      working-directory: ${{ github.workspace }}
     - name: Coveralls GitHub Action
       if: matrix.platform == 'ubuntu-latest' && matrix.python-version == '3.11'
       uses: coverallsapp/github-action@v2.2.3
       with:
-        file: "**coverage.xml"
+        file: ./coverage.xml
       
