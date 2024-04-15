@@ -521,6 +521,53 @@ def _p_00(a, e, f, Omega, i, omega, r, obliq, prec, f1, f2):
 
 @jax.jit
 def planet_3d_coeffs(a, e, f, Omega, i, omega, r, obliq, prec, f1, f2, **kwargs):
+    """
+    Calculate and return the coefficients that describe the planet as an implicit
+    surface in 3D space as a function of its orbital state.
+
+    This function computes a dictionary of coefficients related to the 3D position
+    and orientation of a planet given its orbital and rotational characteristics. All
+    inputs must be jnp.ndarrays. They can either be shape (1,) or (N,) with 1 unique
+    N allowed per call (e.g., everything but f and prec are single-valued, but those
+    two are length N).
+
+    Args:
+        a (Array [Rstar]): Semi-major axis of the orbit in units of R_star
+        e (Array [Dimensionless]): Eccentricity of the orbit
+        f (Array [Radian]): True anomaly, the angle between the direction of periapsis
+                            and the current position of the planet as seen from
+                            the star.
+        Omega (Array [Radian]): Longitude of the ascending node
+        i (Array [Radian]): Orbital inclination
+        omega (Array [Radian]): Argument of periapsis
+        r (Array [Rstar]): Equitorial radius of the planet, in units of R_star
+        obliq (Array [Radian]): Obliquity, the angle between the planet's orbital plane
+                                and its equatorial plane. Defined when the planet is at
+                                periapsis with an Omega of zero as a rotation around the
+                                sky-frame y-axis, such that a positive obliquity tips
+                                the planet's north pole away from the star.
+        prec (Array [Radian]): Precession angle, or equivalently the longitude of
+                               ascending node of the planet's equatorial plane. This
+                               is defined at periapsis with an Omega of zero as a
+                               rotation about the sky-frame z-axis.
+        f1 (Array [Dimensionless]): The flattening coefficient of the planet that
+                                    describes the compression along the planet's polar
+                                    axis. A value of 0.0 indicates no flattening. f1
+                                    must always be larger than f2.
+        f2 (Array [Dimensionless]): The flattening coefficient of the planet that
+                                    describes the compression along the planet's
+                                    "y" axis, the vector in its equatorial plane that is
+                                    perpendicular to the direction of motion at
+                                    periapsis, assuming the 0.0 obliquity. f2 must
+                                    always be smaller than f1.
+                                    
+        **kwargs: Unused additional keyword arguments. These are included so that we
+                    can can take in a larger state dictionary that includes all of the
+                    required parameters along with other unnecessary ones.
+    Returns:
+        dict: A dictionary with keys representing different coefficient names and
+              their corresponding values.
+    """
     return {
         "p_xx": _p_xx(a, e, f, Omega, i, omega, r, obliq, prec, f1, f2),
         "p_xy": _p_xy(a, e, f, Omega, i, omega, r, obliq, prec, f1, f2),

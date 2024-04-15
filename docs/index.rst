@@ -6,9 +6,26 @@
 Welcome to squishyplanet's documentation!
 =========================================
 
+
 .. toctree::
    :maxdepth: 2
-   :caption: Contents:
+   :caption: User Guide
+
+   installation
+   quickstart
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Tutorials
+
+   tutorials/lightcurve_compare.ipynb
+
+.. toctree::
+   :maxdepth: 2
+   :caption: API Documentation
+
+   oblate_system
+   engine
 
 
 

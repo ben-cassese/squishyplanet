@@ -1,2 +1,2 @@
-from squishyplanet.system import *
+from squishyplanet.OblateSystem import *
 print("imported!")

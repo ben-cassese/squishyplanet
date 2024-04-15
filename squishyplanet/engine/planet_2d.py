@@ -32,6 +32,34 @@ def _rho_00(p_xx, p_xy, p_xz, p_x0, p_yy, p_yz, p_y0, p_zz, p_z0, p_00):
 def planet_2d_coeffs(
     p_xx, p_xy, p_xz, p_x0, p_yy, p_yz, p_y0, p_zz, p_z0, p_00, **kwargs
 ):
+    """
+    Compute the coefficients that describe the planet as an implicit 2D surface from the
+    observer's perspective.
+
+    This function transforms the coefficients that describe the planet's 3D shape into
+    a new set of coefficients that describe its projected outline as seen from
+    z=infinity.
+
+    Args:
+        p_xx (Array): Coefficient representing xx interaction in the 3D model.
+        p_xy (Array): Coefficient representing xy interaction in the 3D model.
+        p_xz (Array): Coefficient representing xz interaction in the 3D model.
+        p_x0 (Array): Coefficient representing x0 interaction in the 3D model.
+        p_yy (Array): Coefficient representing yy interaction in the 3D model.
+        p_yz (Array): Coefficient representing yz interaction in the 3D model.
+        p_y0 (Array): Coefficient representing y0 interaction in the 3D model.
+        p_zz (Array): Coefficient representing zz interaction in the 3D model.
+        p_z0 (Array): Coefficient representing z0 interaction in the 3D model.
+        p_00 (Array): Coefficient representing 00 interaction in the 3D model.
+        **kwargs: Unused additional keyword arguments. These are included to allow for
+                flexibility in providing additional data that may be ignored during the
+                computation but included for interface consistency.
+
+Returns:
+    dict: A dictionary with keys representing different transformed coefficient
+          names ('rho_xx', 'rho_xy', 'rho_x0', 'rho_yy', 'rho_y0', 'rho_00') and
+          their corresponding values.
+    """
     return {
         "rho_xx": _rho_xx(
             p_xx, p_xy, p_xz, p_x0, p_yy, p_yz, p_y0, p_zz, p_z0, p_00

@@ -16,7 +16,11 @@ dependencies = [
     "astropy>5",
     "matplotlib",
     "sympy",
-    "ipykernel"
+    "ipykernel",
+    "sphinx_rtd_theme",
+    "nbsphinx",
+    "sphinx_automodapi",
+    "sphinx-book-theme",
 ]
 authors = [
   {name = "Ben Cassese", email = "b.c.cassese@columbia.edu"},
@@ -39,7 +43,7 @@ Documentation = "https://squishyplanet.readthedocs.io/en/latest/"
 include-package-data = true
 
 [tool.black]
-line-length = 79
+line-length = 88
 
 # [tool.pytest]
 # testpaths = ["squishyplanet"]
