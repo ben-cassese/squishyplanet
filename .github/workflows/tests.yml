@@ -25,12 +25,13 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         python -m pip install pytest-cov
+        python -m pip install .
       #  python -m pip install tox tox-gh-actions
     # - name: Test with tox
     #   run: tox
 
     - name: Test with pytest
-      run: pytest --cov
+      run: coverage run --parallel --source squishyplanet --module pytest
       env:
         PLATFORM: ${{ matrix.platform }}
 
