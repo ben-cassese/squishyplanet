@@ -1,2 +1,4 @@
-# squishyplanet
-Transits of non-spherical exoplanets
+# bulge
+A package for dealing with non-spherical exoplanets
+
+WIP!
