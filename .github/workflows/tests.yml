@@ -28,11 +28,7 @@ jobs:
         PLATFORM: ${{ matrix.platform }}
     - name: Coveralls GitHub Action
       if: matrix.platform == 'ubuntu-latest' && matrix.python-version == '3.11'
-      run: |
-        python -m pip install coveralls
-        coverage xml
-        coveralls -f coverage.xml
-      # uses: coverallsapp/github-action@v2.2.3
-      # with:
-      #   file: coverage.xml
+      uses: coverallsapp/github-action@v2.2.3
+      with:
+        file: coverage.xml
       
