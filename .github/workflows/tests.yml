@@ -31,9 +31,10 @@ jobs:
     #   run: tox
 
     - name: Test with pytest
-      run: coverage run --parallel --source squishyplanet --module pytest
-      env:
-        PLATFORM: ${{ matrix.platform }}
+      run: |
+        pytest --cov
+      # env:
+      #   PLATFORM: ${{ matrix.platform }}
 
     - name: Coveralls GitHub Action
       if: ${{ matrix.python-version }} == '3.12'
