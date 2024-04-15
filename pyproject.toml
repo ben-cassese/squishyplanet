@@ -41,5 +41,8 @@ include-package-data = true
 [tool.black]
 line-length = 79
 
-[tool.pytest]
-testpaths = ["squishyplanet"]
+# [tool.pytest]
+# testpaths = ["squishyplanet"]
+
+# [tool.coverage.run]
+# source = squishyplanet
