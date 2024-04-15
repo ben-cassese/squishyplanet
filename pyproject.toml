@@ -17,10 +17,6 @@ dependencies = [
     "matplotlib",
     "sympy",
     "ipykernel",
-    "sphinx_rtd_theme",
-    "nbsphinx",
-    "sphinx_automodapi",
-    "sphinx-book-theme",
 ]
 authors = [
   {name = "Ben Cassese", email = "b.c.cassese@columbia.edu"},
