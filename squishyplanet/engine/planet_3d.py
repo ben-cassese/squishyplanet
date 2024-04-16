@@ -565,8 +565,12 @@ def planet_3d_coeffs(a, e, f, Omega, i, omega, r, obliq, prec, f1, f2, **kwargs)
                     can can take in a larger state dictionary that includes all of the
                     required parameters along with other unnecessary ones.
     Returns:
-        dict: A dictionary with keys representing different coefficient names and
-              their corresponding values.
+        dict:
+            A dictionary with keys representing different coefficient names and
+            their corresponding values. The coeffients satisfy the implicit equation:
+
+            .. math::
+                p_{xx} x^2 + p_{xy} xy + p_{xz} xz + p_{x0} x + p_{yy} y^2 + p_{yz} yz + p_{y0} y + p_{zz} z^2 + p_{z0} z + p_{00} = 1
     """
     return {
         "p_xx": _p_xx(a, e, f, Omega, i, omega, r, obliq, prec, f1, f2),

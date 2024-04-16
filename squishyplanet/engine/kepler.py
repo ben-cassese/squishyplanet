@@ -10,14 +10,16 @@ from jax.interpreters import ad
 
 @jax.jit
 def kepler(M, ecc):
-    """Solve Kepler's equation to compute the true anomaly
+    """Solve Kepler's equation to compute the true anomaly.
+
+    This implementation is based on that within jaxoplanet, many thanks to the authors.
 
     Args:
-        M: Mean anomaly
-        ecc: Eccentricity
+        M (Array [Radian]): Mean anomaly
+        ecc (Array [Dimensionless]): Eccentricity
 
     Returns:
-        The sine and cosine of the true anomaly
+        Array: True anomaly in radians
     """
     sinf, cosf = _kepler(M, ecc)
     # this is the only bit that's different from jaxoplanet-
@@ -37,8 +39,8 @@ def _kepler(M, ecc):
 
     # Solve
     ome = 1 - ecc
-    E = starter(M, ecc, ome)
-    E = refine(M, ecc, ome, E)
+    E = _starter(M, ecc, ome)
+    E = _refine(M, ecc, ome, E)
 
     # Re-wrap back into the full range
     E = jnp.where(high, 2 * jnp.pi - E, E)
@@ -80,7 +82,7 @@ def _(primals, tangents):
     return (sinf, cosf), (cosf * f_dot, -sinf * f_dot)
 
 
-def starter(M, ecc, ome):
+def _starter(M, ecc, ome):
     M2 = jnp.square(M)
     alpha = 3 * jnp.pi / (jnp.pi - 6 / jnp.pi)
     alpha += 1.6 / (jnp.pi - 6 / jnp.pi) * (jnp.pi - M) / (1 + ecc)
@@ -93,7 +95,7 @@ def starter(M, ecc, ome):
     return (2 * r * w / (jnp.square(w) + w * q + q2) + M) / d
 
 
-def refine(M, ecc, ome, E):
+def _refine(M, ecc, ome, E):
     sE = E - jnp.sin(E)
     cE = 1 - jnp.cos(E)
 
@@ -153,6 +155,26 @@ def _z(a, e, f, Omega, i, omega):
 
 @jax.jit
 def skypos(a, e, f, Omega, i, omega, **kwargs):
+    """
+    Compute the cartesian coordinates of the center of the planet in the sky frame
+    given its orbital elements.
+
+    Args:
+        a (Array [Rstar]): Semi-major axis of the orbit in units of R_star
+        e (Array [Dimensionless]): Eccentricity of the orbit
+        f (Array [Radian]): True anomaly, the angle between the direction of periapsis
+                            and the current position of the planet as seen from
+                            the star.
+        Omega (Array [Radian]): Longitude of the ascending node
+        i (Array [Radian]): Orbital inclination
+        omega (Array [Radian]): Argument of periapsis
+        **kwargs: Unused additional keyword arguments. These are included so that we
+            can can take in a larger state dictionary that includes all of the
+            required parameters along with other unnecessary ones.
+    
+    Returns:
+        Array: The cartesian coordinates of the planet in the sky frame. Shape [3, N].
+    """
     return jnp.array(
         [
             _x(a, e, f, Omega, i, omega),

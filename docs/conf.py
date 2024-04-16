@@ -31,10 +31,12 @@ extensions = [
     "sphinx.ext.viewcode",
     "nbsphinx",
     "sphinx_automodapi.automodapi",
+    "myst_parser",
 ]
 
 templates_path = ["_templates"]
 exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
+source_suffix = ['.rst', '.md']
 
 
 # -- Options for HTML output -------------------------------------------------
@@ -53,4 +55,12 @@ html_theme_options = {
     "repository_branch": "main",
     "use_repository_button": True,
     "use_download_button": True,
+}
+
+html_context = {
+   "default_mode": "light"
+}
+
+html_sidebars = {
+    "**": ["navbar-logo.html", "search-field.html", "sbt-sidebar-nav.html"]
 }

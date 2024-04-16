@@ -8,7 +8,7 @@ import jax.numpy as jnp
 # and the final value for c_y1 is off. everything is fine at f=1e-5 though, so leaving
 # for now
 @jax.jit
-def poly_to_parametric_helper(rho_xx, rho_xy, rho_x0, rho_yy, rho_y0, rho_00, **kwargs):
+def _poly_to_parametric_helper(rho_xx, rho_xy, rho_x0, rho_yy, rho_y0, rho_00, **kwargs):
     rho_00 -= 1
 
     # the center of the ellipse
@@ -48,7 +48,35 @@ def poly_to_parametric_helper(rho_xx, rho_xy, rho_x0, rho_yy, rho_y0, rho_00, **
 
 @jax.jit
 def poly_to_parametric(rho_xx, rho_xy, rho_x0, rho_yy, rho_y0, rho_00):
-    r1, r2, xc, yc, cosa, sina = poly_to_parametric_helper(
+    """
+    Convert between the coefficients that describe an implicit to those
+    defining a parametric ellipse.
+
+    The input coefficients are those of the implicit ellipse equation:
+
+    .. math::
+        \\rho_{xx} x^2 + \\rho_{xy} xy + \\rho_{x0} x + \\rho_{yy} y^2 + \\rho_{y0} y + \\rho_{00} = 1
+
+
+
+    Args:
+        rho_xx (Array [Dimensionless]): Coefficient of x^2
+        rho_xy (Array [Dimensionless]): Coefficient of xy
+        rho_x0 (Array [Dimensionless]): Coefficient of x
+        rho_yy (Array [Dimensionless]): Coefficient of y^2
+        rho_y0 (Array [Dimensionless]): Coefficient of y
+        rho_00 (Array [Dimensionless]): Constant term
+
+    Returns:
+        dict: 
+            Dictionary of coefficients for the parametric ellipse. The ellipse can now
+            be described by the following parametric equations for parameter :math:`\\alpha`:
+
+            .. math::
+                x = c_{x1} * \\cos(\\alpha) + c_{x2} * \\sin(\\alpha) + c_{x3}
+                y = c_{y1} * \\cos(\\alpha) + c_{y2} * \\sin(\\alpha) + c_{y3}
+    """
+    r1, r2, xc, yc, cosa, sina = _poly_to_parametric_helper(
         rho_xx, rho_xy, rho_x0, rho_yy, rho_y0, rho_00
     )
 
@@ -73,6 +101,27 @@ def cartesian_intersection_to_parametric_angle(
     c_y2,
     c_y3,
 ):
+    """
+    Given a set of x and y coordinates corresponding to the intersection of the planet
+    and star, compute the angle :math:`\\alpha` that corresponds to each point.
+
+    Here, :math:`\\alpha` is the parameter in the parametric equations of the ellipse.
+    See :func:`poly_to_parametric` for more details.
+
+    Args:
+        xs (Array [Rstar]): x-coordinates of the intersection points
+        ys (Array [Rstar]): y-coordinates of the intersection points
+        c_x1 (Array [Dimensionless]): Coefficient of x^2
+        c_x2 (Array [Dimensionless]): Coefficient of xy
+        c_x3 (Array [Dimensionless]): Coefficient of x
+        c_y1 (Array [Dimensionless]): Coefficient of y^2
+        c_y2 (Array [Dimensionless]): Coefficient of y
+        c_y3 (Array [Dimensionless]): Constant term
+
+    Returns:
+        Array [Rstar]: The angle :math:`\\alpha` corresponding to each intersection point
+    
+    """
     def inner(x, y):
         def loss(alpha):
             x_alpha = c_x1 * jnp.cos(alpha) + c_x2 * jnp.sin(alpha) + c_x3

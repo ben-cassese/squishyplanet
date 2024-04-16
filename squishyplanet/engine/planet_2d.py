@@ -38,7 +38,10 @@ def planet_2d_coeffs(
 
     This function transforms the coefficients that describe the planet's 3D shape into
     a new set of coefficients that describe its projected outline as seen from
-    z=infinity.
+    z=infinity. The input p coefficients satisfy the equation:
+
+    .. math::
+                p_{xx} x^2 + p_{xy} xy + p_{xz} xz + p_{x0} x + p_{yy} y^2 + p_{yz} yz + p_{y0} y + p_{zz} z^2 + p_{z0} z + p_{00} = 1
 
     Args:
         p_xx (Array): Coefficient representing xx interaction in the 3D model.
@@ -55,10 +58,15 @@ def planet_2d_coeffs(
                 flexibility in providing additional data that may be ignored during the
                 computation but included for interface consistency.
 
-Returns:
-    dict: A dictionary with keys representing different transformed coefficient
-          names ('rho_xx', 'rho_xy', 'rho_x0', 'rho_yy', 'rho_y0', 'rho_00') and
-          their corresponding values.
+    Returns:
+        dict:
+            A dictionary with keys representing different transformed coefficient
+            names ('rho_xx', 'rho_xy', 'rho_x0', 'rho_yy', 'rho_y0', 'rho_00') and
+            their corresponding values. These coefficients describe the outline of the 
+            planet as an implicit curve that satisfies the equation:
+
+            .. math::
+                \\rho_{xx} x^2 + \\rho_{xy} xy + \\rho_{x0} x + \\rho_{yy} y^2 + \\rho_{y0} y + \\rho_{00} = 1
     """
     return {
         "rho_xx": _rho_xx(

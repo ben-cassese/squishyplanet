@@ -33,7 +33,7 @@ def _t0(rho_xx, rho_xy, rho_x0, rho_yy, rho_y0, rho_00):
     return -1 + rho_00 + rho_x0 + rho_xx
 
 @jax.jit
-def single_intersection_points(rho_xx, rho_xy, rho_x0, rho_yy, rho_y0, rho_00, **kwargs):
+def _single_intersection_points(rho_xx, rho_xy, rho_x0, rho_yy, rho_y0, rho_00, **kwargs):
     t4 = _t4(rho_xx, rho_xy, rho_x0, rho_yy, rho_y0, rho_00)
     t3 = _t3(rho_xx, rho_xy, rho_x0, rho_yy, rho_y0, rho_00)
     t2 = _t2(rho_xx, rho_xy, rho_x0, rho_yy, rho_y0, rho_00)
@@ -389,7 +389,7 @@ def lightcurve(state):
         (
             xs,
             ys,
-        ) = single_intersection_points(**indv_two)
+        ) = _single_intersection_points(**indv_two)
         #jax.debug.print("transiting decision func")
         #jax.debug.print("para: {x}", x=indv_para)
         #jax.debug.print("two: {x}", x=indv_two)

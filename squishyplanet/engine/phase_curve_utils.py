@@ -3,7 +3,7 @@ import jax
 jax.config.update("jax_enable_x64", True)
 import jax.numpy as jnp
 
-from squishyplanet.engine.parametric_ellipse import poly_to_parametric_helper
+from squishyplanet.engine.parametric_ellipse import _poly_to_parametric_helper
 from squishyplanet.engine.planet_2d import planet_2d_coeffs
 
 ########################################################################################
@@ -13,6 +13,24 @@ from squishyplanet.engine.planet_2d import planet_2d_coeffs
 
 @jax.jit
 def generate_sample_radii_thetas(key, num_points):
+    """
+    Create a random set of radii and thetas for sampling the planet's surface.
+
+    These are uniformly distributed through a unit circle and will be scaled and rotated
+    to match the planet's shape and orientation at each timestep. However, they will
+    be re-used at every time step, which could introduce a bias but makes things much
+    faster. Be sure you use sufficient samples to keep the bias small, then try multiple
+    random keys to quantify it.
+
+    Args:
+        key (Array): A jax.random.PRNGKey for generating random numbers.
+        num_points (int): The number of points to generate.
+
+    Returns:
+        Tuple:
+            A tuple of two arrays, the first containing the radii and the second
+            containing the thetas.
+    """
     key, subkey = jax.random.split(key)
     sample_radii = jnp.sqrt(
         jax.random.uniform(subkey, (num_points.shape[0],), minval=0, maxval=1)
@@ -25,7 +43,7 @@ def generate_sample_radii_thetas(key, num_points):
 
 
 @jax.jit
-def xy_on_surface(
+def _xy_on_surface(
     sample_radii,
     sample_thetas,
     rho_xx,
@@ -37,7 +55,7 @@ def xy_on_surface(
     **kwargs,
 ):
     # n = n.shape[0]
-    r1, r2, xc, yc, cosa, sina = poly_to_parametric_helper(
+    r1, r2, xc, yc, cosa, sina = _poly_to_parametric_helper(
         rho_xx, rho_xy, rho_x0, rho_yy, rho_y0, rho_00
     )
 
@@ -54,7 +72,7 @@ def xy_on_surface(
 
 
 @jax.jit
-def z_on_surface(
+def _z_on_surface(
     x, y, p_xx, p_xy, p_xz, p_x0, p_yy, p_yz, p_y0, p_zz, p_z0, p_00, **kwargs
 ):
     z = (
@@ -106,7 +124,37 @@ def sample_surface(
     p_00,
     **kwargs,
 ):
-    x, y = xy_on_surface(
+    """
+    Convert randomly sampled :math:`(x, y)` points on the projected planet to
+    :math:`(x, y, z)` points on the planet's surface.
+
+    Args:
+        sample_radii (Array): The radii of the sampled points.
+        sample_thetas (Array): The angles of the sampled points.
+        rho_xx (Array): xx coefficient in the 2D implicit representation.
+        rho_xy (Array): xy coefficient in the 2D implicit representation.
+        rho_x0 (Array): x0 coefficient in the 2D implicit representation.
+        rho_yy (Array): yy coefficient in the 2D implicit representation.
+        rho_y0 (Array): y0 coefficient in the 2D implicit representation.
+        rho_00 (Array): 00 coefficient in the 2D implicit representation.
+        p_xx (Array): xx coefficient in the 3D implicit representation.
+        p_xy (Array): xy coefficient in the 3D implicit representation.
+        p_xz (Array): xz coefficient in the 3D implicit representation.
+        p_x0 (Array): x0 coefficient in the 3D implicit representation.
+        p_yy (Array): yy coefficient in the 3D implicit representation.
+        p_yz (Array): yz coefficient in the 3D implicit representation.
+        p_y0 (Array): y0 coefficient in the 3D implicit representation.
+        p_zz (Array): zz coefficient in the 3D implicit representation.
+        p_z0 (Array): z0 coefficient in the 3D implicit representation.
+        p_00 (Array): 00 coefficient in the 3D implicit representation.
+
+    Returns:
+        Tuple:
+            A tuple of three arrays, the first containing the x values, the second
+            containing the y values, and the third containing the z values.
+    
+    """
+    x, y = _xy_on_surface(
         sample_radii,
         sample_thetas,
         rho_xx,
@@ -116,7 +164,7 @@ def sample_surface(
         rho_y0,
         rho_00,
     )
-    z = z_on_surface(
+    z = _z_on_surface(
         x,
         y,
         p_xx,
@@ -149,6 +197,30 @@ def planet_surface_normal(
     p_z0,
     p_00,
 ):
+    """
+    Compute the unit normal vector to the planet's surface at a given point.
+
+    The input :math:`(x, y, z)` points are assumed to lie on the planet's surface.
+
+    Args:
+        x (Array): The x values of the points.
+        y (Array): The y values of the points.
+        z (Array): The z values of the points.
+        p_xx (Array): xx coefficient in the 3D implicit representation.
+        p_xy (Array): xy coefficient in the 3D implicit representation.
+        p_xz (Array): xz coefficient in the 3D implicit representation.
+        p_x0 (Array): x0 coefficient in the 3D implicit representation.
+        p_yy (Array): yy coefficient in the 3D implicit representation.
+        p_yz (Array): yz coefficient in the 3D implicit representation.
+        p_y0 (Array): y0 coefficient in the 3D implicit representation.
+        p_zz (Array): zz coefficient in the 3D implicit representation.
+        p_z0 (Array): z0 coefficient in the 3D implicit representation.
+        p_00 (Array): 00 coefficient in the 3D implicit representation.
+
+    Returns:
+        Array:
+            An array of shape (3, n) containing the unit normal vectors at each point.
+    """
     grad_planet = -jnp.array(
         [
             p_x0 + 2 * p_xx * x + p_xy * y + p_xz * z,
@@ -161,7 +233,7 @@ def planet_surface_normal(
 
 
 @jax.jit
-def surface_star_cos_angle(
+def _surface_star_cos_angle(
     planet_surface_normal,
     x_c,
     y_c,
@@ -181,7 +253,7 @@ def surface_star_cos_angle(
 
 
 @jax.jit
-def surface_observer_cos_angle(planet_surface_normal):
+def _surface_observer_cos_angle(planet_surface_normal):
     # observer = jnp.array([0, 0, 1])
     return planet_surface_normal[2]
 
@@ -311,6 +383,42 @@ def planet_from_star(
     z_c,
     **kwargs,
 ):
+    """
+    Compute the coefficients of the planet's 3D shape from the star's perspective,
+    as if it were aligned the the :math:`z` axis.
+
+    When computing the reflected flux from the planet, we need to know how much flux
+    initial reaches it from the star. To do that, we need to know the planet's projected
+    area as seen from the star, which importantly, could be different than the projected
+    area as seen from the observer. To compute this area, we first use this function to
+    get a 3D representation of the planet as seen from the star, then will use those
+    coefficients to compute an implicit 2D representation, then will use those to get
+    the area.
+
+    The x_c, y_c, and z_c inputs are all technically encoded in the p inputs as well,
+    but it was easier just to carry them around explicitly.
+
+    Args:
+        p_xx (Array): xx coefficient in the 3D implicit representation.
+        p_xy (Array): xy coefficient in the 3D implicit representation.
+        p_xz (Array): xz coefficient in the 3D implicit representation.
+        p_x0 (Array): x0 coefficient in the 3D implicit representation.
+        p_yy (Array): yy coefficient in the 3D implicit representation.
+        p_yz (Array): yz coefficient in the 3D implicit representation.
+        p_y0 (Array): y0 coefficient in the 3D implicit representation.
+        p_zz (Array): zz coefficient in the 3D implicit representation.
+        p_z0 (Array): z0 coefficient in the 3D implicit representation.
+        p_00 (Array): 00 coefficient in the 3D implicit representation.
+        x_c (Array): The x coordinate of the center of the planet.
+        y_c (Array): The y coordinate of the center of the planet.
+        z_c (Array): The z coordinate of the center of the planet.
+
+    Returns:
+        dict:
+            A dictionary containing the coefficients of the planet's shape as seen from
+            the star. Will look identical to the output of :func:`planet_3d.planet_3d_coeffs`.
+    
+    """
     return {
         "p_xx": _pxx(
             p_xx,
@@ -467,11 +575,11 @@ def planet_from_star(
 
 
 @jax.jit
-def lambertian_reflection(surface_star_cos_angle, x, y, z):
+def lambertian_reflection(_surface_star_cos_angle, x, y, z):
     # return jnp.maximum(0, surface_star_angle)
     return (
-        surface_star_cos_angle
-        * (surface_star_cos_angle > 0)
+        _surface_star_cos_angle
+        * (_surface_star_cos_angle > 0)
         * ~((x**2 + y**2 < 1) & (z < 0))
     )
 
@@ -508,7 +616,7 @@ def reflected_normalization(
     rotated_planet_2d_coeffs = planet_2d_coeffs(**rotated_planet_3d_coeffs)
 
     # return rotated_planet_2d_coeffs
-    r1, r2, _, _, _, _ = poly_to_parametric_helper(**rotated_planet_2d_coeffs)
+    r1, r2, _, _, _, _ = _poly_to_parametric_helper(**rotated_planet_2d_coeffs)
     area_seen_by_star = jnp.pi * r1 * r2
 
     return flux_density * area_seen_by_star
@@ -594,7 +702,7 @@ def reflected_phase_curve(
             p_z0,
             p_00,
         )
-        surface_star_angle = surface_star_cos_angle(n, x_c, y_c, z_c)
+        surface_star_angle = _surface_star_cos_angle(n, x_c, y_c, z_c)
         lamb = lambertian_reflection(surface_star_angle, x, y, z)
 
         return None, jnp.sum(lamb) / sample_radii.shape[0]
@@ -736,7 +844,7 @@ def _z_0(a, e, f, Omega, i, omega, r, obliq, prec):
 
 
 @jax.jit
-def pre_squish_transform(a, e, f, Omega, i, omega, r, obliq, prec, **kwargs):
+def _pre_squish_transform(a, e, f, Omega, i, omega, r, obliq, prec, **kwargs):
     mat = jnp.ones((f.shape[0], 3, 4))
     mat = mat.at[:, 0, 0].set(_x_x(a, e, f, Omega, i, omega, r, obliq, prec))
     mat = mat.at[:, 0, 1].set(_x_y(a, e, f, Omega, i, omega, r, obliq, prec))
@@ -882,7 +990,7 @@ def emission_phase_curve(
 
         return None, jnp.sum(emission_samples) / emission_samples.shape[0]
 
-    transform_matricies = pre_squish_transform(**state)
+    transform_matricies = _pre_squish_transform(**state)
 
     flux = jax.lax.scan(
         scan_func,
@@ -995,7 +1103,7 @@ def phase_curve(
             p_z0,
             p_00,
         )
-        surface_star_angle = surface_star_cos_angle(n, x_c, y_c, z_c)
+        surface_star_angle = _surface_star_cos_angle(n, x_c, y_c, z_c)
         lamb = lambertian_reflection(surface_star_angle, x, y, z)
 
         # emission stuff
@@ -1014,7 +1122,7 @@ def phase_curve(
 
         return None, (jnp.sum(lamb) / sample_radii.shape[0], jnp.sum(emission_samples) / emission_samples.shape[0])
 
-    transform_matricies = pre_squish_transform(**state)
+    transform_matricies = _pre_squish_transform(**state)
     
     fluxes = jax.lax.scan(
         scan_func,

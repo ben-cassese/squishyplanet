@@ -14,11 +14,11 @@ from sympy import binomial, symbols, zeros
 # Define our symbols
 z, n = symbols('z n')
 
-def ptilde(n, z):
+def _ptilde(n, z):
     """Return the n^th term in the polynomial basis."""
     return z ** n
 
-def Coefficient(expression, term):
+def _Coefficient(expression, term):
     """Return the coefficient multiplying `term` in `expression`."""
     # Get the coefficient
     coeff = expression.coeff(term)
@@ -27,7 +27,7 @@ def Coefficient(expression, term):
     coeff = coeff.subs(z, 0)
     return coeff
 
-def A1(N):
+def _A1(N):
     """Return the change of basis matrix A1."""
     res = zeros(N + 1, N + 1)
     for i in range(N + 1):
@@ -35,7 +35,7 @@ def A1(N):
             res[i, j] = (-1) ** (i + 1) * binomial(j, i)
     return res
 
-def gtilde(n, z):
+def _gtilde(n, z):
     """Return the n^th term in the Green's basis."""
     if n == 0:
         return 1 + 0 * z
@@ -44,28 +44,46 @@ def gtilde(n, z):
     else:
         return (n + 2) * z ** n - n * z ** (n - 2)
 
-def p_G(n, N):
+def _p_G(n, N):
     """Return the polynomial basis representation of the Green's polynomial `g`."""
-    g = gtilde(n, z)
+    g = _gtilde(n, z)
     res = [g.subs(z, 0)]
     for n in range(1, N + 1):
-        res.append(Coefficient(g, ptilde(n, z)))
+        res.append(_Coefficient(g, _ptilde(n, z)))
     return res
 
 
-def A2(N):
+def _A2(N):
     """Return the change of basis matrix A2. The columns of the **inverse** of this matrix are given by `p_G`."""
     res = zeros(N + 1, N + 1)
     for n in range(N + 1):
-        res[n] = p_G(n, N)
+        res[n] = _p_G(n, N)
     return res.inv()
 
-def A(N):
+def _A(N):
     """Return the full change of basis matrix."""
-    return A2(N) * A1(N)
+    return _A2(N) * _A1(N)
 
 def generate_change_of_basis_matrix(N):
-    m = A(N)
+    """
+    Generate the change of basis matrix to convert limb darking u coefficients to
+    Green's basis coefficients.
+
+    This function is only run once per system, though the resulting matrix is used
+    repeatedly in the light curve calculation. It implements Eq. 17 of Agol, Luger, and
+    Foreman-Mackey 2020 (`doi:10.3847/1538-3881/ab4fee <https://ui.adsabs.harvard.edu/abs/2020AJ....159..123A/abstract>`_).
+
+    Args:
+        N (int): The order of the polynomial limb darkening law.
+
+    Returns:
+        Array:
+            The change of basis matrix. When solving for the blocked flux, this will
+            be multiplied by the u limb darkening coefficients to convert them to the
+            Green's basis.
+
+    """
+    m = _A(N)
     return jnp.array(m, dtype=jnp.float64)
 
 
