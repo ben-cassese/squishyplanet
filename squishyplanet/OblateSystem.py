@@ -10,8 +10,7 @@ from squishyplanet.engine.greens_basis_transform import generate_change_of_basis
 from squishyplanet.engine.kepler import kepler, skypos
 from squishyplanet.engine.polynomial_limb_darkened_transit import lightcurve
 from squishyplanet.engine.phase_curve_utils import (
-    _pre_squish_transform,
-    _surface_star_cos_angle,
+    pre_squish_transform,
     generate_sample_radii_thetas,
     sample_surface,
     planet_surface_normal,

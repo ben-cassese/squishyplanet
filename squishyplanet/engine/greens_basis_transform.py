@@ -70,8 +70,8 @@ def generate_change_of_basis_matrix(N):
     Green's basis coefficients.
 
     This function is only run once per system, though the resulting matrix is used
-    repeatedly in the light curve calculation. It implements Eq. 17 of Agol, Luger, and
-    Foreman-Mackey 2020 (`doi:10.3847/1538-3881/ab4fee <https://ui.adsabs.harvard.edu/abs/2020AJ....159..123A/abstract>`_).
+    repeatedly in the light curve calculation. It implements Eq. 17 of `Agol, Luger, and
+    Foreman-Mackey 2020 <https://ui.adsabs.harvard.edu/abs/2020AJ....159..123A/abstract>`_.
 
     Args:
         N (int): The order of the polynomial limb darkening law.

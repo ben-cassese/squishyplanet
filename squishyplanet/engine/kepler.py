@@ -12,7 +12,7 @@ from jax.interpreters import ad
 def kepler(M, ecc):
     """Solve Kepler's equation to compute the true anomaly.
 
-    This implementation is based on that within jaxoplanet, many thanks to the authors.
+    This implementation is based on that within `jaxoplanet <https://github.com/exoplanet-dev/jaxoplanet/>`_, many thanks to the authors.
 
     Args:
         M (Array [Radian]): Mean anomaly

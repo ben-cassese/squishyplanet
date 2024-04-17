@@ -68,6 +68,67 @@ def _single_intersection_points(rho_xx, rho_xy, rho_x0, rho_yy, rho_y0, rho_00, 
 
 @jax.jit
 def planet_solution_vec(a, b, g_coeffs, c_x1, c_x2, c_x3, c_y1, c_y2, c_y3):
+    """
+    Compute the "solution vector" for a 1D path across the star that lies on the outline
+    of the planet.
+
+    This computes Eq. 21 of `Agol, Luger, and Foreman-Mackey 2020 <https://ui.adsabs.harvard.edu/abs/2020AJ....159..123A/abstract>`_.
+    But, instead of doing it analytically, this uses the ``quadax`` package to 
+    numerically solve the required integrals. For terms s_2 and higher, this is
+    straightforward to do based on the equations in the paper: we simply parameterize
+    the outline of the planet by some angle :math:`\\alpha`, then numerically integrate the dot
+    product of Eq. 62 with that parameterization between the two endpoints of the path.
+    For the first two lower-order terms however, Agol et al. do not provide an
+    equivalent of Eq. 62 and instead provide only the analytic solutions. We therefore
+    use the following as the equivalents for Eq. 62 for these terms:
+
+    .. math::
+
+        G_0 = \\{0, x\\}
+
+    .. math::
+
+        G_1 = \\left\\{0, \\frac{1}{2} \left(x \sqrt{-x^2-y^2+1}-\left(y^2-1\\right) \\tan ^{-1}\left(\\frac{x}{\sqrt{-x^2-y^2+1}}\\right)\\right)+\\frac{\pi }{12} \\right\\}
+
+    These expressions were derived by solving the required PDE in Eq. 14 with the
+    boundary conditions from Eq. 27. Finally, the C coefficients here describe the
+    parametric form of the planet's outline as seen by the observer, and they satisfy:
+
+    .. math::
+
+        x = c_{x1} \cos(\\alpha) + c_{x2} \sin(\\alpha) + c_{x3}
+
+        y = c_{y1} \cos(\\alpha) + c_{y2} \sin(\\alpha) + c_{y3}
+
+    for some angle :math:`\\alpha \\in [0, 2\pi)`.
+
+    Args:
+        a (float):
+            The starting parameter for the path along the planet's outline, :math:`\\alpha_0`.
+        b (float):
+            The ending parameter for the path along the planet's outline, :math:`\\alpha_1`.
+        g_coeffs (Array):
+            The system-specific limb darkening coefficients in the Green's basis.
+            Computed by multiplying the u coefficients with the change of basis matrix
+            from :func:`greens_basis_transform.generate_change_of_basis_matrix`.
+        c_x1 (float):
+            The first coefficient of the parametric 2D outline of the planet.
+        c_x2 (float):
+            The second coefficient of the parametric 2D outline of the planet.
+        c_x3 (float):
+            The third coefficient of the parametric 2D outline of the planet.
+        c_y1 (float):
+            The fourth coefficient of the parametric 2D outline of the planet.
+        c_y2 (float):
+            The fifth coefficient of the parametric 2D outline of the planet.
+        c_y3 (float):
+            The sixth coefficient of the parametric 2D outline of the planet.
+    
+    Returns:
+        Array:
+            The solution vector for the path along the planet's outline. The shape will
+            match that of the input ``g_coeffs``.
+    """
 
     def s0_integrand(s):
         return (jnp.cos(s) * c_x1 + jnp.sin(s) * c_x2 + c_x3) * (
@@ -142,6 +203,53 @@ def planet_solution_vec(a, b, g_coeffs, c_x1, c_x2, c_x3, c_y1, c_y2, c_y3):
 
 @jax.jit
 def star_solution_vec(a, b, g_coeffs, c_x1, c_x2, c_x3, c_y1, c_y2, c_y3):
+    """
+    Compute the "solution vector" for a 1D path across the star that lies on the edge
+    of the star itself.
+
+    This is equivalent to :func:`planet_solution_vec`, but instead of integrating over
+    paths that lie on the planet's outline, we integrate over paths that lie on the edge
+    of the star. As pointed out in the paragraph following Eq. 69 in `Agol, Luger, and
+    Foreman-Mackey 2020 <https://ui.adsabs.harvard.edu/abs/2020AJ....159..123A/abstract>`_,
+    the contribution of all terms higher than :math:`G_1` will be zero in this case
+    since we have limited ourselves to :math:`z=0` by remaining on the star's boundary.
+    This simplifies things somewhat, though we do still have to numerically integrate
+    the dot product of the parametric form of the star's outline with the :math:`G_0`
+    and :math:`G_1` terms written out in :func:`planet_solution_vec`. Technically we
+    probably could use the analytic solutions for these terms, but so far we have not.
+
+    Args:
+        a (float):
+            The starting parameter for the path along the star's outline,
+            :math:`\\alpha_0`. Note: here :math:`\\alpha` is the angle parameterizing
+            the path on the *planet's* outline, not the star's, even though the path
+            we will integrate over is on the star. We convert to the relevant parameters
+            internally.
+        b (float):
+            The ending parameter for the path along the star's outline, :math:`\\alpha_1`.
+        g_coeffs (Array):
+            The system-specific limb darkening coefficients in the Green's basis.
+            Computed by multiplying the u coefficients with the change of basis matrix
+            from :func:`greens_basis_transform.generate_change_of_basis_matrix`.
+        c_x1 (float):
+            The first coefficient of the parametric 2D outline of the planet.
+        c_x2 (float):
+            The second coefficient of the parametric 2D outline of the planet.
+        c_x3 (float):
+            The third coefficient of the parametric 2D outline of the planet.
+        c_y1 (float):
+            The fourth coefficient of the parametric 2D outline of the planet.
+        c_y2 (float):
+            The fifth coefficient of the parametric 2D outline of the planet.
+        c_y3 (float):
+            The sixth coefficient of the parametric 2D outline of the planet.
+    
+    Returns:
+        Array:
+            The solution vector for the path along the planet's outline. The shape will
+            match that of the input ``g_coeffs``.
+    
+    """
     x1 = c_x1 * jnp.cos(a) + c_x2 * jnp.sin(a) + c_x3
     y1 = c_y1 * jnp.cos(a) + c_y2 * jnp.sin(a) + c_y3
     _theta1 = jnp.arctan2(y1, x1)
@@ -219,6 +327,35 @@ def star_solution_vec(a, b, g_coeffs, c_x1, c_x2, c_x3, c_y1, c_y2, c_y3):
 
 @jax.jit
 def lightcurve(state):
+    """
+    The main function for computing a transit light curve.
+
+    This function will return a 1-D array representing the flux recieved from the star,
+    where each entry corresponds to a time in the input `state` dictionary. It first
+    transforms the `state` into the implicit 3D surface of the planet, the implicit 2D
+    sky-projected outline of the planet, and a parametric form of that outline for each
+    time step. These are vectorized operations that are computed simulataneously across
+    all times. It then solves for the intersection points of the planet and star, and
+    if the planet is either partially or fully transiting, numerically solves the
+    required 1D integrals that leverage Green's Theorem to compute the blocked flux. The
+    flux-blocking calculations are done sequentially for each timestep using ``jax.lax.scan``,
+    which seemed to be more efficient than vectorizing again while switching between
+    braches with something like ``jax.lax.cond``. Keep these different behaviors in mind
+    when computing dense lightcurves with ~100s of thousands of time steps: the first
+    part will require enough memory to compute and store ~30 values for each step, but
+    then the actual 1D integrals will be computed sequentially.
+
+    Args:
+        state (dict):
+            A dictionary containing all of the keys that are included in an
+            :func:`OblateSystem` ``state`` attribute.
+    
+    Returns:
+        Array:
+            The flux received from the star at each time step for the times included as
+            ``state["times"]``.
+    
+    """
 
     # array we'll modify if the planet is in transit
     fluxes = jnp.ones_like(state["times"])

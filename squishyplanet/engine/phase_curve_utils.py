@@ -233,19 +233,41 @@ def planet_surface_normal(
 
 
 @jax.jit
-def _surface_star_cos_angle(
+def surface_star_cos_angle(
     planet_surface_normal,
     x_c,
     y_c,
     z_c,
     **kwargs,
 ):
+    """
+    A helper function to compute the cosine of the angle between the planet's surface
+    normal vector and the vector linking the center of the planet to the star.
 
-    # this is an approximation that the star is a) a point source and b) that
-    # all light coming from the star is parallel. Neither of these are true. The former
-    # can be handled the same way starry does it, but distributing point sources across
-    # the surface of the star. I haven't seen anyone address the latter, although it
-    # might be relevant for ultra-hot planets
+    This is an approximation that the star is a) a point source and b) that
+    all light coming from the star is parallel. Neither of these are strictly true. The
+    former could be handled the same way starry does it, by distributing point sources
+    across the surface of the star and averaging. I don't know of any attempts to
+    address the latter, though in principle it wouldn't be hard to do here since we're
+    already doing so much numerically.
+
+    Args:
+        planet_surface_normal (Array): The unit normal vectors to the planet's surface.
+        x_c (Array): The x coordinate of the center of the planet.
+        y_c (Array): The y coordinate of the center of the planet.
+        z_c (Array): The z coordinate of the center of the planet.
+        **kwargs:
+            Additional unused keyword arguments, included so that we can pass in
+            a larger state dictionary that includes all of the required parameters along
+            with other unnecessary ones.
+
+    Returns:
+        Array:
+            The cosine of the angle between the planet's surface normal and the vector
+            pointing from the planet's center to the star.
+    """
+
+
     star = jnp.array([x_c, y_c, z_c])
     star_norm = jnp.linalg.norm(star, axis=0)
 
@@ -575,11 +597,37 @@ def planet_from_star(
 
 
 @jax.jit
-def lambertian_reflection(_surface_star_cos_angle, x, y, z):
+def lambertian_reflection(surface_star_cos_angle, x, y, z):
+    """
+    Compute the reflected intensity at a specific point on the planet's surface assuming
+    a simple Lambertian reflection model.
+
+    This is a simple model that assumes the planet reflects light according to Lambert's
+    cosine law, which states that the intensity of reflected light is proportional to
+    the cosine of the angle between the surface normal and the illumination direction.
+    That arrangement means it does *not* depend on the observer's viewing angle, only
+    the illumination angle. This helper function also assumes a uniform albedo of 1 
+    across the planet's surface (the final reflected flux will be scaled by the provided
+    albedo, though is still always assumed to be uniform).
+
+    This function will also mask out any points on the planet's surface that are on the
+    wrong side of the terminator or blocked by the star during secondary eclipse.
+
+    Args:
+        surface_star_cos_angle (Array): The cosine of the angle between the planet's
+            surface normal and the vector pointing from the planet's center to the star.
+        x (Array): The x values of the points on the planet's surface.
+        y (Array): The y values of the points on the planet's surface.
+        z (Array): The z values of the points on the planet's surface.
+
+    Returns:
+        Array: The intensity of the reflected light at each point.
+
+    """
     # return jnp.maximum(0, surface_star_angle)
     return (
-        _surface_star_cos_angle
-        * (_surface_star_cos_angle > 0)
+        surface_star_cos_angle
+        * (surface_star_cos_angle > 0)
         * ~((x**2 + y**2 < 1) & (z < 0))
     )
 
@@ -593,6 +641,40 @@ def reflected_normalization(
     z_c,
     **kwargs,
 ):
+    """
+    Compute the time-dependent normalization factor for the reflected light.
+
+    The reflected light computations are almost entirely carried out assuming the star
+    is a point source 1 R_star from the center of the planet emitting plane-parallel
+    rays. To convert these to actual reflected flux, we need to a) correct for the
+    distance between the planet and the star and b) account for how much area the planet
+    actually subtends as seen from the star. a) is easy and common across all
+    implementations, it's just the inverse square law. b) is more complicated for oblate
+    planets than spherical planets however, since even on circular orbits, the subtended
+    area (and consequently area that is recieves flux and and is able to reflect it) can
+    change as a function of orbital phase. Note however that it will not vary with phase
+    if the planet is tidally locked and always shows the same face to the star.
+
+    Args:
+        two (dict):
+            A dictionary containing the rho coefficients of the planet's
+            implicit 2D representation, as seen from the observer and calculated with
+            :func:`planet_2d.planet_2d_coeffs`.
+        three (dict):
+            A dictionary containing the p coefficients of the planet's 3D shape, as seen
+            from the observer and calculated with :func:`planet_3d.planet_3d_coeffs`.
+        x_c (Array): The x coordinate of the center of the planet.
+        y_c (Array): The y coordinate of the center of the planet.
+        z_c (Array): The z coordinate of the center of the planet.
+        **kwargs:
+            Additional unused keyword arguments, included so that we can pass in
+            a larger state dictionary that includes all of the required parameters along
+            with other unnecessary ones.
+
+    Returns:
+        Array: The normalization factor for the reflected light.
+    
+    """
     sep_squared = x_c**2 + y_c**2 + z_c**2
     # flux_density = 1 / (4 * jnp.pi * sep_squared)
     # following the starry normalization:
@@ -702,7 +784,7 @@ def reflected_phase_curve(
             p_z0,
             p_00,
         )
-        surface_star_angle = _surface_star_cos_angle(n, x_c, y_c, z_c)
+        surface_star_angle = surface_star_cos_angle(n, x_c, y_c, z_c)
         lamb = lambertian_reflection(surface_star_angle, x, y, z)
 
         return None, jnp.sum(lamb) / sample_radii.shape[0]
@@ -844,7 +926,7 @@ def _z_0(a, e, f, Omega, i, omega, r, obliq, prec):
 
 
 @jax.jit
-def _pre_squish_transform(a, e, f, Omega, i, omega, r, obliq, prec, **kwargs):
+def pre_squish_transform(a, e, f, Omega, i, omega, r, obliq, prec, **kwargs):
     mat = jnp.ones((f.shape[0], 3, 4))
     mat = mat.at[:, 0, 0].set(_x_x(a, e, f, Omega, i, omega, r, obliq, prec))
     mat = mat.at[:, 0, 1].set(_x_y(a, e, f, Omega, i, omega, r, obliq, prec))
@@ -990,7 +1072,7 @@ def emission_phase_curve(
 
         return None, jnp.sum(emission_samples) / emission_samples.shape[0]
 
-    transform_matricies = _pre_squish_transform(**state)
+    transform_matricies = pre_squish_transform(**state)
 
     flux = jax.lax.scan(
         scan_func,
@@ -1103,7 +1185,7 @@ def phase_curve(
             p_z0,
             p_00,
         )
-        surface_star_angle = _surface_star_cos_angle(n, x_c, y_c, z_c)
+        surface_star_angle = surface_star_cos_angle(n, x_c, y_c, z_c)
         lamb = lambertian_reflection(surface_star_angle, x, y, z)
 
         # emission stuff
@@ -1122,7 +1204,7 @@ def phase_curve(
 
         return None, (jnp.sum(lamb) / sample_radii.shape[0], jnp.sum(emission_samples) / emission_samples.shape[0])
 
-    transform_matricies = _pre_squish_transform(**state)
+    transform_matricies = pre_squish_transform(**state)
     
     fluxes = jax.lax.scan(
         scan_func,
