@@ -24,6 +24,9 @@ jobs:
     - name: Install dependencies
       run: |
        python -m pip install tox tox-gh-actions
+       cd tests
+       python -m pip install -r requirements.txt
+       cd ..
 
     - name: Test with tox
       run: tox
@@ -49,6 +52,9 @@ jobs:
           python -m pip install pytest
           python -m pip install coverage
           python -m pip install .
+          cd tests
+          python -m pip install -r requirements.txt
+          cd ..
   
       - name: Test with pytest
         run: |

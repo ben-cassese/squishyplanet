@@ -1,3 +1,9 @@
+jax
+quadax
+tqdm
+black
+astropy>5
+matplotlib
 sphinx_rtd_theme
 nbsphinx
 sphinx_automodapi
