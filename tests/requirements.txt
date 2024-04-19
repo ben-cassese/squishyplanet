@@ -1,1 +1,3 @@
 jaxoplanet
+pytest
+coverage

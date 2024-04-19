@@ -71,6 +71,7 @@ def light_curve_compare(key, poly_limbdark_order, return_lc=False):
 
     state = {
         "t_peri": planet.time_peri.to(ureg.day).magnitude,
+        "times": TIMES.to(ureg.day).magnitude,
         "period": planet.period.to(ureg.day).magnitude,
         "a": planet.semimajor.to(ureg.R_sun).magnitude,
         "e": planet.eccentricity.to(ureg.dimensionless).magnitude,
@@ -85,10 +86,10 @@ def light_curve_compare(key, poly_limbdark_order, return_lc=False):
         "ld_u_coeffs": jnp.array(u),
     }
 
-    s = OblateSystem(state)
+    s = OblateSystem(**state)
     state = s._state
 
-    test_lc = lightcurve(s._state, t.to(ureg.day).magnitude)
+    test_lc = lightcurve(s._state)
 
     if not return_lc:
         m = (jaxoplanet_lc != 0) | (test_lc != 0)
