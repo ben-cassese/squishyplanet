@@ -33,3 +33,6 @@ sphinx:
 python:
   install:
     - requirements: docs/requirements.txt
+    - requirements: tests/requirements.txt
+    - method: pip
+      path: . # install squishyplanet
