@@ -1,3 +1,5 @@
 jaxoplanet>0.0.1
+scipy
+tqdm
 pytest
 coverage

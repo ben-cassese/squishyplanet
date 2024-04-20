@@ -3,21 +3,20 @@ import jax
 jax.config.update("jax_enable_x64", True)
 import jax.numpy as jnp
 
+
 # running into some numerical issues for very narrow ellipses-
 # e.g., the terminator for a spherical planet at f=1e-6. the rhos are ~1e14 there,
 # and the final value for c_y1 is off. everything is fine at f=1e-5 though, so leaving
 # for now
 @jax.jit
-def _poly_to_parametric_helper(rho_xx, rho_xy, rho_x0, rho_yy, rho_y0, rho_00, **kwargs):
+def _poly_to_parametric_helper(
+    rho_xx, rho_xy, rho_x0, rho_yy, rho_y0, rho_00, **kwargs
+):
     rho_00 -= 1
 
     # the center of the ellipse
-    xc = (rho_xy * rho_y0 - 2 * rho_yy * rho_x0) / (
-        4 * rho_xx * rho_yy - rho_xy**2
-    )
-    yc = (rho_xy * rho_x0 - 2 * rho_xx * rho_y0) / (
-        4 * rho_xx * rho_yy - rho_xy**2
-    )
+    xc = (rho_xy * rho_y0 - 2 * rho_yy * rho_x0) / (4 * rho_xx * rho_yy - rho_xy**2)
+    yc = (rho_xy * rho_x0 - 2 * rho_xx * rho_y0) / (4 * rho_xx * rho_yy - rho_xy**2)
 
     # the rotation angle
     if rho_xx.shape == ():
@@ -46,6 +45,7 @@ def _poly_to_parametric_helper(rho_xx, rho_xy, rho_x0, rho_yy, rho_y0, rho_00, *
     r2 = 1 / jnp.sqrt(lambda_2 / k)
     return r1, r2, xc, yc, cosa, sina
 
+
 @jax.jit
 def poly_to_parametric(rho_xx, rho_xy, rho_x0, rho_yy, rho_y0, rho_00):
     """
@@ -68,7 +68,7 @@ def poly_to_parametric(rho_xx, rho_xy, rho_x0, rho_yy, rho_y0, rho_00):
         rho_00 (Array [Dimensionless]): Constant term
 
     Returns:
-        dict: 
+        dict:
             Dictionary of coefficients for the parametric ellipse. The ellipse can now
             be described by the following parametric equations for parameter :math:`\\alpha`:
 
@@ -120,8 +120,9 @@ def cartesian_intersection_to_parametric_angle(
 
     Returns:
         Array [Rstar]: The angle :math:`\\alpha` corresponding to each intersection point
-    
+
     """
+
     def inner(x, y):
         def loss(alpha):
             x_alpha = c_x1 * jnp.cos(alpha) + c_x2 * jnp.sin(alpha) + c_x3
@@ -143,18 +144,18 @@ def cartesian_intersection_to_parametric_angle(
             # following that is wrong
             l = loss(alpha)
             g = grad_loss(alpha)
+
             def not_converged(alpha):
                 return alpha - l / g, None
+
             def converged(alpha):
                 return alpha, None
-            return jax.lax.cond(
-                jnp.abs(g) > 1e-16, not_converged, converged, alpha
-            )
 
+            return jax.lax.cond(jnp.abs(g) > 1e-16, not_converged, converged, alpha)
 
         # if it starts on the actual value, will get nans
         # previously had it start at 0, but in idealized cases used for testing it really is 0
-        return jax.lax.scan(scan_func, 0.123, None, length=50)[0] 
+        return jax.lax.scan(scan_func, 0.123, None, length=50)[0]
 
     alphas = jax.vmap(inner)(xs, ys)
     alphas = jnp.mod(alphas, 2 * jnp.pi)

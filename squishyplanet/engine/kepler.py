@@ -106,9 +106,7 @@ def _refine(M, ecc, ome, E):
     d_3 = -f_0 / (f_1 - 0.5 * f_0 * f_2 / f_1)
     d_4 = -f_0 / (f_1 + 0.5 * d_3 * f_2 + (d_3 * d_3) * f_3 / 6)
     d_42 = d_4 * d_4
-    dE = -f_0 / (
-        f_1 + 0.5 * d_4 * f_2 + d_4 * d_4 * f_3 / 6 - d_42 * d_4 * f_2 / 24
-    )
+    dE = -f_0 / (f_1 + 0.5 * d_4 * f_2 + d_4 * d_4 * f_3 / 6 - d_42 * d_4 * f_2 / 24)
 
     return E + dE
 
@@ -147,10 +145,7 @@ def _y(a, e, f, Omega, i, omega):
 
 
 def _z(a, e, f, Omega, i, omega):
-    return -(
-        (a * (-1 + e**2) * jnp.sin(i) * jnp.sin(f + omega))
-        / (1 + e * jnp.cos(f))
-    )
+    return -((a * (-1 + e**2) * jnp.sin(i) * jnp.sin(f + omega)) / (1 + e * jnp.cos(f)))
 
 
 @jax.jit
@@ -171,7 +166,7 @@ def skypos(a, e, f, Omega, i, omega, **kwargs):
         **kwargs: Unused additional keyword arguments. These are included so that we
             can can take in a larger state dictionary that includes all of the
             required parameters along with other unnecessary ones.
-    
+
     Returns:
         Array: The cartesian coordinates of the planet in the sky frame. Shape [3, N].
     """

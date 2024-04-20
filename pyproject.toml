@@ -44,5 +44,10 @@ line-length = 88
 # [tool.pytest]
 # testpaths = ["squishyplanet"]
 
-# [tool.coverage.run]
-# source = squishyplanet
+[tool.coverage.run]
+omit = [
+    "tests/*",
+]
+exclude_lines = [
+    '.*@_defjvp*'
+]

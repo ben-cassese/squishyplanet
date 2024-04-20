@@ -62,29 +62,17 @@ def planet_2d_coeffs(
         dict:
             A dictionary with keys representing different transformed coefficient
             names ('rho_xx', 'rho_xy', 'rho_x0', 'rho_yy', 'rho_y0', 'rho_00') and
-            their corresponding values. These coefficients describe the outline of the 
+            their corresponding values. These coefficients describe the outline of the
             planet as an implicit curve that satisfies the equation:
 
             .. math::
                 \\rho_{xx} x^2 + \\rho_{xy} xy + \\rho_{x0} x + \\rho_{yy} y^2 + \\rho_{y0} y + \\rho_{00} = 1
     """
     return {
-        "rho_xx": _rho_xx(
-            p_xx, p_xy, p_xz, p_x0, p_yy, p_yz, p_y0, p_zz, p_z0, p_00
-        ),
-        "rho_xy": _rho_xy(
-            p_xx, p_xy, p_xz, p_x0, p_yy, p_yz, p_y0, p_zz, p_z0, p_00
-        ),
-        "rho_x0": _rho_x0(
-            p_xx, p_xy, p_xz, p_x0, p_yy, p_yz, p_y0, p_zz, p_z0, p_00
-        ),
-        "rho_yy": _rho_yy(
-            p_xx, p_xy, p_xz, p_x0, p_yy, p_yz, p_y0, p_zz, p_z0, p_00
-        ),
-        "rho_y0": _rho_y0(
-            p_xx, p_xy, p_xz, p_x0, p_yy, p_yz, p_y0, p_zz, p_z0, p_00
-        ),
-        "rho_00": _rho_00(
-            p_xx, p_xy, p_xz, p_x0, p_yy, p_yz, p_y0, p_zz, p_z0, p_00
-        ),
+        "rho_xx": _rho_xx(p_xx, p_xy, p_xz, p_x0, p_yy, p_yz, p_y0, p_zz, p_z0, p_00),
+        "rho_xy": _rho_xy(p_xx, p_xy, p_xz, p_x0, p_yy, p_yz, p_y0, p_zz, p_z0, p_00),
+        "rho_x0": _rho_x0(p_xx, p_xy, p_xz, p_x0, p_yy, p_yz, p_y0, p_zz, p_z0, p_00),
+        "rho_yy": _rho_yy(p_xx, p_xy, p_xz, p_x0, p_yy, p_yz, p_y0, p_zz, p_z0, p_00),
+        "rho_y0": _rho_y0(p_xx, p_xy, p_xz, p_x0, p_yy, p_yz, p_y0, p_zz, p_z0, p_00),
+        "rho_00": _rho_00(p_xx, p_xy, p_xz, p_x0, p_yy, p_yz, p_y0, p_zz, p_z0, p_00),
     }

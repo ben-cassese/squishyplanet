@@ -142,10 +142,7 @@ def _p_xy(a, e, f, Omega, i, omega, r, obliq, prec, f1, f2):
                 * jnp.cos(Omega)
                 * jnp.sin(Omega)
             )
-            + jnp.cos(Omega)
-            * jnp.sin(i) ** 2
-            * jnp.sin(obliq) ** 2
-            * jnp.sin(Omega)
+            + jnp.cos(Omega) * jnp.sin(i) ** 2 * jnp.sin(obliq) ** 2 * jnp.sin(Omega)
             + jnp.cos(prec)
             * jnp.cos(obliq)
             * jnp.cos(omega)
@@ -156,10 +153,7 @@ def _p_xy(a, e, f, Omega, i, omega, r, obliq, prec, f1, f2):
                 * jnp.cos(2 * Omega)
                 * jnp.sin(prec + omega)
                 + jnp.sin(i) * jnp.sin(obliq) * jnp.sin(Omega) ** 2
-                + jnp.cos(obliq)
-                * jnp.sin(prec)
-                * jnp.sin(omega)
-                * jnp.sin(2 * Omega)
+                + jnp.cos(obliq) * jnp.sin(prec) * jnp.sin(omega) * jnp.sin(2 * Omega)
             )
             + jnp.cos(obliq)
             * jnp.sin(i)
@@ -180,11 +174,7 @@ def _p_xy(a, e, f, Omega, i, omega, r, obliq, prec, f1, f2):
                 * jnp.sin(prec) ** 2
                 * jnp.sin(omega) ** 2
                 * jnp.sin(Omega)
-                + (
-                    jnp.cos(i) ** 2
-                    * jnp.sin(prec + omega) ** 2
-                    * jnp.sin(2 * Omega)
-                )
+                + (jnp.cos(i) ** 2 * jnp.sin(prec + omega) ** 2 * jnp.sin(2 * Omega))
                 / 2.0
             )
         )
@@ -255,16 +245,10 @@ def _p_xz(a, e, f, Omega, i, omega, r, obliq, prec, f1, f2):
                     + jnp.sin(i) * jnp.sin(obliq) * jnp.sin(prec + omega)
                 )
                 * (
-                    jnp.cos(Omega)
-                    * jnp.sin(prec)
-                    * jnp.sin(obliq)
-                    * jnp.sin(omega)
+                    jnp.cos(Omega) * jnp.sin(prec) * jnp.sin(obliq) * jnp.sin(omega)
                     + (
                         -(jnp.cos(obliq) * jnp.sin(i))
-                        + jnp.cos(i)
-                        * jnp.cos(omega)
-                        * jnp.sin(prec)
-                        * jnp.sin(obliq)
+                        + jnp.cos(i) * jnp.cos(omega) * jnp.sin(prec) * jnp.sin(obliq)
                     )
                     * jnp.sin(Omega)
                     + jnp.cos(prec)
@@ -482,18 +466,11 @@ def _p_z0(a, e, f, Omega, i, omega, r, obliq, prec, f1, f2):
         * a
         * (-1 + e**2)
         * (
-            (jnp.cos(prec + omega) * jnp.sin(i) * jnp.sin(f - prec))
-            / (-1 + f2) ** 2
+            (jnp.cos(prec + omega) * jnp.sin(i) * jnp.sin(f - prec)) / (-1 + f2) ** 2
             + (
                 jnp.cos(f - prec)
                 * (
-                    -(
-                        (-2 + f1)
-                        * f1
-                        * jnp.cos(i)
-                        * jnp.cos(obliq)
-                        * jnp.sin(obliq)
-                    )
+                    -((-2 + f1) * f1 * jnp.cos(i) * jnp.cos(obliq) * jnp.sin(obliq))
                     + jnp.sin(i)
                     * ((-1 + f1) ** 2 * jnp.cos(obliq) ** 2 + jnp.sin(obliq) ** 2)
                     * jnp.sin(prec + omega)
@@ -560,7 +537,7 @@ def planet_3d_coeffs(a, e, f, Omega, i, omega, r, obliq, prec, f1, f2, **kwargs)
                                     perpendicular to the direction of motion at
                                     periapsis, assuming the 0.0 obliquity. f2 must
                                     always be smaller than f1.
-                                    
+
         **kwargs: Unused additional keyword arguments. These are included so that we
                     can can take in a larger state dictionary that includes all of the
                     required parameters along with other unnecessary ones.

@@ -18,8 +18,7 @@ from squishyplanet.engine.phase_curve_utils import (
     emission_profile,
     reflected_phase_curve,
     emission_phase_curve,
-    phase_curve
-
+    phase_curve,
 )
 
 import copy
@@ -35,7 +34,7 @@ class OblateSystem:
         period=None,
         a=None,
         e=0.0,
-        i=jnp.pi/2,
+        i=jnp.pi / 2,
         Omega=jnp.pi,
         omega=0.0,
         obliq=0.0,
@@ -90,7 +89,7 @@ class OblateSystem:
             "phase_curve_nsamples",
             "random_seed",
             "data",
-            "uncertainties"
+            "uncertainties",
         ]
 
         state = {}
@@ -98,12 +97,11 @@ class OblateSystem:
             state[key] = locals()[key]
         self._state = state
 
-
         self.validate_inputs()
 
         # necessary for all light curves
-        self._state["greens_basis_transform"] = (
-            generate_change_of_basis_matrix(len(self._state["ld_u_coeffs"]))
+        self._state["greens_basis_transform"] = generate_change_of_basis_matrix(
+            len(self._state["ld_u_coeffs"])
         )
 
         # everything below here is just an instantaneous snapshot mostly for plotting,
@@ -131,29 +129,33 @@ class OblateSystem:
 
     def validate_inputs(self):
         for key, val in self._state.items():
-            if type(val) ==  type(None):
+            if type(val) == type(None):
                 raise ValueError(f"'{key}' is a required parameter")
 
         self._state["ld_u_coeffs"] = jnp.array(self._state["ld_u_coeffs"])
-        assert self._state["ld_u_coeffs"].shape[0] >= 2, "ld_u_coeffs must have at least 2 (even if higher-order terms are 0)"
-        assert type(self._state["phase_curve_nsamples"]) == int, "phase_curve_nsamples must be an integer"
+        assert (
+            self._state["ld_u_coeffs"].shape[0] >= 2
+        ), "ld_u_coeffs must have at least 2 (even if higher-order terms are 0)"
+        assert (
+            type(self._state["phase_curve_nsamples"]) == int
+        ), "phase_curve_nsamples must be an integer"
         assert type(self._state["random_seed"]) == int, "random_seed must be an integer"
 
         if self._state["e"] == 0:
-            assert (
-                self._state["omega"] == 0
-            ), "omega must be 0 for a circular orbit"
+            assert self._state["omega"] == 0, "omega must be 0 for a circular orbit"
 
         shapes = []
         for key in self._state.keys():
-            if (key == "ld_u_coeffs") | (key == "phase_curve_nsamples") | (key == "random_seed"):
+            if (
+                (key == "ld_u_coeffs")
+                | (key == "phase_curve_nsamples")
+                | (key == "random_seed")
+            ):
                 continue
             elif type(self._state[key]) == bool:
                 continue
 
-            if (type(self._state[key]) == float) | (
-                type(self._state[key]) == int
-            ):
+            if (type(self._state[key]) == float) | (type(self._state[key]) == int):
                 self._state[key] = jnp.array([self._state[key]])
                 shapes.append(1)
             else:
@@ -171,14 +173,10 @@ class OblateSystem:
                 "All parameters must be scalars or arrays of the same shape."
             )
 
-    def _illustrate_helper(
-        self, times=None, true_anomalies=None, nsamples=50_000
-    ):
+    def _illustrate_helper(self, times=None, true_anomalies=None, nsamples=50_000):
 
         if (times is not None) & (true_anomalies is not None):
-            raise ValueError(
-                "Provide either times or true anomalies but not both"
-            )
+            raise ValueError("Provide either times or true anomalies but not both")
 
         if times is not None:
             time_deltas = times - self._state["t_peri"]
@@ -343,7 +341,8 @@ def _lightcurve(
     # if you do want a phase curve, generate the radii and thetas that you'll reuse
     # at each timestep
     sample_radii, sample_thetas = generate_sample_radii_thetas(
-        jax.random.key(random_seed), jnp.arange(phase_curve_nsamples)
+        jax.random.key(random_seed),
+        jnp.arange(phase_curve_nsamples),
     )
 
     # just the reflected component
@@ -365,6 +364,11 @@ def _lightcurve(
         reflected = reflected_phase_curve(
             sample_radii, sample_thetas, two, three, state, x_c, y_c, z_c
         )
+        # it really didn't make a difference in speed here
+        # reflected = jax.vmap(
+        #     reflected_phase_curve, in_axes=(0, 0, None, None, None, None, None, None)
+        # )(sample_radii, sample_thetas, two, three, state, x_c, y_c, z_c)
+        # reflected = jnp.mean(reflected, axis=0)
 
         trend = state["systematic_offset"] + state["systematic_linear"] * state["times"]
         return transit + reflected + trend
@@ -384,9 +388,7 @@ def _lightcurve(
         x_c = positions[0, :]
         y_c = positions[1, :]
         z_c = positions[2, :]
-        emitted = emission_phase_curve(
-            sample_radii, sample_thetas, two, three, state
-        )
+        emitted = emission_phase_curve(sample_radii, sample_thetas, two, three, state)
 
         trend = state["systematic_offset"] + state["systematic_linear"] * state["times"]
         return transit + emitted + trend
@@ -410,7 +412,9 @@ def _lightcurve(
             sample_radii, sample_thetas, two, three, state, x_c, y_c, z_c
         )
 
-        trend = state["systematic_offset"] + state["systematic_linear"] * (state["times"])
+        trend = state["systematic_offset"] + state["systematic_linear"] * (
+            state["times"]
+        )
         return transit + reflected + emitted + trend
 
 
@@ -445,5 +449,5 @@ def _loglike(
 
     resids = state["data"] - lc
     var = jnp.exp(state["log_jitter"]) + state["uncertainties"] ** 2
-    
-    return jnp.sum(-0.5 * (resids ** 2 / var + jnp.log(var)))
+
+    return jnp.sum(-0.5 * (resids**2 / var + jnp.log(var)))

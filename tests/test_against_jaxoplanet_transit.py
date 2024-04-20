@@ -17,7 +17,7 @@ from squishyplanet.OblateSystem import OblateSystem
 from squishyplanet.engine.kepler import kepler
 
 N_JAXOPLANT_COMPARISONS = 10
-TIMES = jnp.linspace(-1, 1, 17280) * ureg.day # 10s cadence for 48 hours
+TIMES = jnp.linspace(-1, 1, 17280) * ureg.day  # 10s cadence for 48 hours
 POLY_ORDERS = [2]
 
 

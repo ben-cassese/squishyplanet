@@ -21,9 +21,7 @@ from squishyplanet.engine.kepler import kepler
 
 
 @jax.jit
-def planet_flux_integrand(
-    alpha, u1, u2, c_x1, c_x2, c_x3, c_y1, c_y2, c_y3, **kwargs
-):
+def planet_flux_integrand(alpha, u1, u2, c_x1, c_x2, c_x3, c_y1, c_y2, c_y3, **kwargs):
     return (
         (
             c_x3 * (-(jnp.sin(alpha) * c_y1) + jnp.cos(alpha) * c_y2)
@@ -44,10 +42,8 @@ def planet_flux_integrand(
                 -1
                 + jnp.sqrt(
                     1
-                    - (jnp.cos(alpha) * c_x1 + jnp.sin(alpha) * c_x2 + c_x3)
-                    ** 2
-                    - (jnp.cos(alpha) * c_y1 + jnp.sin(alpha) * c_y2 + c_y3)
-                    ** 2
+                    - (jnp.cos(alpha) * c_x1 + jnp.sin(alpha) * c_x2 + c_x3) ** 2
+                    - (jnp.cos(alpha) * c_y1 + jnp.sin(alpha) * c_y2 + c_y3) ** 2
                 )
             )
             + 2
@@ -63,19 +59,15 @@ def planet_flux_integrand(
                 * u1
                 * jnp.sqrt(
                     1
-                    - (jnp.cos(alpha) * c_x1 + jnp.sin(alpha) * c_x2 + c_x3)
-                    ** 2
-                    - (jnp.cos(alpha) * c_y1 + jnp.sin(alpha) * c_y2 + c_y3)
-                    ** 2
+                    - (jnp.cos(alpha) * c_x1 + jnp.sin(alpha) * c_x2 + c_x3) ** 2
+                    - (jnp.cos(alpha) * c_y1 + jnp.sin(alpha) * c_y2 + c_y3) ** 2
                 )
                 + 4
                 * u2
                 * jnp.sqrt(
                     1
-                    - (jnp.cos(alpha) * c_x1 + jnp.sin(alpha) * c_x2 + c_x3)
-                    ** 2
-                    - (jnp.cos(alpha) * c_y1 + jnp.sin(alpha) * c_y2 + c_y3)
-                    ** 2
+                    - (jnp.cos(alpha) * c_x1 + jnp.sin(alpha) * c_x2 + c_x3) ** 2
+                    - (jnp.cos(alpha) * c_y1 + jnp.sin(alpha) * c_y2 + c_y3) ** 2
                 )
             )
         )
@@ -89,9 +81,7 @@ def planet_flux_integrand(
 
 
 # @jax.jit
-def star_flux_integral(
-    alpha1, alpha2, u1, u2, c_x1, c_x2, c_x3, c_y1, c_y2, c_y3
-):
+def star_flux_integral(alpha1, alpha2, u1, u2, c_x1, c_x2, c_x3, c_y1, c_y2, c_y3):
     x1 = c_x1 * jnp.cos(alpha1) + c_x2 * jnp.sin(alpha1) + c_x3
     y1 = c_y1 * jnp.cos(alpha1) + c_y2 * jnp.sin(alpha1) + c_y3
     theta1 = jnp.arctan2(y1, x1)
@@ -103,13 +93,13 @@ def star_flux_integral(
     theta2 = jnp.where(theta2 < 0, theta2 + 2 * jnp.pi, theta2)
 
     # print(theta1, theta2)
-    #jax.debug.print("theta1 {x}", x=theta1)
-    #jax.debug.print("theta2 {x}", x=theta2)
+    # jax.debug.print("theta1 {x}", x=theta1)
+    # jax.debug.print("theta2 {x}", x=theta2)
 
-    delta = jnp.abs(jnp.arctan2(jnp.sin(theta1-theta2), jnp.cos(theta1-theta2)))
-    #jax.debug.print("weird delta {x}", x=delta)
+    delta = jnp.abs(jnp.arctan2(jnp.sin(theta1 - theta2), jnp.cos(theta1 - theta2)))
+    # jax.debug.print("weird delta {x}", x=delta)
 
-    #jax.debug.print("star contribution {x}", x=delta / (2 * jnp.pi))
+    # jax.debug.print("star contribution {x}", x=delta / (2 * jnp.pi))
     return delta / (2 * jnp.pi)
 
 
@@ -146,8 +136,6 @@ def lightcurve(state, times):
         * (positions[2, :] > 0)
     )
 
-    
-
     # not thrilled with this implementation- you can feed all of para straight to
     # quadgk without scanning or vmapping, which makes me think you should be able to
     # feed it just all of the entries where it's transiting. but, I kept running into
@@ -157,9 +145,7 @@ def lightcurve(state, times):
         func = jax.tree_util.Partial(
             planet_flux_integrand, u1=state["u1"], u2=state["u2"], **para
         )
-        blocked_flux = quadgk(
-            func, [0, 2 * jnp.pi], epsabs=epsabs, epsrel=epsrel
-        )[0]
+        blocked_flux = quadgk(func, [0, 2 * jnp.pi], epsabs=epsabs, epsrel=epsrel)[0]
         blocked_flux = blocked_flux / (
             -(1 / 6) * jnp.pi * (-6 + 2 * state["u1"] + state["u2"])
         )
@@ -173,15 +159,13 @@ def lightcurve(state, times):
         alphas = jnp.where(alphas < 0, alphas + 2 * jnp.pi, alphas)
         alphas = jnp.where(alphas > 2 * jnp.pi, alphas - 2 * jnp.pi, alphas)
         alphas = jnp.sort(alphas)
-        #jax.debug.print("xs {x}", x=xs)
-        #jax.debug.print("ys {x}", x=ys)
-        #jax.debug.print("alphas {x}", x=alphas)
+        # jax.debug.print("xs {x}", x=xs)
+        # jax.debug.print("ys {x}", x=ys)
+        # jax.debug.print("alphas {x}", x=alphas)
 
         test_ang = alphas[0] + (alphas[1] - alphas[0]) / 2
-        test_ang = jnp.where(
-            test_ang > 2 * jnp.pi, test_ang - 2 * jnp.pi, test_ang
-        )
-        #jax.debug.print("test_ang {x}", x=test_ang)
+        test_ang = jnp.where(test_ang > 2 * jnp.pi, test_ang - 2 * jnp.pi, test_ang)
+        # jax.debug.print("test_ang {x}", x=test_ang)
 
         test_val = limb_darkening_profile(
             x=para["c_x1"] * jnp.cos(test_ang)
@@ -194,7 +178,7 @@ def lightcurve(state, times):
             u2=0.2,
             **para,
         )
-        #jax.debug.print("test_val {x}", x=test_val)
+        # jax.debug.print("test_val {x}", x=test_val)
 
         func = jax.tree_util.Partial(
             planet_flux_integrand, u1=state["u1"], u2=state["u2"], **para
@@ -202,31 +186,29 @@ def lightcurve(state, times):
         # full = quadgk(func, [0, 2 * jnp.pi], epsabs=epsabs, epsrel=epsrel)[
         #     0
         # ] / (-(1 / 6) * jnp.pi * (-6 + 2 * state["u1"] + state["u2"]))
-        
+
         def testval_is_not_nan(_):
             planet_contribution = quadgk(
                 func, [alphas[0], alphas[1]], epsabs=epsabs, epsrel=epsrel
             )[0] / (-(1 / 6) * jnp.pi * (-6 + 2 * state["u1"] + state["u2"]))
             return planet_contribution
+
         def testval_is_nan(_):
-            # planet_contribution = 
-            
-            leg1 = quadgk(
-                func, [alphas[1], 2*jnp.pi], epsabs=epsabs, epsrel=epsrel
-            )[0]
-            leg2 = quadgk(
-                func, [0.0, alphas[0]], epsabs=epsabs, epsrel=epsrel
-            )[0]
-            planet_contribution = (leg1 + leg2) / (-(1 / 6) * jnp.pi * (-6 + 2 * state["u1"] + state["u2"]))
+            # planet_contribution =
+
+            leg1 = quadgk(func, [alphas[1], 2 * jnp.pi], epsabs=epsabs, epsrel=epsrel)[
+                0
+            ]
+            leg2 = quadgk(func, [0.0, alphas[0]], epsabs=epsabs, epsrel=epsrel)[0]
+            planet_contribution = (leg1 + leg2) / (
+                -(1 / 6) * jnp.pi * (-6 + 2 * state["u1"] + state["u2"])
+            )
             return planet_contribution
 
         planet_contribution = jax.lax.cond(
-            jnp.isnan(test_val),
-            testval_is_nan,
-            testval_is_not_nan,
-            ()
+            jnp.isnan(test_val), testval_is_nan, testval_is_not_nan, ()
         )
-        #jax.debug.print("planet_contribution {x}", x=planet_contribution)
+        # jax.debug.print("planet_contribution {x}", x=planet_contribution)
         # #jax.debug.print("full {x}", x=full)
         # #jax.debug.print("side1 {x}", x=side1)
         # #jax.debug.print("side2 {x}", x=side2)
@@ -239,7 +221,7 @@ def lightcurve(state, times):
             u2=state["u2"],
             **para,
         )
-    
+
         total_blocked = planet_contribution + star_contribution
 
         return total_blocked

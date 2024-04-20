@@ -22,7 +22,7 @@ def profile(
     x_c,
     y_c,
     z_c,
-    **kwargs
+    **kwargs,
 ):
     return (
         -(

@@ -6,9 +6,7 @@ import jax.numpy as jnp
 from squishyplanet.engine.skypos import skypos
 
 
-def _t_00(
-    p_xx, p_xy, p_xz, p_x0, p_yy, p_yz, p_y0, p_zz, p_z0, p_00, x_c, y_c, z_c
-):
+def _t_00(p_xx, p_xy, p_xz, p_x0, p_yy, p_yz, p_y0, p_zz, p_z0, p_00, x_c, y_c, z_c):
     return (
         p_00
         + (
@@ -25,9 +23,7 @@ def _t_00(
     )
 
 
-def _t_x0(
-    p_xx, p_xy, p_xz, p_x0, p_yy, p_yz, p_y0, p_zz, p_z0, p_00, x_c, y_c, z_c
-):
+def _t_x0(p_xx, p_xy, p_xz, p_x0, p_yy, p_yz, p_y0, p_zz, p_z0, p_00, x_c, y_c, z_c):
     return -(
         (
             y_c
@@ -45,27 +41,18 @@ def _t_x0(
                 + p_yz * p_z0 * y_c
                 - 2 * p_zz * (p_x0 * x_c + p_y0 * y_c)
             )
-            + 2
-            * (p_xz * p_z0 - 2 * p_x0 * p_zz)
-            * (p_xz * x_c + p_yz * y_c)
-            * z_c
+            + 2 * (p_xz * p_z0 - 2 * p_x0 * p_zz) * (p_xz * x_c + p_yz * y_c) * z_c
             + 2 * p_zz * (p_xz * p_z0 - 2 * p_x0 * p_zz) * z_c**2
         )
         / (p_xz * x_c + p_yz * y_c + 2 * p_zz * z_c) ** 2
     )
 
 
-def _t_xx(
-    p_xx, p_xy, p_xz, p_x0, p_yy, p_yz, p_y0, p_zz, p_z0, p_00, x_c, y_c, z_c
-):
+def _t_xx(p_xx, p_xy, p_xz, p_x0, p_yy, p_yz, p_y0, p_zz, p_z0, p_00, x_c, y_c, z_c):
     return (
         4 * p_xx**2 * p_zz * x_c**2
         + (p_xy * y_c + p_xz * z_c)
-        * (
-            -(p_xz**2 * x_c)
-            + p_xy * p_zz * y_c
-            - p_xz * (p_yz * y_c + p_zz * z_c)
-        )
+        * (-(p_xz**2 * x_c) + p_xy * p_zz * y_c - p_xz * (p_yz * y_c + p_zz * z_c))
         + p_xx
         * (
             -(p_xz**2 * x_c**2)
@@ -76,9 +63,7 @@ def _t_xx(
     ) / (p_xz * x_c + p_yz * y_c + 2 * p_zz * z_c) ** 2
 
 
-def _t_xy(
-    p_xx, p_xy, p_xz, p_x0, p_yy, p_yz, p_y0, p_zz, p_z0, p_00, x_c, y_c, z_c
-):
+def _t_xy(p_xx, p_xy, p_xz, p_x0, p_yy, p_yz, p_y0, p_zz, p_z0, p_00, x_c, y_c, z_c):
     return (
         -2
         * (
@@ -101,9 +86,7 @@ def _t_xy(
     ) / (p_xz * x_c + p_yz * y_c + 2 * p_zz * z_c) ** 2
 
 
-def _t_yy(
-    p_xx, p_xy, p_xz, p_x0, p_yy, p_yz, p_y0, p_zz, p_z0, p_00, x_c, y_c, z_c
-):
+def _t_yy(p_xx, p_xy, p_xz, p_x0, p_yy, p_yz, p_y0, p_zz, p_z0, p_00, x_c, y_c, z_c):
     return (
         p_xz**2 * p_yy * x_c**2
         + p_xy**2 * p_zz * x_c**2
@@ -114,14 +97,10 @@ def _t_yy(
     ) / (p_xz * x_c + p_yz * y_c + 2 * p_zz * z_c) ** 2
 
 
-def _t_y0(
-    p_xx, p_xy, p_xz, p_x0, p_yy, p_yz, p_y0, p_zz, p_z0, p_00, x_c, y_c, z_c
-):
+def _t_y0(p_xx, p_xy, p_xz, p_x0, p_yy, p_yz, p_y0, p_zz, p_z0, p_00, x_c, y_c, z_c):
     return (
         p_xz**2 * p_y0 * x_c**2
-        + p_x0
-        * x_c
-        * (2 * p_xy * p_zz * x_c - p_yz**2 * y_c + 4 * p_yy * p_zz * y_c)
+        + p_x0 * x_c * (2 * p_xy * p_zz * x_c - p_yz**2 * y_c + 4 * p_yy * p_zz * y_c)
         - p_xz
         * x_c
         * (
@@ -133,11 +112,7 @@ def _t_y0(
             - 4 * p_y0 * p_zz * z_c
         )
         - (p_yz * p_z0 - 2 * p_y0 * p_zz)
-        * (
-            p_xy * x_c * y_c
-            + 2 * p_yy * y_c**2
-            + 2 * z_c * (p_yz * y_c + p_zz * z_c)
-        )
+        * (p_xy * x_c * y_c + 2 * p_yy * y_c**2 + 2 * z_c * (p_yz * y_c + p_zz * z_c))
     ) / (p_xz * x_c + p_yz * y_c + 2 * p_zz * z_c) ** 2
 
 
@@ -251,6 +226,7 @@ def terminator_2d_coeffs(
         ),
     }
 
+
 def _terminator_planet_x1(
     p_xx,
     p_xy,
@@ -318,20 +294,14 @@ def _terminator_planet_x1(
                 p_xz**2 * x_c**2
                 - 4 * p_xx * p_zz * x_c**2
                 + 2 * p_xz * p_yz * x_c * y_c
-                + y_c
-                * (
-                    -4 * p_xy * p_zz * x_c
-                    + p_yz**2 * y_c
-                    - 4 * p_yy * p_zz * y_c
-                )
+                + y_c * (-4 * p_xy * p_zz * x_c + p_yz**2 * y_c - 4 * p_yy * p_zz * y_c)
             )
         )
         + p_x0
         * (p_yz**2 - 4 * p_yy * p_zz)
         * (
             4 * p_xx * p_zz * x_c**2
-            + y_c
-            * (4 * p_xy * p_zz * x_c - p_yz**2 * y_c + 4 * p_yy * p_zz * y_c)
+            + y_c * (4 * p_xy * p_zz * x_c - p_yz**2 * y_c + 4 * p_yy * p_zz * y_c)
         )
         + p_xz
         * (
@@ -341,15 +311,9 @@ def _terminator_planet_x1(
                 -2 * p_x0 * p_yz * (p_yz**2 - 4 * p_yy * p_zz) * x_c
                 + 2
                 * p_xy
-                * (
-                    p_yz**2 * p_z0
-                    - 4 * p_y0 * p_yz * p_zz
-                    + 4 * p_yy * p_z0 * p_zz
-                )
+                * (p_yz**2 * p_z0 - 4 * p_y0 * p_yz * p_zz + 4 * p_yy * p_z0 * p_zz)
                 * x_c
-                + (p_y0 * p_yz - 2 * p_yy * p_z0)
-                * (p_yz**2 - 4 * p_yy * p_zz)
-                * y_c
+                + (p_y0 * p_yz - 2 * p_yy * p_z0) * (p_yz**2 - 4 * p_yy * p_zz) * y_c
             )
         )
     ) / (
@@ -364,8 +328,7 @@ def _terminator_planet_x1(
             p_xz**2 * x_c**2
             - 4 * p_xx * p_zz * x_c**2
             + 2 * p_xz * p_yz * x_c * y_c
-            + y_c
-            * (-4 * p_xy * p_zz * x_c + p_yz**2 * y_c - 4 * p_yy * p_zz * y_c)
+            + y_c * (-4 * p_xy * p_zz * x_c + p_yz**2 * y_c - 4 * p_yy * p_zz * y_c)
         )
     )
 
@@ -407,11 +370,7 @@ def _terminator_planet_y1(
             + p_x0
             * p_yz
             * x_c
-            * (
-                -4 * p_xy * p_zz * x_c
-                + 3 * p_yz**2 * y_c
-                - 4 * p_yy * p_zz * y_c
-            )
+            * (-4 * p_xy * p_zz * x_c + 3 * p_yz**2 * y_c - 4 * p_yy * p_zz * y_c)
         )
         + p_xz**2
         * (
@@ -442,12 +401,7 @@ def _terminator_planet_y1(
             * (
                 -4 * p_xx * p_yz**2 * p_zz * x_c**2
                 + 4 * p_xy**2 * p_zz**2 * x_c**2
-                + 2
-                * p_xy
-                * p_zz
-                * (-7 * p_yz**2 + 4 * p_yy * p_zz)
-                * x_c
-                * y_c
+                + 2 * p_xy * p_zz * (-7 * p_yz**2 + 4 * p_yy * p_zz) * x_c * y_c
                 + 3 * p_yz**2 * (p_yz**2 - 4 * p_yy * p_zz) * y_c**2
             )
             + x_c
@@ -487,22 +441,13 @@ def _terminator_planet_y1(
                     - 4 * p_xx * p_zz * x_c**2
                     + 2 * p_xz * p_yz * x_c * y_c
                     + y_c
-                    * (
-                        -4 * p_xy * p_zz * x_c
-                        + p_yz**2 * y_c
-                        - 4 * p_yy * p_zz * y_c
-                    )
+                    * (-4 * p_xy * p_zz * x_c + p_yz**2 * y_c - 4 * p_yy * p_zz * y_c)
                 )
             )
         )
         + p_xz
         * (
-            8
-            * p_xx**2
-            * p_yz
-            * p_zz
-            * (p_yz * p_z0 - 2 * p_y0 * p_zz)
-            * x_c**3
+            8 * p_xx**2 * p_yz * p_zz * (p_yz * p_z0 - 2 * p_y0 * p_zz) * x_c**3
             + 2
             * p_xx
             * x_c
@@ -511,11 +456,7 @@ def _terminator_planet_y1(
                 + 2
                 * p_xy
                 * p_zz
-                * (
-                    3 * p_yz**2 * p_z0
-                    - 8 * p_y0 * p_yz * p_zz
-                    + 4 * p_yy * p_z0 * p_zz
-                )
+                * (3 * p_yz**2 * p_z0 - 8 * p_y0 * p_yz * p_zz + 4 * p_yy * p_z0 * p_zz)
                 * x_c
                 * y_c
                 - 3
@@ -528,33 +469,18 @@ def _terminator_planet_y1(
                 * p_yz
                 * p_zz
                 * x_c
-                * (
-                    4 * p_xy * p_zz * x_c
-                    - p_yz**2 * y_c
-                    + 4 * p_yy * p_zz * y_c
-                )
+                * (4 * p_xy * p_zz * x_c - p_yz**2 * y_c + 4 * p_yy * p_zz * y_c)
             )
             + y_c
             * (
                 8 * p_xy**3 * p_z0 * p_zz**2 * x_c**2
-                - 6
-                * p_xy**2
-                * p_z0
-                * p_zz
-                * (p_yz**2 - 4 * p_yy * p_zz)
-                * x_c
-                * y_c
+                - 6 * p_xy**2 * p_z0 * p_zz * (p_yz**2 - 4 * p_yy * p_zz) * x_c * y_c
                 + p_xy * p_z0 * (p_yz**2 - 4 * p_yy * p_zz) ** 2 * y_c**2
                 + p_x0
                 * p_yz
                 * (
                     24 * p_xy**2 * p_zz**2 * x_c**2
-                    - 12
-                    * p_xy
-                    * p_zz
-                    * (p_yz**2 - 4 * p_yy * p_zz)
-                    * x_c
-                    * y_c
+                    - 12 * p_xy * p_zz * (p_yz**2 - 4 * p_yy * p_zz) * x_c * y_c
                     + (p_yz**2 - 4 * p_yy * p_zz) ** 2 * y_c**2
                 )
                 + p_yz
@@ -667,12 +593,7 @@ def _terminator_planet_y1(
             )
             + p_xx
             * (
-                8
-                * p_xy**2
-                * p_zz**2
-                * (p_yz * p_z0 - 2 * p_y0 * p_zz)
-                * x_c**2
-                * y_c
+                8 * p_xy**2 * p_zz**2 * (p_yz * p_z0 - 2 * p_y0 * p_zz) * x_c**2 * y_c
                 - 6
                 * p_xy
                 * p_zz
@@ -691,11 +612,7 @@ def _terminator_planet_y1(
                 * p_xy
                 * p_zz**2
                 * x_c**2
-                * (
-                    2 * p_xy * p_zz * x_c
-                    - p_yz**2 * y_c
-                    + 4 * p_yy * p_zz * y_c
-                )
+                * (2 * p_xy * p_zz * x_c - p_yz**2 * y_c + 4 * p_yy * p_zz * y_c)
                 + 2
                 * p_zz
                 * x_c
@@ -761,8 +678,7 @@ def _terminator_planet_y1(
             p_xz**2 * x_c**2
             - 4 * p_xx * p_zz * x_c**2
             + 2 * p_xz * p_yz * x_c * y_c
-            + y_c
-            * (-4 * p_xy * p_zz * x_c + p_yz**2 * y_c - 4 * p_yy * p_zz * y_c)
+            + y_c * (-4 * p_xy * p_zz * x_c + p_yz**2 * y_c - 4 * p_yy * p_zz * y_c)
         )
     )
 
@@ -834,20 +750,14 @@ def _terminator_planet_x2(
                 p_xz**2 * x_c**2
                 - 4 * p_xx * p_zz * x_c**2
                 + 2 * p_xz * p_yz * x_c * y_c
-                + y_c
-                * (
-                    -4 * p_xy * p_zz * x_c
-                    + p_yz**2 * y_c
-                    - 4 * p_yy * p_zz * y_c
-                )
+                + y_c * (-4 * p_xy * p_zz * x_c + p_yz**2 * y_c - 4 * p_yy * p_zz * y_c)
             )
         )
         + p_x0
         * (p_yz**2 - 4 * p_yy * p_zz)
         * (
             4 * p_xx * p_zz * x_c**2
-            + y_c
-            * (4 * p_xy * p_zz * x_c - p_yz**2 * y_c + 4 * p_yy * p_zz * y_c)
+            + y_c * (4 * p_xy * p_zz * x_c - p_yz**2 * y_c + 4 * p_yy * p_zz * y_c)
         )
         + p_xz
         * (
@@ -857,15 +767,9 @@ def _terminator_planet_x2(
                 -2 * p_x0 * p_yz * (p_yz**2 - 4 * p_yy * p_zz) * x_c
                 + 2
                 * p_xy
-                * (
-                    p_yz**2 * p_z0
-                    - 4 * p_y0 * p_yz * p_zz
-                    + 4 * p_yy * p_z0 * p_zz
-                )
+                * (p_yz**2 * p_z0 - 4 * p_y0 * p_yz * p_zz + 4 * p_yy * p_z0 * p_zz)
                 * x_c
-                + (p_y0 * p_yz - 2 * p_yy * p_z0)
-                * (p_yz**2 - 4 * p_yy * p_zz)
-                * y_c
+                + (p_y0 * p_yz - 2 * p_yy * p_z0) * (p_yz**2 - 4 * p_yy * p_zz) * y_c
             )
         )
     ) / (
@@ -880,8 +784,7 @@ def _terminator_planet_x2(
             p_xz**2 * x_c**2
             - 4 * p_xx * p_zz * x_c**2
             + 2 * p_xz * p_yz * x_c * y_c
-            + y_c
-            * (-4 * p_xy * p_zz * x_c + p_yz**2 * y_c - 4 * p_yy * p_zz * y_c)
+            + y_c * (-4 * p_xy * p_zz * x_c + p_yz**2 * y_c - 4 * p_yy * p_zz * y_c)
         )
     )
 
@@ -923,11 +826,7 @@ def _terminator_planet_y2(
             + p_x0
             * p_yz
             * x_c
-            * (
-                -4 * p_xy * p_zz * x_c
-                + 3 * p_yz**2 * y_c
-                - 4 * p_yy * p_zz * y_c
-            )
+            * (-4 * p_xy * p_zz * x_c + 3 * p_yz**2 * y_c - 4 * p_yy * p_zz * y_c)
         )
         - p_xz**2
         * (
@@ -998,22 +897,13 @@ def _terminator_planet_y2(
                     - 4 * p_xx * p_zz * x_c**2
                     + 2 * p_xz * p_yz * x_c * y_c
                     + y_c
-                    * (
-                        -4 * p_xy * p_zz * x_c
-                        + p_yz**2 * y_c
-                        - 4 * p_yy * p_zz * y_c
-                    )
+                    * (-4 * p_xy * p_zz * x_c + p_yz**2 * y_c - 4 * p_yy * p_zz * y_c)
                 )
             )
         )
         + p_xz
         * (
-            8
-            * p_xx**2
-            * p_yz
-            * p_zz
-            * (p_yz * p_z0 - 2 * p_y0 * p_zz)
-            * x_c**3
+            8 * p_xx**2 * p_yz * p_zz * (p_yz * p_z0 - 2 * p_y0 * p_zz) * x_c**3
             + 2
             * p_xx
             * x_c
@@ -1022,11 +912,7 @@ def _terminator_planet_y2(
                 + 2
                 * p_xy
                 * p_zz
-                * (
-                    3 * p_yz**2 * p_z0
-                    - 8 * p_y0 * p_yz * p_zz
-                    + 4 * p_yy * p_z0 * p_zz
-                )
+                * (3 * p_yz**2 * p_z0 - 8 * p_y0 * p_yz * p_zz + 4 * p_yy * p_z0 * p_zz)
                 * x_c
                 * y_c
                 - 3
@@ -1039,33 +925,18 @@ def _terminator_planet_y2(
                 * p_yz
                 * p_zz
                 * x_c
-                * (
-                    4 * p_xy * p_zz * x_c
-                    - p_yz**2 * y_c
-                    + 4 * p_yy * p_zz * y_c
-                )
+                * (4 * p_xy * p_zz * x_c - p_yz**2 * y_c + 4 * p_yy * p_zz * y_c)
             )
             + y_c
             * (
                 8 * p_xy**3 * p_z0 * p_zz**2 * x_c**2
-                - 6
-                * p_xy**2
-                * p_z0
-                * p_zz
-                * (p_yz**2 - 4 * p_yy * p_zz)
-                * x_c
-                * y_c
+                - 6 * p_xy**2 * p_z0 * p_zz * (p_yz**2 - 4 * p_yy * p_zz) * x_c * y_c
                 + p_xy * p_z0 * (p_yz**2 - 4 * p_yy * p_zz) ** 2 * y_c**2
                 + p_x0
                 * p_yz
                 * (
                     24 * p_xy**2 * p_zz**2 * x_c**2
-                    - 12
-                    * p_xy
-                    * p_zz
-                    * (p_yz**2 - 4 * p_yy * p_zz)
-                    * x_c
-                    * y_c
+                    - 12 * p_xy * p_zz * (p_yz**2 - 4 * p_yy * p_zz) * x_c * y_c
                     + (p_yz**2 - 4 * p_yy * p_zz) ** 2 * y_c**2
                 )
                 - p_yz
@@ -1130,12 +1001,7 @@ def _terminator_planet_y2(
                     p_x0
                     * (
                         8 * p_xy**2 * p_zz**2 * x_c**2
-                        - 6
-                        * p_xy
-                        * p_zz
-                        * (p_yz**2 - 4 * p_yy * p_zz)
-                        * x_c
-                        * y_c
+                        - 6 * p_xy * p_zz * (p_yz**2 - 4 * p_yy * p_zz) * x_c * y_c
                         + (p_yz**2 - 4 * p_yy * p_zz) ** 2 * y_c**2
                     )
                 )
@@ -1209,11 +1075,7 @@ def _terminator_planet_y2(
                 * p_xy
                 * p_zz**2
                 * x_c**2
-                * (
-                    2 * p_xy * p_zz * x_c
-                    - p_yz**2 * y_c
-                    + 4 * p_yy * p_zz * y_c
-                )
+                * (2 * p_xy * p_zz * x_c - p_yz**2 * y_c + 4 * p_yy * p_zz * y_c)
                 + 2
                 * p_zz
                 * x_c
@@ -1279,10 +1141,10 @@ def _terminator_planet_y2(
             p_xz**2 * x_c**2
             - 4 * p_xx * p_zz * x_c**2
             + 2 * p_xz * p_yz * x_c * y_c
-            + y_c
-            * (-4 * p_xy * p_zz * x_c + p_yz**2 * y_c - 4 * p_yy * p_zz * y_c)
+            + y_c * (-4 * p_xy * p_zz * x_c + p_yz**2 * y_c - 4 * p_yy * p_zz * y_c)
         )
     )
+
 
 @jax.jit
 def terminator_planet_intersections(
@@ -1313,6 +1175,7 @@ def terminator_planet_intersections(
         p_xx, p_xy, p_xz, p_x0, p_yy, p_yz, p_y0, p_zz, p_z0, p_00, x_c, y_c, z_c
     )
     return jnp.array([x1, x2]), jnp.array([y1, y2])
+
 
 # def _t4(
 #     rho_xx,
@@ -1590,4 +1453,3 @@ def terminator_planet_intersections(
 #         + rho_yy * t_xx * y**2
 #         - rho_xx * t_yy * y**2
 #     ) / (rho_xx * t_x0 - rho_x0 * t_xx - rho_xy * t_xx * y + rho_xx * t_xy * y)
-

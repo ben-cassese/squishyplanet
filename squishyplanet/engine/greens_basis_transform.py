@@ -1,8 +1,9 @@
-# Taken directly from the repository associated with 
+# Taken directly from the repository associated with
 # Agol, Luger, and Foreman-Mackey 2020 (doi:10.3847/1538-3881/ab4fee)
 # Many thanks to the authors for making this code available!
 
 import jax
+
 jax.config.update("jax_enable_x64", True)
 import jax.numpy as jnp
 
@@ -12,11 +13,13 @@ from sympy import binomial, symbols, zeros
 
 
 # Define our symbols
-z, n = symbols('z n')
+z, n = symbols("z n")
+
 
 def _ptilde(n, z):
     """Return the n^th term in the polynomial basis."""
-    return z ** n
+    return z**n
+
 
 def _Coefficient(expression, term):
     """Return the coefficient multiplying `term` in `expression`."""
@@ -27,6 +30,7 @@ def _Coefficient(expression, term):
     coeff = coeff.subs(z, 0)
     return coeff
 
+
 def _A1(N):
     """Return the change of basis matrix A1."""
     res = zeros(N + 1, N + 1)
@@ -35,6 +39,7 @@ def _A1(N):
             res[i, j] = (-1) ** (i + 1) * binomial(j, i)
     return res
 
+
 def _gtilde(n, z):
     """Return the n^th term in the Green's basis."""
     if n == 0:
@@ -42,7 +47,8 @@ def _gtilde(n, z):
     elif n == 1:
         return z
     else:
-        return (n + 2) * z ** n - n * z ** (n - 2)
+        return (n + 2) * z**n - n * z ** (n - 2)
+
 
 def _p_G(n, N):
     """Return the polynomial basis representation of the Green's polynomial `g`."""
@@ -60,9 +66,11 @@ def _A2(N):
         res[n] = _p_G(n, N)
     return res.inv()
 
+
 def _A(N):
     """Return the full change of basis matrix."""
     return _A2(N) * _A1(N)
+
 
 def generate_change_of_basis_matrix(N):
     """

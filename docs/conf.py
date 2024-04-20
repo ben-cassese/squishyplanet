@@ -8,15 +8,20 @@
 
 import sys
 import os
-sys.path.insert(0, os.path.abspath('.'))
-sys.path.insert(0, os.path.abspath('../squishyplanet'))  # If your modules are in a parent directory
-sys.path.insert(0, os.path.abspath('../squishyplanet/engine'))  # Add the path to the "engine" subdirectory
+
+sys.path.insert(0, os.path.abspath("."))
+sys.path.insert(
+    0, os.path.abspath("../squishyplanet")
+)  # If your modules are in a parent directory
+sys.path.insert(
+    0, os.path.abspath("../squishyplanet/engine")
+)  # Add the path to the "engine" subdirectory
 
 
-project = 'squishyplanet'
-copyright = '2024, Ben Cassese'
-author = 'Ben Cassese'
-release = '0.0.1'
+project = "squishyplanet"
+copyright = "2024, Ben Cassese"
+author = "Ben Cassese"
+release = "0.0.1"
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
@@ -36,7 +41,7 @@ extensions = [
 
 templates_path = ["_templates"]
 exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
-source_suffix = ['.rst', '.md']
+source_suffix = [".rst", ".md"]
 
 
 # -- Options for HTML output -------------------------------------------------
@@ -57,9 +62,7 @@ html_theme_options = {
     "use_download_button": True,
 }
 
-html_context = {
-   "default_mode": "light"
-}
+html_context = {"default_mode": "light"}
 
 html_sidebars = {
     "**": ["navbar-logo.html", "search-field.html", "sbt-sidebar-nav.html"]

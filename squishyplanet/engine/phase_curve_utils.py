@@ -33,11 +33,11 @@ def generate_sample_radii_thetas(key, num_points):
     """
     key, subkey = jax.random.split(key)
     sample_radii = jnp.sqrt(
-        jax.random.uniform(subkey, (num_points.shape[0],), minval=0, maxval=1)
+        jax.random.uniform(subkey, (vmap_splits.shape[0],), minval=0, maxval=1)
     )
     key, subkey = jax.random.split(key)
     sample_thetas = jax.random.uniform(
-        subkey, (num_points.shape[0],), minval=0, maxval=2 * jnp.pi
+        subkey, (vmap_splits.shape[0],), minval=0, maxval=2 * jnp.pi
     )
     return sample_radii, sample_thetas
 
@@ -152,7 +152,7 @@ def sample_surface(
         Tuple:
             A tuple of three arrays, the first containing the x values, the second
             containing the y values, and the third containing the z values.
-    
+
     """
     x, y = _xy_on_surface(
         sample_radii,
@@ -265,8 +265,9 @@ def surface_star_cos_angle(
         Array:
             The cosine of the angle between the planet's surface normal and the vector
             pointing from the planet's center to the star.
-    """
 
+
+    """
 
     star = jnp.array([x_c, y_c, z_c])
     star_norm = jnp.linalg.norm(star, axis=0)
@@ -284,9 +285,8 @@ def _surface_observer_cos_angle(planet_surface_normal):
 # Reflection helpers
 ########################################################################################
 
-def _pxx(
-    p_xx, p_xy, p_xz, p_x0, p_yy, p_yz, p_y0, p_zz, p_z0, p_00, x_c, y_c, z_c
-):
+
+def _pxx(p_xx, p_xy, p_xz, p_x0, p_yy, p_yz, p_y0, p_zz, p_z0, p_00, x_c, y_c, z_c):
     return (
         p_zz * (x_c**2 + y_c**2) ** 2
         + z_c
@@ -298,9 +298,7 @@ def _pxx(
     ) / ((x_c**2 + y_c**2) * (x_c**2 + y_c**2 + z_c**2))
 
 
-def _pxy(
-    p_xx, p_xy, p_xz, p_x0, p_yy, p_yz, p_y0, p_zz, p_z0, p_00, x_c, y_c, z_c
-):
+def _pxy(p_xx, p_xy, p_xz, p_x0, p_yy, p_yz, p_y0, p_zz, p_z0, p_00, x_c, y_c, z_c):
     return (
         -(p_yz * x_c * (x_c**2 + y_c**2))
         + p_xz * y_c * (x_c**2 + y_c**2)
@@ -309,61 +307,41 @@ def _pxy(
     ) / ((x_c**2 + y_c**2) * jnp.sqrt(x_c**2 + y_c**2 + z_c**2))
 
 
-def _pxz(
-    p_xx, p_xy, p_xz, p_x0, p_yy, p_yz, p_y0, p_zz, p_z0, p_00, x_c, y_c, z_c
-):
+def _pxz(p_xx, p_xy, p_xz, p_x0, p_yy, p_yz, p_y0, p_zz, p_z0, p_00, x_c, y_c, z_c):
     return (
         2
-        * (
-            p_xx * x_c**2
-            + y_c * (p_xy * x_c + p_yy * y_c)
-            - p_zz * (x_c**2 + y_c**2)
-        )
+        * (p_xx * x_c**2 + y_c * (p_xy * x_c + p_yy * y_c) - p_zz * (x_c**2 + y_c**2))
         * z_c
         - p_xz * x_c * (x_c**2 + y_c**2 - z_c**2)
         - p_yz * y_c * (x_c**2 + y_c**2 - z_c**2)
     ) / (jnp.sqrt(x_c**2 + y_c**2) * (x_c**2 + y_c**2 + z_c**2))
 
 
-def _px0(
-    p_xx, p_xy, p_xz, p_x0, p_yy, p_yz, p_y0, p_zz, p_z0, p_00, x_c, y_c, z_c
-):
+def _px0(p_xx, p_xy, p_xz, p_x0, p_yy, p_yz, p_y0, p_zz, p_z0, p_00, x_c, y_c, z_c):
     return (-(p_z0 * (x_c**2 + y_c**2)) + (p_x0 * x_c + p_y0 * y_c) * z_c) / (
         jnp.sqrt(x_c**2 + y_c**2) * jnp.sqrt(x_c**2 + y_c**2 + z_c**2)
     )
 
 
-def _pyy(
-    p_xx, p_xy, p_xz, p_x0, p_yy, p_yz, p_y0, p_zz, p_z0, p_00, x_c, y_c, z_c
-):
-    return (p_yy * x_c**2 - p_xy * x_c * y_c + p_xx * y_c**2) / (
-        x_c**2 + y_c**2
-    )
+def _pyy(p_xx, p_xy, p_xz, p_x0, p_yy, p_yz, p_y0, p_zz, p_z0, p_00, x_c, y_c, z_c):
+    return (p_yy * x_c**2 - p_xy * x_c * y_c + p_xx * y_c**2) / (x_c**2 + y_c**2)
 
 
-def _pyz(
-    p_xx, p_xy, p_xz, p_x0, p_yy, p_yz, p_y0, p_zz, p_z0, p_00, x_c, y_c, z_c
-):
+def _pyz(p_xx, p_xy, p_xz, p_x0, p_yy, p_yz, p_y0, p_zz, p_z0, p_00, x_c, y_c, z_c):
     return (
         -2 * p_xx * x_c * y_c
         + 2 * p_yy * x_c * y_c
         + p_xy * (x_c**2 - y_c**2)
         + p_yz * x_c * z_c
         - p_xz * y_c * z_c
-    ) / (
-        jnp.sqrt(x_c**2 + y_c**2) * jnp.sqrt(x_c**2 + y_c**2 + z_c**2)
-    )
+    ) / (jnp.sqrt(x_c**2 + y_c**2) * jnp.sqrt(x_c**2 + y_c**2 + z_c**2))
 
 
-def _py0(
-    p_xx, p_xy, p_xz, p_x0, p_yy, p_yz, p_y0, p_zz, p_z0, p_00, x_c, y_c, z_c
-):
+def _py0(p_xx, p_xy, p_xz, p_x0, p_yy, p_yz, p_y0, p_zz, p_z0, p_00, x_c, y_c, z_c):
     return (p_y0 * x_c - p_x0 * y_c) / jnp.sqrt(x_c**2 + y_c**2)
 
 
-def _pzz(
-    p_xx, p_xy, p_xz, p_x0, p_yy, p_yz, p_y0, p_zz, p_z0, p_00, x_c, y_c, z_c
-):
+def _pzz(p_xx, p_xy, p_xz, p_x0, p_yy, p_yz, p_y0, p_zz, p_z0, p_00, x_c, y_c, z_c):
     return (
         p_xx * x_c**2
         + p_xy * x_c * y_c
@@ -374,17 +352,11 @@ def _pzz(
     ) / (x_c**2 + y_c**2 + z_c**2)
 
 
-def _pz0(
-    p_xx, p_xy, p_xz, p_x0, p_yy, p_yz, p_y0, p_zz, p_z0, p_00, x_c, y_c, z_c
-):
-    return (p_x0 * x_c + p_y0 * y_c + p_z0 * z_c) / jnp.sqrt(
-        x_c**2 + y_c**2 + z_c**2
-    )
+def _pz0(p_xx, p_xy, p_xz, p_x0, p_yy, p_yz, p_y0, p_zz, p_z0, p_00, x_c, y_c, z_c):
+    return (p_x0 * x_c + p_y0 * y_c + p_z0 * z_c) / jnp.sqrt(x_c**2 + y_c**2 + z_c**2)
 
 
-def _p00(
-    p_xx, p_xy, p_xz, p_x0, p_yy, p_yz, p_y0, p_zz, p_z0, p_00, x_c, y_c, z_c
-):
+def _p00(p_xx, p_xy, p_xz, p_x0, p_yy, p_yz, p_y0, p_zz, p_z0, p_00, x_c, y_c, z_c):
     return p_00
 
 
@@ -439,7 +411,7 @@ def planet_from_star(
         dict:
             A dictionary containing the coefficients of the planet's shape as seen from
             the star. Will look identical to the output of :func:`planet_3d.planet_3d_coeffs`.
-    
+
     """
     return {
         "p_xx": _pxx(
@@ -595,7 +567,6 @@ def planet_from_star(
     }
 
 
-
 @jax.jit
 def lambertian_reflection(surface_star_cos_angle, x, y, z):
     """
@@ -606,7 +577,7 @@ def lambertian_reflection(surface_star_cos_angle, x, y, z):
     cosine law, which states that the intensity of reflected light is proportional to
     the cosine of the angle between the surface normal and the illumination direction.
     That arrangement means it does *not* depend on the observer's viewing angle, only
-    the illumination angle. This helper function also assumes a uniform albedo of 1 
+    the illumination angle. This helper function also assumes a uniform albedo of 1
     across the planet's surface (the final reflected flux will be scaled by the provided
     albedo, though is still always assumed to be uniform).
 
@@ -673,7 +644,7 @@ def reflected_normalization(
 
     Returns:
         Array: The normalization factor for the reflected light.
-    
+
     """
     sep_squared = x_c**2 + y_c**2 + z_c**2
     # flux_density = 1 / (4 * jnp.pi * sep_squared)
@@ -815,15 +786,15 @@ def reflected_phase_curve(
         ),
     )[1]
 
-    norm = reflected_normalization(
-        two, three, x_c, y_c, z_c
-    )
+    norm = reflected_normalization(two, three, x_c, y_c, z_c)
 
     return flux * norm * state["reflected_albedo"]
+
 
 ########################################################################################
 # Emission helpers
 ########################################################################################
+
 
 def _x_x(a, e, f, Omega, i, omega, r, obliq, prec):
     return (
@@ -857,21 +828,15 @@ def _x_z(a, e, f, Omega, i, omega, r, obliq, prec):
 
 
 def _x_0(a, e, f, Omega, i, omega, r, obliq, prec):
-    return (a * (-1 + e**2) * jnp.cos(f - prec) * jnp.cos(obliq)) / (
-        1 + e * jnp.cos(f)
-    )
+    return (a * (-1 + e**2) * jnp.cos(f - prec) * jnp.cos(obliq)) / (1 + e * jnp.cos(f))
 
 
 def _y_x(a, e, f, Omega, i, omega, r, obliq, prec):
     return -(
         jnp.cos(omega)
-        * (
-            jnp.cos(Omega) * jnp.sin(prec)
-            + jnp.cos(i) * jnp.cos(prec) * jnp.sin(Omega)
-        )
+        * (jnp.cos(Omega) * jnp.sin(prec) + jnp.cos(i) * jnp.cos(prec) * jnp.sin(Omega))
     ) + jnp.sin(omega) * (
-        -(jnp.cos(prec) * jnp.cos(Omega))
-        + jnp.cos(i) * jnp.sin(prec) * jnp.sin(Omega)
+        -(jnp.cos(prec) * jnp.cos(Omega)) + jnp.cos(i) * jnp.sin(prec) * jnp.sin(Omega)
     )
 
 
@@ -920,9 +885,7 @@ def _z_z(a, e, f, Omega, i, omega, r, obliq, prec):
 
 
 def _z_0(a, e, f, Omega, i, omega, r, obliq, prec):
-    return (a * (-1 + e**2) * jnp.cos(f - prec) * jnp.sin(obliq)) / (
-        1 + e * jnp.cos(f)
-    )
+    return (a * (-1 + e**2) * jnp.cos(f - prec) * jnp.sin(obliq)) / (1 + e * jnp.cos(f))
 
 
 @jax.jit
@@ -942,32 +905,44 @@ def pre_squish_transform(a, e, f, Omega, i, omega, r, obliq, prec, **kwargs):
     mat = mat.at[:, 2, 3].set(_z_0(a, e, f, Omega, i, omega, r, obliq, prec))
     return mat
 
+
 @jax.jit
-def _emission_profle(x, y, z, r, f1, f2, hotspot_latitude, hotspot_longitude, hotspot_concentration):
+def _emission_profle(
+    x, y, z, r, f1, f2, hotspot_latitude, hotspot_longitude, hotspot_concentration
+):
+    # the last factor is 1 / float(gamma(3/2) / (2*jnp.pi**(3/2))), a constant that
+    # ensures uniform sampling on the sphere will give you an integral equal to 1.0
+    # https://en.wikipedia.org/wiki/Von_Mises%E2%80%93Fisher_distribution
     return (
-        jnp.exp(
-            hotspot_concentration
-            + (
+        (
+            jnp.exp(
                 hotspot_concentration
-                * (
-                    -((-1 + f2) * z * jnp.cos(hotspot_latitude))
-                    + (-1 + f1)
-                    * jnp.sin(hotspot_latitude)
-                    * ((-1 + f2) * x * jnp.cos(hotspot_longitude) - y * jnp.sin(hotspot_longitude))
+                + (
+                    hotspot_concentration
+                    * (
+                        -((-1 + f2) * z * jnp.cos(hotspot_latitude))
+                        + (-1 + f1)
+                        * jnp.sin(hotspot_latitude)
+                        * (
+                            (-1 + f2) * x * jnp.cos(hotspot_longitude)
+                            - y * jnp.sin(hotspot_longitude)
+                        )
+                    )
+                )
+                / (
+                    (-1 + f1)
+                    * (-1 + f2)
+                    * r
+                    * jnp.sqrt(
+                        (x**2 + y**2 / (-1 + f2) ** 2 + z**2 / (-1 + f1) ** 2) / r**2
+                    )
                 )
             )
-            / (
-                (-1 + f1)
-                * (-1 + f2)
-                * r
-                * jnp.sqrt(
-                    (x**2 + y**2 / (-1 + f2) ** 2 + z**2 / (-1 + f1) ** 2)
-                    / r**2
-                )
-            )
+            * hotspot_concentration
         )
-        * hotspot_concentration
-    ) / (-2 * jnp.pi + 2 * jnp.exp(2 * hotspot_concentration) * jnp.pi)
+        / (-2 * jnp.pi + 2 * jnp.exp(2 * hotspot_concentration) * jnp.pi)
+        * 12.566370614359174
+    )
 
 
 @jax.jit
@@ -982,15 +957,28 @@ def emission_profile(
     hotspot_latitude,
     hotspot_longitude,
     hotspot_concentration,
-    **kwargs
+    **kwargs,
 ):
     # always one time slice at a time
 
     # do this check before you transform into the planet frame
     mask = ~((x**2 + y**2 < 1) & (z < 0))
     x, y, z = jnp.matmul(transform, jnp.array([x, y, z, jnp.ones_like(x)]))
-    return _emission_profle(x, y, z, r, f1, f2, hotspot_latitude, hotspot_longitude, hotspot_concentration) * mask
-
+    # area_after_squish = emission_squish_correction(x, y, z, r, f1, f2)
+    return (
+        _emission_profle(
+            x,
+            y,
+            z,
+            r,
+            f1,
+            f2,
+            hotspot_latitude,
+            hotspot_longitude,
+            hotspot_concentration,
+        )
+        * mask
+    )  # * area_after_squish
 
 
 @jax.jit
@@ -1105,10 +1093,9 @@ def emission_phase_curve(
 # Combined curves
 ########################################################################################
 
+
 @jax.jit
-def phase_curve(
-    sample_radii, sample_thetas, two, three, state, x_c, y_c, z_c
-):
+def phase_curve(sample_radii, sample_thetas, two, three, state, x_c, y_c, z_c):
 
     if two["rho_xx"].shape != two["rho_x0"].shape:
         two["rho_xx"] = jnp.ones_like(x_c) * two["rho_xx"]
@@ -1202,10 +1189,13 @@ def phase_curve(
             state["hotspot_concentration"],
         )
 
-        return None, (jnp.sum(lamb) / sample_radii.shape[0], jnp.sum(emission_samples) / emission_samples.shape[0])
+        return None, (
+            jnp.sum(lamb) / sample_radii.shape[0],
+            jnp.sum(emission_samples) / emission_samples.shape[0],
+        )
 
     transform_matricies = pre_squish_transform(**state)
-    
+
     fluxes = jax.lax.scan(
         scan_func,
         None,
@@ -1233,8 +1223,9 @@ def phase_curve(
         ),
     )[1]
 
-    reflected_norm = reflected_normalization(
-        two, three, x_c, y_c, z_c
-    )
+    reflected_norm = reflected_normalization(two, three, x_c, y_c, z_c)
 
-    return fluxes[0] * reflected_norm * state["reflected_albedo"], fluxes[1] * state["emitted_scale"] # the reflected and emitted contributions
+    return (
+        fluxes[0] * reflected_norm * state["reflected_albedo"],
+        fluxes[1] * state["emitted_scale"],
+    )  # the reflected and emitted contributions
