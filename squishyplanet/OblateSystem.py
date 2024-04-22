@@ -19,6 +19,8 @@ from squishyplanet.engine.phase_curve_utils import (
     reflected_phase_curve,
     emission_phase_curve,
     phase_curve,
+    stellar_ellipsoidal_variations,
+    stellar_doppler_variations,
 )
 
 import copy
@@ -145,6 +147,16 @@ class OblateSystem:
         compute_emitted_phase_curve (bool, default=False):
             Whether to include flux emitted by the planet when calling
             :func:`lightcurve`.
+        compute_stellar_ellipsoidal_variations (bool, default=False):
+            Whether to include stellar ellipsoidal variations in the light curve. This
+            is the effect of the star's shape changing due to the gravitational pull of
+            the planet, and here is modeled as a simple sinusoidal variation with 4
+            peaks per orbit.
+        compute_stellar_doppler_variations (bool, default=False):
+            Whether to include stellar doppler variations in the light curve. This 
+            captures the effects of the star's radial velocity changing and boosting the
+            total flux/pushing some flux into/out of the bandpass of the observation.
+            Here, it is modeled as a simple sinusoidal variation with 2 peaks per orbit.
         phase_curve_nsamples (int, default=50_000):
             The number of random samples of the planet's surface to draw when performing
             Monte Carlo estimates of the emitted/reflected flux. A larger number will
@@ -186,11 +198,15 @@ class OblateSystem:
         hotspot_concentration=0.2,
         reflected_albedo=1.0,
         emitted_scale=1e-6,
+        stellar_ellipsoidal_alpha=1e-6,
+        stellar_doppler_alpha=1e-6,
         systematic_trend_coeffs=jnp.array([0.0, 0.0]),
         log_jitter=-10,
         tidally_locked=True,
         compute_reflected_phase_curve=False,
         compute_emitted_phase_curve=False,
+        compute_stellar_ellipsoidal_variations=False,
+        compute_stellar_doppler_variations=False,
         phase_curve_nsamples=50_000,
         random_seed=0,
         data=jnp.array([1.0]),
@@ -217,11 +233,15 @@ class OblateSystem:
             "hotspot_concentration",
             "reflected_albedo",
             "emitted_scale",
+            "stellar_ellipsoidal_alpha",
+            "stellar_doppler_alpha",
             "systematic_trend_coeffs",
             "log_jitter",
             "tidally_locked",
             "compute_reflected_phase_curve",
             "compute_emitted_phase_curve",
+            "compute_stellar_ellipsoidal_variations",
+            "compute_stellar_doppler_variations",
             "phase_curve_nsamples",
             "random_seed",
             "data",
@@ -488,6 +508,12 @@ class OblateSystem:
         return _lightcurve(
             compute_reflected_phase_curve=self._state["compute_reflected_phase_curve"],
             compute_emitted_phase_curve=self._state["compute_emitted_phase_curve"],
+            compute_stellar_ellipsoidal_variations=self._state[
+                "compute_stellar_ellipsoidal_variations"
+            ],
+            compute_stellar_doppler_variations=self._state[
+                "compute_stellar_doppler_variations"
+            ],
             random_seed=self._state["random_seed"],
             phase_curve_nsamples=self._state["phase_curve_nsamples"],
             state=self._state,
@@ -518,6 +544,12 @@ class OblateSystem:
         return _loglike(
             compute_reflected_phase_curve=self._state["compute_reflected_phase_curve"],
             compute_emitted_phase_curve=self._state["compute_emitted_phase_curve"],
+            compute_stellar_ellipsoidal_variations=self._state[
+                "compute_stellar_ellipsoidal_variations"
+            ],
+            compute_stellar_doppler_variations=self._state[
+                "compute_stellar_doppler_variations"
+            ],
             random_seed=self._state["random_seed"],
             phase_curve_nsamples=self._state["phase_curve_nsamples"],
             state=self._state,
@@ -532,100 +564,96 @@ class OblateSystem:
         1,
         2,
         3,
+        4,
+        5,
     ),
 )
 def _lightcurve(
     compute_reflected_phase_curve,
     compute_emitted_phase_curve,
+    compute_stellar_ellipsoidal_variations,
+    compute_stellar_doppler_variations,
     random_seed,
     phase_curve_nsamples,
     state,
     params,
 ):
-
-    # if all you want is the transit, don't do any of the phase curve calculations
-    if (not compute_reflected_phase_curve) & (not compute_emitted_phase_curve):
-        for key in params.keys():
+    # always compute the primary transit and trend
+    for key in params.keys():
             state[key] = params[key]
-        trend = jnp.polyval(state["systematic_trend_coeffs"], state["times"])
-        return lightcurve(state) + trend
+    transit = lightcurve(state)
+    trend = jnp.polyval(state["systematic_trend_coeffs"], state["times"])
 
-    # if you do want a phase curve, generate the radii and thetas that you'll reuse
-    # at each timestep
+    # if you don't want any phase curve stuff, you're done
+    if (not compute_reflected_phase_curve) & (not compute_emitted_phase_curve) and \
+        (not compute_stellar_doppler_variations) & (not compute_stellar_ellipsoidal_variations):
+        return transit + trend
+
+    ######################################################
+    # compute the planet's contribution to the phase curve
+    ######################################################
+
+    # generate the radii and thetas that you'll reuse at each timestep
     sample_radii, sample_thetas = generate_sample_radii_thetas(
         jax.random.key(random_seed),
         jnp.arange(phase_curve_nsamples),
     )
+    
+    # technically these are all calculated in "transit", but since phase
+    # curves are a) rare and b) expensive, we'll just do it again to keep
+    # the transit section of the code more self-contained
+    three = planet_3d_coeffs(**state)
+    two = planet_2d_coeffs(**three)
+    positions = skypos(**state)
+    x_c = positions[0, :]
+    y_c = positions[1, :]
+    z_c = positions[2, :]
 
     # just the reflected component
     if compute_reflected_phase_curve & (not compute_emitted_phase_curve):
-        for key in params.keys():
-            state[key] = params[key]
-
-        transit = lightcurve(state)
-
-        # technically these are all calculated in "transit", but since phase
-        # curves are a) rare and b) expensive, we'll just do it again to keep
-        # the transit section of the code more self-contained
-        three = planet_3d_coeffs(**state)
-        two = planet_2d_coeffs(**three)
-        positions = skypos(**state)
-        x_c = positions[0, :]
-        y_c = positions[1, :]
-        z_c = positions[2, :]
         reflected = reflected_phase_curve(
             sample_radii, sample_thetas, two, three, state, x_c, y_c, z_c
         )
+        emitted = 0.0
         # it really didn't make a difference in speed here
         # reflected = jax.vmap(
         #     reflected_phase_curve, in_axes=(0, 0, None, None, None, None, None, None)
         # )(sample_radii, sample_thetas, two, three, state, x_c, y_c, z_c)
         # reflected = jnp.mean(reflected, axis=0)
 
-        trend = jnp.polyval(state["systematic_trend_coeffs"], state["times"])
-        return transit + reflected + trend
-
     # just the emitted component
     elif (not compute_reflected_phase_curve) & compute_emitted_phase_curve:
-        for key in params.keys():
-            state[key] = params[key]
-        transit = lightcurve(state)
-
-        # technically these are all calculated in "transit", but since phase
-        # curves are a) rare and b) expensive, we'll just do it again to keep
-        # the transit section of the code more self-contained
-        three = planet_3d_coeffs(**state)
-        two = planet_2d_coeffs(**three)
-        positions = skypos(**state)
-        x_c = positions[0, :]
-        y_c = positions[1, :]
-        z_c = positions[2, :]
+        reflected = 0.0
         emitted = emission_phase_curve(sample_radii, sample_thetas, two, three, state)
 
-        trend = jnp.polyval(state["systematic_trend_coeffs"], state["times"])
-        return transit + emitted + trend
-
-    # both reflected and emitted components
+    # both reflected and emitted components. this function shares some of the
+    # computation between the two, so it's a bit faster than running them separately
     elif compute_reflected_phase_curve & compute_emitted_phase_curve:
-        for key in params.keys():
-            state[key] = params[key]
-        transit = lightcurve(state)
-
-        # technically these are all calculated in "transit", but since phase
-        # curves are a) rare and b) expensive, we'll just do it again to keep
-        # the transit section of the code more self-contained
-        three = planet_3d_coeffs(**state)
-        two = planet_2d_coeffs(**three)
-        positions = skypos(**state)
-        x_c = positions[0, :]
-        y_c = positions[1, :]
-        z_c = positions[2, :]
         reflected, emitted = phase_curve(
             sample_radii, sample_thetas, two, three, state, x_c, y_c, z_c
         )
 
-        trend = jnp.polyval(state["systematic_trend_coeffs"], state["times"])
-        return transit + reflected + emitted + trend
+    ####################################################
+    # compute the star's contribution to the phase curve
+    ####################################################
+
+    if compute_stellar_ellipsoidal_variations | compute_stellar_doppler_variations:
+        time_deltas = state["times"] - state["t_peri"]
+        mean_anomalies = 2 * jnp.pi * time_deltas / state["period"]
+        true_anomalies = kepler(mean_anomalies, state["e"])
+
+    if compute_stellar_ellipsoidal_variations:
+        ellipsoidal = stellar_ellipsoidal_variations(true_anomalies, state["stellar_ellipsoidal_alpha"], state["period"])
+    else:
+        ellipsoidal = 0.0
+    
+    if compute_stellar_doppler_variations:
+        doppler = stellar_doppler_variations(true_anomalies, state["stellar_doppler_alpha"], state["period"])
+    else:
+        doppler = 0.0
+
+    # put it all together
+    return transit + trend + reflected + emitted + ellipsoidal + doppler
 
 
 @partial(
@@ -635,11 +663,15 @@ def _lightcurve(
         1,
         2,
         3,
+        4,
+        5,
     ),
 )
 def _loglike(
     compute_reflected_phase_curve,
     compute_emitted_phase_curve,
+    compute_stellar_ellipsoidal_variations,
+    compute_stellar_doppler_variations,
     random_seed,
     phase_curve_nsamples,
     state,

@@ -33,11 +33,11 @@ def generate_sample_radii_thetas(key, num_points):
     """
     key, subkey = jax.random.split(key)
     sample_radii = jnp.sqrt(
-        jax.random.uniform(subkey, (vmap_splits.shape[0],), minval=0, maxval=1)
+        jax.random.uniform(subkey, (num_points.shape[0],), minval=0, maxval=1)
     )
     key, subkey = jax.random.split(key)
     sample_thetas = jax.random.uniform(
-        subkey, (vmap_splits.shape[0],), minval=0, maxval=2 * jnp.pi
+        subkey, (num_points.shape[0],), minval=0, maxval=2 * jnp.pi
     )
     return sample_radii, sample_thetas
 
@@ -1294,6 +1294,63 @@ def emission_phase_curve(
     )[1]
 
     return flux * state["emitted_scale"]
+
+########################################################################################
+# Stellar effects helpers
+########################################################################################
+
+@jax.jit
+def stellar_ellipsoidal_variations(true_anomalies, stellar_ellipsoidal_alpha, period):
+    """
+    Compute the contributions to a phase curve for a star with ellipsoidal variations.
+
+    A simple sinusoid model with minima at primary and secondary eclipse, meant to 
+    capture gravitational  Works only for a circular orbit and assumes
+    that :math:`\Omega=\pi`. Uses the model in
+    `Shporer et al. 2014 <https://ui.adsabs.harvard.edu/abs/2014ApJ...788...92S/abstract>`_.
+
+    Technically the amplitude in `Morris, Heng, and Kitzmann 2024 <https://ui.adsabs.harvard.edu/abs/2024arXiv240113635M/abstract>`_ is given by
+
+    .. math::
+
+        A_{ellip} = \\frac{\\alpha}{0.077} \\frac{M_p}{M_J} \\left(\\frac{R_s}{R_\odot}\\right)^3 \\left(\\frac{P}{1 \\text{day}}\\right)^{-2}
+
+    But we instead roll everything into the alpha parameter.
+
+    Args:
+        true_anomalies (Array):
+            The true anomaly of the planet at each time step.
+        stellar_ellipsoidal_alpha (float):
+            The amplitude of the ellipsoidal variations.
+        period (float):
+            The orbital period of the planet.
+
+    Returns:
+        Array:
+            The contribution to the phase curve from the star's ellipsoidal variations.
+
+    """
+    amp = stellar_ellipsoidal_alpha #/ period**2
+    phi = true_anomalies - jnp.pi/2 # orbital phase is zero at primary transit
+    phi = jnp.where(phi < 0, phi + 2*jnp.pi, phi)
+    phi = phi / (2*jnp.pi)
+    return amp * (1 - jnp.cos(4*jnp.pi*(phi - 0.5)))
+
+
+@jax.jit
+def stellar_doppler_variations(true_anomalies, stellar_doppler_alpha, period):
+    """
+    Compute the contributions to a phase curve for a star with Doppler variations.
+
+    A simple sinusoid model with a phase of 90 degrees at primary transit meant to
+    capture Doppler boosting/flux falling in and out of the bandpass.
+    """
+
+    amp = stellar_doppler_alpha #/ period**(-1/3)
+    phi = true_anomalies - jnp.pi/2 # orbital phase is zero at primary transit
+    phi = jnp.where(phi < 0, phi + 2*jnp.pi, phi)
+    phi = phi / (2*jnp.pi)
+    return amp * jnp.sin(2*jnp.pi*phi)
 
 
 ########################################################################################
