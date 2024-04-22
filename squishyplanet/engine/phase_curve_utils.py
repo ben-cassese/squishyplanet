@@ -128,6 +128,10 @@ def sample_surface(
     Convert randomly sampled :math:`(x, y)` points on the projected planet to
     :math:`(x, y, z)` points on the planet's surface.
 
+    The :math:`rho` coefficients are calculated with :func:`planet_2d.planet_2d_coeffs`,
+    the :math:`p` coefficients are calculated with :func:`planet_3d.planet_3d_coeffs`,
+    and the sample points are generated with :func:`generate_sample_radii_thetas`.
+
     Args:
         sample_radii (Array): The radii of the sampled points.
         sample_thetas (Array): The angles of the sampled points.
@@ -147,6 +151,10 @@ def sample_surface(
         p_zz (Array): zz coefficient in the 3D implicit representation.
         p_z0 (Array): z0 coefficient in the 3D implicit representation.
         p_00 (Array): 00 coefficient in the 3D implicit representation.
+        **kwargs:
+            Additional unused keyword arguments, included so that we can pass in
+            a larger state dictionary that includes all of the required parameters along
+            with other unnecessary ones.
 
     Returns:
         Tuple:
@@ -679,6 +687,49 @@ def reflected_normalization(
 def reflected_phase_curve(
     sample_radii, sample_thetas, two, three, state, x_c, y_c, z_c
 ):
+    """
+    Compute the timeseries of light reflected from  the planet.
+
+    This function computes the reflected light from the planet at each time step. It
+    assume the planet is a) a Lambertian reflector, b) that the star is a point source
+    sending out parallel rays, c) that the :math:`a/R_s >> R_p` (i.e., the distance
+    between each point on the surface to the star is essentially constant), and d) that
+    the planet has a spatially uniform albedo of unity (the entire curve can be scaled
+    by an actual albedo later, but the assumption of uniformity is baked-in). However,
+    it does take into account the planet's oblateness and orientation.
+
+    Args:
+        sample_radii (Array):
+            Randomly sampled radii from a unit sphere, used to generate points on the
+            visible disk of the planet at each timestep. Create with
+            :func:`generate_sample_radii_thetas`.
+        sample_thetas (Array):
+            Randomly sampled thetas from a unit sphere, used to generate points on the
+            visible disk of the planet at each timestep. Create with
+            :func:`generate_sample_radii_thetas`.
+        two (dict):
+            A dictionary containing the rho coefficients of the planet's implicit 2D
+            representation, as seen from the observer and calculated with
+            :func:`planet_2d.planet_2d_coeffs`.
+        three (dict):
+            A dictionary containing the p coefficients of the planet's 3D shape, as seen
+            from the observer and calculated with :func:`planet_3d.planet_3d_coeffs`.
+        state (dict):
+            A dictionary containing all of the parameters needed to compute the phase
+            curve. This includes the planet's orbital parameters, the observer's
+            parameters, and the hotspot parameters.
+        x_c (Array): The x coordinate of the center of the planet.
+        y_c (Array): The y coordinate of the center of the planet.
+        z_c (Array): The z coordinate of the center of the planet.
+
+
+    Returns:
+        Array:
+            The timeseries of reflected light from the planet. Each element of the array
+            corresponds to the time of the corresponding element in state["times"].
+
+
+    """
 
     # can be used to generate just a reflected curve alone
     # if doing emission also though, some of these calculations can be reused
@@ -890,6 +941,34 @@ def _z_0(a, e, f, Omega, i, omega, r, obliq, prec):
 
 @jax.jit
 def pre_squish_transform(a, e, f, Omega, i, omega, r, obliq, prec, **kwargs):
+    """
+    Compute the rotation matrix to go from the sky frame to the planet's.
+
+    This is the underlying transformation behind everything in
+    :func:`planet_3d.planet_3d_coeffs`, except that module never actually uses it
+    in this form since it applies it then goes ahead and gathers terms.
+
+    Args:
+        a (Array): The semi-major axis of the planet.
+        e (Array): The eccentricity of the planet.
+        f (Array): The true anomaly of the planet.
+        Omega (Array): The longitude of the ascending node of the planet.
+        i (Array): The inclination of the planet.
+        omega (Array): The argument of periapsis of the planet.
+        r (Array): The equatorial radius of the planet.
+        obliq (Array): The obliquity of the planet.
+        prec (Array): The precession of the planet.
+        **kwargs:
+            Additional unused keyword arguments, included so that we can pass in
+            a larger state dictionary that includes all of the required parameters along
+            with other unnecessary ones.
+
+    Returns:
+        Array:
+            A matrix that can be used to rotate vectors from the sky frame to the
+            planet's frame.
+
+    """
     mat = jnp.ones((f.shape[0], 3, 4))
     mat = mat.at[:, 0, 0].set(_x_x(a, e, f, Omega, i, omega, r, obliq, prec))
     mat = mat.at[:, 0, 1].set(_x_y(a, e, f, Omega, i, omega, r, obliq, prec))
@@ -945,6 +1024,56 @@ def _emission_profle(
     )
 
 
+# @jax.jit
+# def emission_squish_correction(x,y,z,r,f1,f2):
+#     """
+#     Correction factor for the squishing of the planet due to its oblateness.
+
+#     We're using the
+#     `von Mises-Fisher distribution
+#     <https://https://en.wikipedia.org/wiki/Von_Mises%E2%80%93Fisher_distribution>`_ to
+#     model a hotspot. But, that's defined on the unit sphere, and after compressing it to
+#     the squished planet, the surface denisty of emission intensity will be warped. We
+#     need to correct for that warping here. The input coordinates here are **IN THE
+#     PLANET'S FRAME, NOT THE SKY FRAME.** After getting :math:`x,y,z` samples in the sky
+#     frame, apply the rotation matrix from :func:`pre_squish_transform` to get these.
+
+#     Not sure if this link will live, but see
+#     `here <https://math.stackexchange.com/questions/973101/how-to-generate-points-uniformly-distributed-on-the-surface-of-an-ellipsoid>`_
+#     for an intuition.
+
+#     Args:
+#         x (Array):
+#             The x values of the points on the planet's surface IN THE PLANET'S FRAME
+#         y (Array):
+#             The y values of the points on the planet's surface IN THE PLANET'S FRAME
+#         z (Array):
+#             The z values of the points on the planet's surface IN THE PLANET'S FRAME
+#         r (Array):
+#             The equatorial radius of the planet.
+#         f1 (Array):
+#             The planet's :math:`z` flattening coefficient.
+#         f2 (Array):
+#             The planet's :math:`y` flattening coefficient.
+
+#     Returns:
+#         Array:
+#             The correction factor for the squishing of the planet due to its oblateness.
+
+
+#     """
+#     a = 1/r
+#     b = 1/jnp.sqrt(r**2 * (1 - f2)**2)
+#     c = 1/jnp.sqrt(r**2 * (1 - f1)**2)
+
+#     # this will be less than one away from the poles
+#     area_after_squish = (jnp.sqrt(
+#         (a*c*y)**2 + (a*b*z)**2 + (b*c*x)**2
+#     ) / (b*c))
+
+#     return area_after_squish
+
+
 @jax.jit
 def emission_profile(
     x,
@@ -959,6 +1088,41 @@ def emission_profile(
     hotspot_concentration,
     **kwargs,
 ):
+    """
+    Compute the emitted intensity at a given point on the planet's surface.
+
+    CURRENTLY BROKEN, NOT CORRECTING FOR AREA DISTORTION CORRECTLY
+
+    Args:
+        x (Array):
+            The x values of the points on the planet's surface in the sky frame
+        y (Array):
+            The y values of the points on the planet's surface in the sky frame
+        z (Array):
+            The z values of the points on the planet's surface in the sky frame
+        transform (Array):
+            The rotation matrix to transform the sky frame to the planet's frame,
+            calculated with :func:`pre_squish_transform`.
+        r (Array):
+            The equatorial radius of the planet.
+        f1 (Array):
+            The planet's :math:`z` flattening coefficient.
+        f2 (Array):
+            The planet's :math:`y` flattening coefficient.
+        hotspot_latitude (Array):
+            The "latitude" of the hotspot on the planet. Defined the physics way for
+            :math:`\theta` though, not the geography way: 0 is the north pole,
+            :math:`\pi/2` is the equator, and :math:`\pi` is the south pole.
+        hotspot_longitude (Array):
+            The longitude of the hotspot on the planet.
+        hotspot_concentration (Array):
+            The concentration of the hotspot on the planet. :math:`\kappa` in the
+            von Mises-Fisher distribution.
+
+    Returns:
+        Array:
+            The intensity of the emitted light at each point.
+    """
     # always one time slice at a time
 
     # do this check before you transform into the planet frame
@@ -990,6 +1154,49 @@ def emission_phase_curve(
     state,
     **kwargs,
 ):
+    """
+    Compute the timeseries of the emitted light from the planet.
+
+    CURRENTLY BROKEN, NOT CORRECTING FOR AREA DISTORTION CORRECTLY
+
+    This function does a Monte Carlo estimation of the visible flux emitted by the
+    planet at each time step assuming that a) the surface intensity is modeled by a
+    von Mises-Fisher distribution and b) the planet is a Lambertian emitter. To save
+    on computation, it takes one set of randomly generated samples of a unit disk,
+    then coverts these to points on the planet's visible disk at each timestep. This
+    introduces some bias- be sure to use a large enough sample it is below an
+    appropriate threshold. Also, to compute secondary eclipses, samples are zeroed
+    out when they fall behind the star.
+
+
+    Args:
+        sample_radii (Array):
+            Randomly sampled radii from a unit sphere, used to generate points on the
+            visible disk of the planet at each timestep. Create with
+            :func:`generate_sample_radii_thetas`.
+        sample_thetas (Array):
+            Randomly sampled thetas from a unit sphere, used to generate points on the
+            visible disk of the planet at each timestep. Create with
+            :func:`generate_sample_radii_thetas`.
+        two (dict):
+            A dictionary containing the rho coefficients of the planet's implicit 2D
+            representation, as seen from the observer and calculated with
+            :func:`planet_2d.planet_2d_coeffs`.
+        three (dict):
+            A dictionary containing the p coefficients of the planet's 3D shape, as seen
+            from the observer and calculated with :func:`planet_3d.planet_3d_coeffs`.
+        state (dict):
+            A dictionary containing all of the parameters needed to compute the phase
+            curve. This includes the planet's orbital parameters, the observer's
+            parameters, and the hotspot parameters.
+
+    Returns:
+        Array:
+            The timeseries of observed emitted light from the planet. Each element of
+            the array is the total observed emitted flux at that corresponding time in
+            the state["times"] array.
+
+    """
     # can be used to generate just an emitted phase curve alone
     # if doing reflection also though, some of these calculations can be reused
 
@@ -1096,6 +1303,43 @@ def emission_phase_curve(
 
 @jax.jit
 def phase_curve(sample_radii, sample_thetas, two, three, state, x_c, y_c, z_c):
+    """
+    Compute the reflected and emitted phase curves of the planet.
+
+    This is essentially a wrapper for :func:`reflected_phase_curve` and
+    :func:`emission_phase_curve`, except is reuses computations where it can, and also
+    applies the appriate scalings to each (albedo/distance from star/area seen by star
+    for reflection, and the emitted scale for emission).
+
+    Args:
+        sample_radii (Array):
+            Randomly sampled radii from a unit sphere, used to generate points on the
+            visible disk of the planet at each timestep. Create with
+            :func:`generate_sample_radii_thetas`.
+        sample_thetas (Array):
+            Randomly sampled thetas from a unit sphere, used to generate points on the
+            visible disk of the planet at each timestep. Create with
+            :func:`generate_sample_radii_thetas`.
+        two (dict):
+            A dictionary containing the rho coefficients of the planet's implicit 2D
+            representation, as seen from the observer and calculated with
+            :func:`planet_2d.planet_2d_coeffs`.
+        three (dict):
+            A dictionary containing the p coefficients of the planet's 3D shape, as seen
+            from the observer and calculated with :func:`planet_3d.planet_3d_coeffs`.
+        state (dict):
+            A dictionary containing all of the parameters needed to compute the phase
+            curve. This includes the planet's orbital parameters, the observer's
+            parameters, and the hotspot parameters.
+        x_c (Array): The x coordinate of the center of the planet.
+        y_c (Array): The y coordinate of the center of the planet.
+        z_c (Array): The z coordinate of the center of the planet.
+
+    Returns:
+        Tuple:
+            The correctly scaled reflected and emitted contributions to the phase curve.
+
+    """
 
     if two["rho_xx"].shape != two["rho_x0"].shape:
         two["rho_xx"] = jnp.ones_like(x_c) * two["rho_xx"]

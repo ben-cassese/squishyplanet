@@ -27,6 +27,144 @@ import pprint
 
 
 class OblateSystem:
+    """
+    The core user interface for ``squishyplanet``, used to model potentially-triaxial
+    exoplanet transits/phase curves.
+
+    Note, all instances will have values associated with phase curve
+    calculations, such as albedo and hotspot location. However, if inputs such are
+    "compute_reflected_phase_curve" are set to ``False``, these values will not be used.
+    The :func:`lightcurve` method will return only the transit light curve in this case,
+    and should be used if computing a transit, reflected, or emitted phase curve.
+
+    All arguments will be internally converted to ``jax.numpy`` dtypes, and all methods
+    will similarly return ``jax.numpy`` arrays. These can be treated similarly to
+    numpy arrays in most cases, but if passing outputs to external inference libraries
+    expecting numpy, you may need to explicitly convert them.
+
+    Properties:
+        state (dict):
+            A dictionary of all the parameters of the system, including those specified
+            by the user, default values, and those calculated by combinations of the
+            two. Immutable, but can be accessed to see the current state of the system.
+
+    Args:
+        times (array-like, [Days], default=None):
+            The times at which to calculate the light curve. The gap between times is
+            assumed to be in units of days, but any zero-point/standard system
+            (e.g. BJD) will work. A required parameter, will raise an error if not
+            provided.
+        t_peri (float, [Days], default=None):
+            The time of periastron passage. A required parameter, will raise an error
+            if not provided.
+        period (float, [Days], default=None):
+            The period of the orbit. A required parameter, will raise an error if not
+            provided.
+        a (float, [Rstar], default=None):
+            The semi-major axis of the orbit in units of the radius of the star. A
+            required parameter, will raise an error if not provided.
+        e (float, default=0.0):
+            The eccentricity of the orbit.
+        i (float, [Radian], default=jnp.pi / 2):
+            The inclination of the orbit.
+        Omega (float, [Radian], default=jnp.pi):
+            The longitude of the ascending node. Changing this will **not affect** the
+            transit light curve (more accurately, changes can always be compensated for
+            via rotations in obliq or prec). It is included only because it naturally
+            arises in the orbit rotations, and I guess could come into play if anyone
+            ever wants to do a joint astrometry model.
+        omega (float, [Radian], default=0.0):
+            The argument of periapsis. Set to 0.0 for a circular orbit, otherwise there
+            will be degeneracies with t_peri.
+        obliq (float, [Radian], default=0.0):
+            The obliquity of the planet. This is the angle between the planet's rotation
+            axis and the normal to the orbital plane. It is defined such that a planet
+            on a circular orbit with :math:`\Omega = 0` and :math:`\\nu = 0` (i.e., when
+            it's along the positive :math:`x` axis) will have its north pole tipped
+            *away* from the star.
+        prec (float, [Radian], default=0.0):
+            The "precession angle" of the planet. This defined as a rotation of the
+            planet about an axis that's aligned with its orbit normal and runs through
+            the center of the planet (e.g., if obliq=0, it would set the planet's
+            instantaneous rotational phase, and if obliq :math:`\\neq` 0, it would set
+            the "season" of the northern hemisphere at periastron passage.)
+        r (float, [Rstar], default=None):
+            The equatorial radius of the planet. This will always be the largest of the
+            3 axes of the triaxial ellipsoid. A required parameter, will raise an error
+            if not provided.
+        f1 (float, [Dimensionless], default=0.0):
+            The fractional difference between the (longest) equatorial and polar radii
+            of the planet. This is defined as :math:`(R_{eq} - R_{pol}) / R_{eq}`.
+        f2 (float, [Dimensionless], default=0.0):
+            The fractional difference between long and short radii of the ellipse that
+            defines the equator of the planet. Defined similarly to f1.
+        ld_u_coeffs (array-like, default=jnp.array([0.0, 0.0])):
+            The coefficients that determine the limb darkening profile of the star. The
+            star is assumed to be azimuthally symmetric and have a radial profile
+            described by:
+
+            .. math::
+
+                \\frac{I(\mu)}{I_0} = - \Sigma_{i=0}^N u_i (1 - \mu)^i
+
+            for some order polynomial :math:`N`. See
+            `Agol, Luger, and Foreman-Mackey 2020 <https://ui.adsabs.harvard.edu/abs/2020AJ....159..123A/abstract>`_
+            for more.
+        hotspot_latitude (float, [Radian], default=0.0):
+            The latitude of a potential hotspot on the planet. This is defined according
+            to the "physics" convention of spherical coordinates, not in the geography
+            sense: 0 is the north pole, :math:`\pi/2` is the equator, and :math:`\pi` is
+            the south pole.
+        hotspot_longitude (float, [Radian], default=0.0):
+            The longitude of a potential hotspot on the planet.
+        hotspot_concentration (float, default=0.2):
+            The "concentration" of the hotspot. This is the :math:`\kappa` parameter in
+            the von Mises-Fisher distribution that describes the hotspot.
+        reflected_albedo (float, default=1.0):
+            The (spatialy uniform) albedo of the planet. This is the fraction of light
+            that is reflected, though the directional-dependent scattering is dictated
+            by Lambert's cosine law.
+        emitted_scale (float, default=1.0):
+            The total emitted flux of the planet, in units of un-occulted stellar flux.
+            The von Mises-Fisher distribution integrates to 1, and this factor scales
+            the resulting emission profile.
+        systematic_trend_coeffs (array-like, default=jnp.array([0.0,0.0])):
+            The coefficients that determine the polynomial trend in time added to the
+            lightcurves. Used to optionally model long-term drifts in observed data.
+        log_jitter (float, default=-10):
+            The log of the "jitter" term included in likelihood calculations. The jitter
+            is added in quadrature to the provided uncertainties to account for any
+            unmodeled noise in the data.
+        tidally_locked (bool, default=True):
+            Whether the planet is tidally locked to the star. If ``True``, then ``prec``
+            will always be set equal to the true anomaly, meaning the same face of the
+            planet will always face the star.
+        compute_reflected_phase_curve (bool, default=False):
+            Whether to include flux reflected by the planet when calling
+            :func:`lightcurve`.
+        compute_emitted_phase_curve (bool, default=False):
+            Whether to include flux emitted by the planet when calling
+            :func:`lightcurve`.
+        phase_curve_nsamples (int, default=50_000):
+            The number of random samples of the planet's surface to draw when performing
+            Monte Carlo estimates of the emitted/reflected flux. A larger number will
+            increase the resolution/shrink the error of the estimate but result in
+            longer computation times.
+        random_seed (int, default=0):
+            A random seed used for the Monte Carlo integrals in the phase curve. This
+            feeds into ``jax.random.PRNGKey``. Runs with the same ``random_seed`` will
+            always return identical outputs, so if checking the affect of altering
+            ``phase_curve_nsamples``, you should change this as well.
+        data (array-like, default=jnp.array([1.0])):
+            The observed data to compare to the light curve. Must be the same length as
+            ``times``. Only needed if calling :func:`loglike`.
+        uncertainties (array-like, default=jnp.array([0.01])):
+            The uncertainties on the observed data. Must be the same length as ``data``,
+            even if the errors are homoskedastic. Only needed if calling
+            :func:`loglike`.
+
+    """
+
     def __init__(
         self,
         times=None,
@@ -42,14 +180,13 @@ class OblateSystem:
         r=None,
         f1=0.0,
         f2=0.0,
-        ld_u_coeffs=jnp.array([0, 0]),
+        ld_u_coeffs=jnp.array([0.0, 0.0]),
         hotspot_latitude=0.0,
         hotspot_longitude=0.0,
         hotspot_concentration=0.2,
         reflected_albedo=1.0,
-        emitted_scale=1.0,
-        systematic_offset=0.0,
-        systematic_linear=0.0,
+        emitted_scale=1e-6,
+        systematic_trend_coeffs=jnp.array([0.0, 0.0]),
         log_jitter=-10,
         tidally_locked=True,
         compute_reflected_phase_curve=False,
@@ -80,8 +217,7 @@ class OblateSystem:
             "hotspot_concentration",
             "reflected_albedo",
             "emitted_scale",
-            "systematic_offset",
-            "systematic_linear",
+            "systematic_trend_coeffs",
             "log_jitter",
             "tidally_locked",
             "compute_reflected_phase_curve",
@@ -97,7 +233,7 @@ class OblateSystem:
             state[key] = locals()[key]
         self._state = state
 
-        self.validate_inputs()
+        self._validate_inputs()
 
         # necessary for all light curves
         self._state["greens_basis_transform"] = generate_change_of_basis_matrix(
@@ -127,7 +263,29 @@ class OblateSystem:
         self._coeffs_2d = planet_2d_coeffs(**self._coeffs_3d)
         self._para_coeffs_2d = poly_to_parametric(**self._coeffs_2d)
 
-    def validate_inputs(self):
+    def __repr__(self):
+        s = pprint.pformat(self.state)
+        return f"OblateSystem(\n{s}\n)"
+
+    @property
+    def state(self):
+        """
+        A dictionary that includes all of the parameters of the system.
+
+        This is an immutable property, and will raise an error if you try to set it.
+        If altering parameters that would affect a lightcurve, pass those as a
+        dictionary to the :func:`lightcurve` method. If altering the data or times at
+        which to generate the lightcurve, just define a new system with those values.
+
+        Returns:
+            dict:
+            A dictionary of all the parameters of the system, including those specified
+            by the user, default values, and those calculated by combinations of the
+            two.
+        """
+        return self._state
+
+    def _validate_inputs(self):
         for key, val in self._state.items():
             if type(val) == type(None):
                 raise ValueError(f"'{key}' is a required parameter")
@@ -147,9 +305,13 @@ class OblateSystem:
         shapes = []
         for key in self._state.keys():
             if (
-                (key == "ld_u_coeffs")
+                (key == "times")
+                | (key == "ld_u_coeffs")
                 | (key == "phase_curve_nsamples")
                 | (key == "random_seed")
+                | (key == "data")
+                | (key == "uncertainties")
+                | (key == "systematic_trend_coeffs")
             ):
                 continue
             elif type(self._state[key]) == bool:
@@ -285,6 +447,44 @@ class OblateSystem:
         }
 
     def lightcurve(self, params={}):
+        """
+        Compute the light curve of the system.
+
+        This method will return the light curve of the system at the times specified
+        when the system was initialized. If you want to compute the light curve at
+        different times, or with different orbital parameters, you can pass those
+        parameters as a dictionary to this method.
+
+        The first time this is run for a given system, JAX will jit-compile the
+        function, which can take some time. Subsequent calls will be much faster unless
+        you change the shape of any of the input arrays (e.g., changing the number of
+        times or the order of the polynomial limb darkening law). In those cases, or if
+        changing any of boolean flags, JAX will need to re-compile the function again.
+
+
+        Args:
+            params (dict, default={}):
+                A dictionary of parameters to update in the system state. Any keys
+                not provided will be pulled from the current state of the system.
+
+        Returns:
+            Array: The timeseries lightcurve of the system. The length will be equal to
+            `state["times"]`, and each index corresponds to a time in that array.
+
+        Examples:
+            >>> state = {
+                    "t_peri" : 0.0,
+                    "times" : jnp.linspace(-jnp.pi, 2*jnp.pi, 3504),
+                    "a" : 2.0,
+                    "period" : 2*jnp.pi,
+                    "r" : 0.1,
+                    "compute_reflected_phase_curve" : True,
+                    "compute_emitted_phase_curve" : True,
+                    "emitted_scale" : 1e-5,
+                }
+            >>> system = OblateSystem(**state)
+            >>> system.lightcurve()
+        """
         return _lightcurve(
             compute_reflected_phase_curve=self._state["compute_reflected_phase_curve"],
             compute_emitted_phase_curve=self._state["compute_emitted_phase_curve"],
@@ -295,6 +495,26 @@ class OblateSystem:
         )
 
     def loglike(self, params={}):
+        """
+        Compute the log likelihood of the system given the observed data and some set of
+        parameters.
+
+        This method will call :func:`lightcurve` with the provided parameters and
+        compare the output to the observed data. The likelihood is assumed to be
+        Gaussian with no correlation between times. The jitter term is added in
+        quadrature to the provided uncertainties.
+
+        Args:
+            params (dict, default={}):
+                A dictionary of parameters to update in the system state. Any keys
+                not provided will be pulled from the current state of the system.
+
+        Returns:
+            float:
+            The log likelihood of the system given the observed data and the
+            provided parameters.
+
+        """
         return _loglike(
             compute_reflected_phase_curve=self._state["compute_reflected_phase_curve"],
             compute_emitted_phase_curve=self._state["compute_emitted_phase_curve"],
@@ -303,14 +523,6 @@ class OblateSystem:
             state=self._state,
             params=params,
         )
-
-    @property
-    def state(self):
-        return self._state
-
-    def __repr__(self):
-        s = pprint.pformat(self.state)
-        return f"OblateSystem(\n{s}\n)"
 
 
 @partial(
@@ -335,7 +547,7 @@ def _lightcurve(
     if (not compute_reflected_phase_curve) & (not compute_emitted_phase_curve):
         for key in params.keys():
             state[key] = params[key]
-        trend = state["systematic_offset"] + state["systematic_linear"] * state["times"]
+        trend = jnp.polyval(state["systematic_trend_coeffs"], state["times"])
         return lightcurve(state) + trend
 
     # if you do want a phase curve, generate the radii and thetas that you'll reuse
@@ -370,7 +582,7 @@ def _lightcurve(
         # )(sample_radii, sample_thetas, two, three, state, x_c, y_c, z_c)
         # reflected = jnp.mean(reflected, axis=0)
 
-        trend = state["systematic_offset"] + state["systematic_linear"] * state["times"]
+        trend = jnp.polyval(state["systematic_trend_coeffs"], state["times"])
         return transit + reflected + trend
 
     # just the emitted component
@@ -390,7 +602,7 @@ def _lightcurve(
         z_c = positions[2, :]
         emitted = emission_phase_curve(sample_radii, sample_thetas, two, three, state)
 
-        trend = state["systematic_offset"] + state["systematic_linear"] * state["times"]
+        trend = jnp.polyval(state["systematic_trend_coeffs"], state["times"])
         return transit + emitted + trend
 
     # both reflected and emitted components
@@ -412,9 +624,7 @@ def _lightcurve(
             sample_radii, sample_thetas, two, three, state, x_c, y_c, z_c
         )
 
-        trend = state["systematic_offset"] + state["systematic_linear"] * (
-            state["times"]
-        )
+        trend = jnp.polyval(state["systematic_trend_coeffs"], state["times"])
         return transit + reflected + emitted + trend
 
 
