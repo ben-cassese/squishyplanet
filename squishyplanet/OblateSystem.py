@@ -15,7 +15,7 @@ from squishyplanet.engine.phase_curve_utils import (
     sample_surface,
     planet_surface_normal,
     lambertian_reflection,
-    emission_profile,
+    # emission_at_timestep,
     reflected_phase_curve,
     emission_phase_curve,
     phase_curve,
@@ -153,7 +153,7 @@ class OblateSystem:
             the planet, and here is modeled as a simple sinusoidal variation with 4
             peaks per orbit.
         compute_stellar_doppler_variations (bool, default=False):
-            Whether to include stellar doppler variations in the light curve. This 
+            Whether to include stellar doppler variations in the light curve. This
             captures the effects of the star's radial velocity changing and boosting the
             total flux/pushing some flux into/out of the bandpass of the observation.
             Here, it is modeled as a simple sinusoidal variation with 2 peaks per orbit.
@@ -439,21 +439,21 @@ class OblateSystem:
             # the emitted brightness profile
             # need to take the first index since you aren't scanning here
             transform = pre_squish_transform(**self._state)[0]
-            emission = emission_profile(x, y, z, transform, **self._state)
+            # emission = _emission_profile(x, y, z, transform, **self._state)
 
             X_outline.append(x_outline)
             Y_outline.append(y_outline)
             Xs.append(x)
             Ys.append(y)
             Reflection.append(reflection)
-            Emission.append(emission)
+            # Emission.append(emission)
 
         X_outline = jnp.array(X_outline)
         Y_outline = jnp.array(Y_outline)
         Xs = jnp.array(Xs)
         Ys = jnp.array(Ys)
         Reflection = jnp.array(Reflection)
-        Emission = jnp.array(Emission)
+        # Emission = jnp.array(Emission)
 
         self._state = original_state
         return {
@@ -463,7 +463,7 @@ class OblateSystem:
             "sample_xs": Xs,
             "sample_ys": Ys,
             "reflected_intensity": Reflection,
-            "emitted_intensity": Emission,
+            # "emitted_intensity": Emission,
         }
 
     def lightcurve(self, params={}):
@@ -580,13 +580,14 @@ def _lightcurve(
 ):
     # always compute the primary transit and trend
     for key in params.keys():
-            state[key] = params[key]
+        state[key] = params[key]
     transit = lightcurve(state)
     trend = jnp.polyval(state["systematic_trend_coeffs"], state["times"])
 
     # if you don't want any phase curve stuff, you're done
-    if (not compute_reflected_phase_curve) & (not compute_emitted_phase_curve) and \
-        (not compute_stellar_doppler_variations) & (not compute_stellar_ellipsoidal_variations):
+    if (not compute_reflected_phase_curve) & (not compute_emitted_phase_curve) and (
+        not compute_stellar_doppler_variations
+    ) & (not compute_stellar_ellipsoidal_variations):
         return transit + trend
 
     ######################################################
@@ -598,7 +599,7 @@ def _lightcurve(
         jax.random.key(random_seed),
         jnp.arange(phase_curve_nsamples),
     )
-    
+
     # technically these are all calculated in "transit", but since phase
     # curves are a) rare and b) expensive, we'll just do it again to keep
     # the transit section of the code more self-contained
@@ -643,12 +644,16 @@ def _lightcurve(
         true_anomalies = kepler(mean_anomalies, state["e"])
 
     if compute_stellar_ellipsoidal_variations:
-        ellipsoidal = stellar_ellipsoidal_variations(true_anomalies, state["stellar_ellipsoidal_alpha"], state["period"])
+        ellipsoidal = stellar_ellipsoidal_variations(
+            true_anomalies, state["stellar_ellipsoidal_alpha"], state["period"]
+        )
     else:
         ellipsoidal = 0.0
-    
+
     if compute_stellar_doppler_variations:
-        doppler = stellar_doppler_variations(true_anomalies, state["stellar_doppler_alpha"], state["period"])
+        doppler = stellar_doppler_variations(
+            true_anomalies, state["stellar_doppler_alpha"], state["period"]
+        )
     else:
         doppler = 0.0
 

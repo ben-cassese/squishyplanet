@@ -986,96 +986,106 @@ def pre_squish_transform(a, e, f, Omega, i, omega, r, obliq, prec, **kwargs):
 
 
 @jax.jit
-def _emission_profle(
+def _emission_profile(
     x, y, z, r, f1, f2, hotspot_latitude, hotspot_longitude, hotspot_concentration
 ):
-    # the last factor is 1 / float(gamma(3/2) / (2*jnp.pi**(3/2))), a constant that
-    # ensures uniform sampling on the sphere will give you an integral equal to 1.0
+    # this will produce and UNNORMALIZED emission sample- we aren't correcting for the
+    # sphere-to-ellipsoid mapping yet
+
+    # When randomly sampling over a sphere, this will get you an average value of 1
+
+    # the (4(jnp.pi)) is also 1 / float(gamma(3/2) / (2*jnp.pi**(3/2))), is called out
+    # here, used to convert from flux/area to flux
     # https://en.wikipedia.org/wiki/Von_Mises%E2%80%93Fisher_distribution
+
+    # first, inflate the x,y,z samples (which live on the planet's surface)
+    # to the unit sphere
+    x = x / r
+    y = y / (r * (1 - f2))
+    z = z / (r * (1 - f1))
+
+    # then, evalutate the pdf of the von Mises-Fisher distribution:
     return (
         (
             jnp.exp(
-                hotspot_concentration
-                + (
+                (
                     hotspot_concentration
                     * (
-                        -((-1 + f2) * z * jnp.cos(hotspot_latitude))
-                        + (-1 + f1)
-                        * jnp.sin(hotspot_latitude)
-                        * (
-                            (-1 + f2) * x * jnp.cos(hotspot_longitude)
-                            - y * jnp.sin(hotspot_longitude)
-                        )
+                        z * jnp.cos(hotspot_latitude)
+                        + x * jnp.cos(hotspot_longitude) * jnp.sin(hotspot_latitude)
+                        + y * jnp.sin(hotspot_latitude) * jnp.sin(hotspot_longitude)
                     )
                 )
-                / (
-                    (-1 + f1)
-                    * (-1 + f2)
-                    * r
-                    * jnp.sqrt(
-                        (x**2 + y**2 / (-1 + f2) ** 2 + z**2 / (-1 + f1) ** 2) / r**2
-                    )
-                )
+                / 1.0
             )
             * hotspot_concentration
         )
-        / (-2 * jnp.pi + 2 * jnp.exp(2 * hotspot_concentration) * jnp.pi)
+        / (
+            2.0
+            * (-jnp.exp(-hotspot_concentration) + jnp.exp(hotspot_concentration))
+            * jnp.pi
+        )
         * 12.566370614359174
     )
 
 
-# @jax.jit
-# def emission_squish_correction(x,y,z,r,f1,f2):
-#     """
-#     Correction factor for the squishing of the planet due to its oblateness.
+@jax.jit
+def emission_squish_correction(x, y, z, r, f1, f2):
+    """
+    Correction factor for the squishing of the planet due to its oblateness.
 
-#     We're using the
-#     `von Mises-Fisher distribution
-#     <https://https://en.wikipedia.org/wiki/Von_Mises%E2%80%93Fisher_distribution>`_ to
-#     model a hotspot. But, that's defined on the unit sphere, and after compressing it to
-#     the squished planet, the surface denisty of emission intensity will be warped. We
-#     need to correct for that warping here. The input coordinates here are **IN THE
-#     PLANET'S FRAME, NOT THE SKY FRAME.** After getting :math:`x,y,z` samples in the sky
-#     frame, apply the rotation matrix from :func:`pre_squish_transform` to get these.
+    We're using the
+    `von Mises-Fisher distribution
+    <https://https://en.wikipedia.org/wiki/Von_Mises%E2%80%93Fisher_distribution>`_ to
+    model a hotspot. But, that's defined on the unit sphere, and after compressing it to
+    the squished planet, the surface denisty of emission intensity will be warped. We
+    need to correct for that warping here. The input coordinates here are **IN THE
+    PLANET'S FRAME, NOT THE SKY FRAME.** After getting :math:`x,y,z` samples in the sky
+    frame, apply the rotation matrix from :func:`pre_squish_transform` to get these.
 
-#     Not sure if this link will live, but see
-#     `here <https://math.stackexchange.com/questions/973101/how-to-generate-points-uniformly-distributed-on-the-surface-of-an-ellipsoid>`_
-#     for an intuition.
+    This is based on Algorithm 1 of Marples and Williams 2024 `doi:10.1007/s11075-023-01628-4
+    <https://doi.org/10.1007/s11075-023-01628-4>`_, which is a rejection-sampling scheme
+    for drawing points uniformly from the surface of an ellipsoid. In this case, our
+    samples are not uniformly distributed, since we sampled evenly on the the projected
+    disk, not the 3D surface. But, since we're still mapping from the planet to the unit
+    sphere when evaluating the von Mises-Fisher distribution, we need to correct for the
+    geometry-induced warping. We do that by weighting each point by the inverse of the
+    probability that they would have been rejected when mapping the unit sphere to the
+    planet.
 
-#     Args:
-#         x (Array):
-#             The x values of the points on the planet's surface IN THE PLANET'S FRAME
-#         y (Array):
-#             The y values of the points on the planet's surface IN THE PLANET'S FRAME
-#         z (Array):
-#             The z values of the points on the planet's surface IN THE PLANET'S FRAME
-#         r (Array):
-#             The equatorial radius of the planet.
-#         f1 (Array):
-#             The planet's :math:`z` flattening coefficient.
-#         f2 (Array):
-#             The planet's :math:`y` flattening coefficient.
+    Args:
+        x (Array):
+            The x values of the points on the planet's surface IN THE PLANET'S FRAME
+        y (Array):
+            The y values of the points on the planet's surface IN THE PLANET'S FRAME
+        z (Array):
+            The z values of the points on the planet's surface IN THE PLANET'S FRAME
+        r (Array):
+            The equatorial radius of the planet.
+        f1 (Array):
+            The planet's :math:`z` flattening coefficient.
+        f2 (Array):
+            The planet's :math:`y` flattening coefficient.
 
-#     Returns:
-#         Array:
-#             The correction factor for the squishing of the planet due to its oblateness.
+    Returns:
+        Array:
+            The correction factor for the squishing of the planet due to its oblateness.
 
 
-#     """
-#     a = 1/r
-#     b = 1/jnp.sqrt(r**2 * (1 - f2)**2)
-#     c = 1/jnp.sqrt(r**2 * (1 - f1)**2)
+    """
+    a = r
+    b = jnp.sqrt(r**2 * (1 - f2) ** 2)
+    c = jnp.sqrt(r**2 * (1 - f1) ** 2)
 
-#     # this will be less than one away from the poles
-#     area_after_squish = (jnp.sqrt(
-#         (a*c*y)**2 + (a*b*z)**2 + (b*c*x)**2
-#     ) / (b*c))
+    # c assumed to be the smallest axis
+    g = c * jnp.sqrt(x**2 / a**4 + y**2 / b**4 + z**2 / c**4)
 
-#     return area_after_squish
+    weight = 1.0 / g
+    return weight
 
 
 @jax.jit
-def emission_profile(
+def emission_at_timestep(
     x,
     y,
     z,
@@ -1091,7 +1101,7 @@ def emission_profile(
     """
     Compute the emitted intensity at a given point on the planet's surface.
 
-    CURRENTLY BROKEN, NOT CORRECTING FOR AREA DISTORTION CORRECTLY
+    Corrects for distortion between sphere and ellipsoid, and for viewing geometry.
 
     Args:
         x (Array):
@@ -1111,7 +1121,7 @@ def emission_profile(
             The planet's :math:`y` flattening coefficient.
         hotspot_latitude (Array):
             The "latitude" of the hotspot on the planet. Defined the physics way for
-            :math:`\theta` though, not the geography way: 0 is the north pole,
+            :math:`\\theta` though, not the geography way: 0 is the north pole,
             :math:`\pi/2` is the equator, and :math:`\pi` is the south pole.
         hotspot_longitude (Array):
             The longitude of the hotspot on the planet.
@@ -1128,21 +1138,39 @@ def emission_profile(
     # do this check before you transform into the planet frame
     mask = ~((x**2 + y**2 < 1) & (z < 0))
     x, y, z = jnp.matmul(transform, jnp.array([x, y, z, jnp.ones_like(x)]))
-    # area_after_squish = emission_squish_correction(x, y, z, r, f1, f2)
+    correction = emission_squish_correction(x, y, z, r, f1, f2)
+
+    # _emission_profile takes the samples on the planet surface and boosts them onto
+    # a unit sphere. Had the samples been uniformly distributed on the planet's surface,
+    # applying the correction factor to make up for the squishing would be enough. But,
+    # we sampled uniformly on the projected disk, not the 3D surface: they don't occupy
+    # an area of 4pi, just pi. So, we divide by another factor of 4 here.
+
+    # To check this, create a super-concentrated hotspot on a tidally locked planet. The
+    # peak emission should be nearly equal to emitted_scale when the hotspot faces the
+    # observer, since the rest of the contributions are negligible and the area isn't
+    # distorted by viewing geometry
     return (
-        _emission_profle(
-            x,
-            y,
-            z,
-            r,
-            f1,
-            f2,
-            hotspot_latitude,
-            hotspot_longitude,
-            hotspot_concentration,
+        jnp.sum(
+            (
+                _emission_profile(
+                    x,
+                    y,
+                    z,
+                    r,
+                    f1,
+                    f2,
+                    hotspot_latitude,
+                    hotspot_longitude,
+                    hotspot_concentration,
+                )
+                * mask
+            )
+            * correction
         )
-        * mask
-    )  # * area_after_squish
+        / jnp.sum(correction)
+        / 4.0
+    )
 
 
 @jax.jit
@@ -1252,7 +1280,7 @@ def emission_phase_curve(
             p_z0,
             p_00,
         )
-        emission_samples = emission_profile(
+        em = emission_at_timestep(
             x,
             y,
             z,
@@ -1265,7 +1293,7 @@ def emission_phase_curve(
             state["hotspot_concentration"],
         )
 
-        return None, jnp.sum(emission_samples) / emission_samples.shape[0]
+        return None, em
 
     transform_matricies = pre_squish_transform(**state)
 
@@ -1295,16 +1323,18 @@ def emission_phase_curve(
 
     return flux * state["emitted_scale"]
 
+
 ########################################################################################
 # Stellar effects helpers
 ########################################################################################
+
 
 @jax.jit
 def stellar_ellipsoidal_variations(true_anomalies, stellar_ellipsoidal_alpha, period):
     """
     Compute the contributions to a phase curve for a star with ellipsoidal variations.
 
-    A simple sinusoid model with minima at primary and secondary eclipse, meant to 
+    A simple sinusoid model with minima at primary and secondary eclipse, meant to
     capture gravitational  Works only for a circular orbit and assumes
     that :math:`\Omega=\pi`. Uses the model in
     `Shporer et al. 2014 <https://ui.adsabs.harvard.edu/abs/2014ApJ...788...92S/abstract>`_.
@@ -1330,11 +1360,11 @@ def stellar_ellipsoidal_variations(true_anomalies, stellar_ellipsoidal_alpha, pe
             The contribution to the phase curve from the star's ellipsoidal variations.
 
     """
-    amp = stellar_ellipsoidal_alpha #/ period**2
-    phi = true_anomalies - jnp.pi/2 # orbital phase is zero at primary transit
-    phi = jnp.where(phi < 0, phi + 2*jnp.pi, phi)
-    phi = phi / (2*jnp.pi)
-    return amp * (1 - jnp.cos(4*jnp.pi*(phi - 0.5)))
+    amp = stellar_ellipsoidal_alpha  # / period**2
+    phi = true_anomalies - jnp.pi / 2  # orbital phase is zero at primary transit
+    phi = jnp.where(phi < 0, phi + 2 * jnp.pi, phi)
+    phi = phi / (2 * jnp.pi)
+    return amp * (1 - jnp.cos(4 * jnp.pi * (phi - 0.5)))
 
 
 @jax.jit
@@ -1346,11 +1376,11 @@ def stellar_doppler_variations(true_anomalies, stellar_doppler_alpha, period):
     capture Doppler boosting/flux falling in and out of the bandpass.
     """
 
-    amp = stellar_doppler_alpha #/ period**(-1/3)
-    phi = true_anomalies - jnp.pi/2 # orbital phase is zero at primary transit
-    phi = jnp.where(phi < 0, phi + 2*jnp.pi, phi)
-    phi = phi / (2*jnp.pi)
-    return amp * jnp.sin(2*jnp.pi*phi)
+    amp = stellar_doppler_alpha  # / period**(-1/3)
+    phi = true_anomalies - jnp.pi / 2  # orbital phase is zero at primary transit
+    phi = jnp.where(phi < 0, phi + 2 * jnp.pi, phi)
+    phi = phi / (2 * jnp.pi)
+    return amp * jnp.sin(2 * jnp.pi * phi)
 
 
 ########################################################################################
@@ -1477,7 +1507,7 @@ def phase_curve(sample_radii, sample_thetas, two, three, state, x_c, y_c, z_c):
         lamb = lambertian_reflection(surface_star_angle, x, y, z)
 
         # emission stuff
-        emission_samples = emission_profile(
+        em = emission_at_timestep(
             x,
             y,
             z,
@@ -1492,7 +1522,7 @@ def phase_curve(sample_radii, sample_thetas, two, three, state, x_c, y_c, z_c):
 
         return None, (
             jnp.sum(lamb) / sample_radii.shape[0],
-            jnp.sum(emission_samples) / emission_samples.shape[0],
+            em,
         )
 
     transform_matricies = pre_squish_transform(**state)
