@@ -7,7 +7,7 @@ a system, then vary those parameters through built-in functions to generate diff
 models and compare them to data.
 
 
-.. automodule:: OblateSystem
+.. automodule:: oblate_system
     :members:
     :undoc-members:
     :show-inheritance:

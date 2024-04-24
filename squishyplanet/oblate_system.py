@@ -3,6 +3,11 @@ import jax
 jax.config.update("jax_enable_x64", True)
 import jax.numpy as jnp
 
+import copy
+from functools import partial
+import pprint
+import matplotlib.pyplot as plt
+
 from squishyplanet.engine.planet_3d import planet_3d_coeffs
 from squishyplanet.engine.planet_2d import planet_2d_coeffs
 from squishyplanet.engine.parametric_ellipse import poly_to_parametric
@@ -14,18 +19,15 @@ from squishyplanet.engine.phase_curve_utils import (
     generate_sample_radii_thetas,
     sample_surface,
     planet_surface_normal,
+    surface_star_cos_angle,
     lambertian_reflection,
-    # emission_at_timestep,
+    corrected_emission_profile,
     reflected_phase_curve,
     emission_phase_curve,
     phase_curve,
     stellar_ellipsoidal_variations,
     stellar_doppler_variations,
 )
-
-import copy
-from functools import partial
-import pprint
 
 
 class OblateSystem:
@@ -376,8 +378,8 @@ class OblateSystem:
             true_anomalies = jnp.array([true_anomalies])
 
         # the trace of the orbit
-        fs = jnp.linspace(0, 2 * jnp.pi, 200)
-        positions = skypos(
+        fs = jnp.linspace(0, 2 * jnp.pi, 300)
+        orbit_positions = skypos(
             a=self._state["a"],
             e=self._state["e"],
             f=fs,
@@ -385,6 +387,10 @@ class OblateSystem:
             i=self._state["i"],
             omega=self._state["omega"],
         )
+        behind_star = (
+            (orbit_positions[0, :] ** 2 + orbit_positions[1, :] ** 2) < 1
+        ) & (orbit_positions[2, :] < 0)
+        orbit_positions = orbit_positions.at[:, behind_star].set(jnp.nan)
 
         original_state = copy.deepcopy(self._state)
         X_outline = []
@@ -398,9 +404,15 @@ class OblateSystem:
             # all of these could just be done in one go,
             # but bookkeeping was easier this way
             self._state["f"] = jnp.array([true_anomalies[i]])
+            if self._state["tidally_locked"]:
+                self._state["prec"] = self._state["f"]
             self._coeffs_3d = planet_3d_coeffs(**self._state)
             self._coeffs_2d = planet_2d_coeffs(**self._coeffs_3d)
             self._para_coeffs_2d = poly_to_parametric(**self._coeffs_2d)
+            positions = skypos(**self._state)
+            self._state["x_c"] = positions[0, :]
+            self._state["y_c"] = positions[1, :]
+            self._state["z_c"] = positions[2, :]
 
             # the boundary of the planet
             thetas = jnp.linspace(0, 2 * jnp.pi, 200)
@@ -439,32 +451,246 @@ class OblateSystem:
             # the emitted brightness profile
             # need to take the first index since you aren't scanning here
             transform = pre_squish_transform(**self._state)[0]
-            # emission = _emission_profile(x, y, z, transform, **self._state)
+            emission = corrected_emission_profile(
+                x,
+                y,
+                z,
+                transform,
+                **self._state,
+            )
+
+            behind_star = ((x**2 + y**2) < 1) & (z < 0)
+            reflection = jnp.where(behind_star, jnp.nan, reflection)
+            emission = jnp.where(behind_star, jnp.nan, emission)
 
             X_outline.append(x_outline)
             Y_outline.append(y_outline)
             Xs.append(x)
             Ys.append(y)
             Reflection.append(reflection)
-            # Emission.append(emission)
+            Emission.append(emission)
 
         X_outline = jnp.array(X_outline)
         Y_outline = jnp.array(Y_outline)
         Xs = jnp.array(Xs)
         Ys = jnp.array(Ys)
         Reflection = jnp.array(Reflection)
-        # Emission = jnp.array(Emission)
+        Emission = jnp.array(Emission)
+
+        # behind_star = ((Xs ** 2 + Ys ** 2) < 1)
+        # Reflection = jnp.where(Reflection == 0, jnp.nan, Reflection)
+        # Emission = jnp.where(Emission == 0, jnp.nan, Emission)
 
         self._state = original_state
         return {
-            "orbit_positions": positions,
+            "orbit_positions": orbit_positions,
             "planet_x_outlines": X_outline,
             "planet_y_outlines": Y_outline,
             "sample_xs": Xs,
             "sample_ys": Ys,
             "reflected_intensity": Reflection,
-            # "emitted_intensity": Emission,
+            "emitted_intensity": Emission,
         }
+
+    def illustrate(
+        self,
+        times=None,
+        true_anomalies=None,
+        orbit=True,
+        reflected=False,
+        emitted=False,
+        star_fill=True,
+        window_size=0.4,
+        star_centered=False,
+        nsamples=50_000,
+        figsize=(8, 8),
+    ):
+        """
+        Visualize the layout of the system at one or more times.
+
+        This method, if run in a jupyter notebook, will display a plot of some
+        combination of the star, planet, and its orbit. It can color in the planet
+        according to its reflected or emission profile, and the star according to its
+        limb darkening profile. Helpful for checking the orientation of planet hotspots
+        and/or its orientation after deformation.
+
+        Args:
+
+            times (array-like, [Days], default=None):
+                The times at which to illustrate the system. The gap between times is
+                assumed to be in units of days, but any zero-point/standard system
+                (e.g. BJD) will work. Provide either this or ``true_anomalies`` but not
+                both.
+            true_anomalies (array-like, [Radian], default=None):
+                The true anomalies at which to illustrate the system. Provide either this
+                or ``times`` but not both.
+            orbit (bool, default=True):
+                Whether to plot a trace of the planet's orbital path
+            reflected (bool, default=False):
+                Whether to color in the planet according to its reflected flux profile.
+                Can optionally include this or ``emitted`` but not both.
+            emitted (bool, default=False):
+                Whether to color in the planet according to its emitted flux profile. Can
+                optionally include this or ``reflected`` but not both.
+            star_fill (bool, default=True):
+                Whether to color in the star according to its limb darkening profile.
+                Note that the lowest color contour is bounded at zero, so if you have an
+                unphysical limb darkening law where some radii are negative, those
+                will appear as gaps (most often the contours will not reach the black
+                outline of the star, which is always drawn).
+            window_size (float, [Rstar], default=0.4):
+                The size of the plotting window. The window will be centered on the
+                mean position of the planet across all of the suggested times, unless
+                ``star_centered`` is set to ``True``.
+            star_centered (bool, default=False):
+                Whether to center the plot on the star rather than the planet.
+            nsamples (int, default=50_000):
+                The number of random samples of the planet's surface to draw when
+                illustrating the system. A larger number will increase the resolution
+                of the plot but result in longer computation times.
+            figsize (tuple, default=(8, 8)):
+                The size of the figure to display. Passed directly to
+                ``matplotlib.pyplot.subplots``.
+
+        Returns:
+            None:
+            This method is used for its side effects of displaying a plot, not for its
+            return value.
+
+        """
+        if emitted:
+            assert (
+                reflected == False
+            ), "Can't illustrate both reflected and emitted flux"
+        if reflected:
+            assert emitted == False, "Can't illustrate both reflected and emitted flux"
+
+        fig, ax = plt.subplots(1, 1, figsize=(8, 8))
+
+        info = self._illustrate_helper(
+            times=times, true_anomalies=true_anomalies, nsamples=nsamples
+        )
+
+        if star_centered:
+            im_center_x = 0
+            im_center_y = 0
+        else:
+            im_center_x = jnp.mean(info["planet_x_outlines"])
+            im_center_y = jnp.mean(info["planet_y_outlines"])
+
+        star = plt.Circle((0, 0), 1, color="black", fill=False)
+        ax.add_artist(star)
+        if star_fill:
+            # lifted from engine.polynomial_limb_darkened_transit
+            u_coeffs = jnp.ones(self._state["ld_u_coeffs"].shape[0] + 1) * (-1)
+            u_coeffs = u_coeffs.at[1:].set(self._state["ld_u_coeffs"])
+            g_coeffs = jnp.matmul(self._state["greens_basis_transform"], u_coeffs)
+            normalization_constant = 1 / (
+                jnp.pi * (g_coeffs[0] + (2 / 3) * g_coeffs[1])
+            )
+
+            def _star_radial_profile(r):
+                us = jnp.ones(self._state["ld_u_coeffs"].shape[0] + 1) * (-1)
+                us = us.at[1:].set(self._state["ld_u_coeffs"])
+                mu = jnp.sqrt(1 - r**2)
+                powers = jnp.arange(len(us))
+                return -jnp.sum(us * (1 - mu) ** powers) * normalization_constant
+
+            X = jnp.linspace(-1, 1, 300)
+            Y = jnp.linspace(-1, 1, 300)
+            X, Y = jnp.meshgrid(X, Y)
+            R = jnp.sqrt(X**2 + Y**2)
+            Z = jax.vmap(_star_radial_profile)(R.flatten()).reshape(X.shape)
+
+            min_val = jnp.max(jnp.array([0, jnp.nanmin(Z)]))
+            max_val = jnp.nanmax(Z)
+            ax.contourf(
+                X, Y, Z, cmap="copper", levels=jnp.linspace(min_val, max_val, 20)
+            )
+
+        if orbit:
+            ax.plot(
+                info["orbit_positions"][0, :],
+                info["orbit_positions"][1, :],
+                color="black",
+                ls="--",
+                lw=1,
+                label="Orbit",
+            )
+
+        for i in range(len(info["planet_x_outlines"])):
+            ax.plot(
+                info["planet_x_outlines"][i],
+                info["planet_y_outlines"][i],
+                color="black",
+                lw=1,
+                label="Planet",
+            )
+
+            if reflected:
+                ax.hexbin(
+                    info["sample_xs"][i],
+                    info["sample_ys"][i],
+                    info["reflected_intensity"][i],
+                    cmap="plasma",
+                    gridsize=100,
+                    mincnt=1,
+                )
+
+            if emitted:
+                ax.hexbin(
+                    info["sample_xs"][i],
+                    info["sample_ys"][i],
+                    info["emitted_intensity"][i],
+                    cmap="plasma",
+                    gridsize=100,
+                    mincnt=1,
+                )
+
+        ax.set(
+            aspect="equal",
+            xlim=(im_center_x - window_size / 2, im_center_x + window_size / 2),
+            ylim=(im_center_y - window_size / 2, im_center_y + window_size / 2),
+        )
+
+        return
+
+    def limb_darkening_profile(self, r):
+        """
+        Compute the limb darkening profile of the star at a given radius.
+
+        Meant as a helper function for sanity checks and plotting, especially if you're
+        using higher-order limb darkening laws and are concerned if the profile is
+        positive/monotonic.
+
+        Args:
+            r (float or array-like):
+                The radius at which to compute the limb darkening profile. Must be
+                between 0 and 1.
+
+        Returns:
+            Array:
+            The limb darkening profile of the star at the given radius.
+
+        """
+        u_coeffs = jnp.ones(self._state["ld_u_coeffs"].shape[0] + 1) * (-1)
+        u_coeffs = u_coeffs.at[1:].set(self._state["ld_u_coeffs"])
+        g_coeffs = jnp.matmul(self._state["greens_basis_transform"], u_coeffs)
+
+        # total flux from the star. 1/eq. 28 in Agol, Luger, and Foreman-Mackey 2020
+        normalization_constant = 1 / (jnp.pi * (g_coeffs[0] + (2 / 3) * g_coeffs[1]))
+
+        def inner(r):
+            us = jnp.ones(self._state["ld_u_coeffs"].shape[0] + 1) * (-1)
+            us = us.at[1:].set(self._state["ld_u_coeffs"])
+            mu = jnp.sqrt(1 - r**2)
+            powers = jnp.arange(len(us))
+            return -jnp.sum(us * (1 - mu) ** powers) * normalization_constant
+
+        if type(r) == float:
+            return inner(r)
+        else:
+            return jax.vmap(inner)(r)
 
     def lightcurve(self, params={}):
         """

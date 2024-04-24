@@ -13,12 +13,12 @@ import matplotlib.pyplot as plt
 from tqdm import tqdm
 
 from squishyplanet.engine.polynomial_limb_darkened_transit import lightcurve
-from squishyplanet.OblateSystem import OblateSystem
 from squishyplanet.engine.kepler import kepler
+from squishyplanet import OblateSystem
 
-N_JAXOPLANT_COMPARISONS = 10
+N_JAXOPLANT_COMPARISONS = 1_000
 TIMES = jnp.linspace(-1, 1, 17280) * ureg.day  # 10s cadence for 48 hours
-POLY_ORDERS = [2]
+POLY_ORDERS = [2, 3, 4]
 
 
 def light_curve_compare(key, poly_limbdark_order, return_lc=False):

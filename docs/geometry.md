@@ -1,4 +1,4 @@
-# Geometry Visualizations
+# Geometry visualizations
 
 
 ```{figure} ./visualizations/SphereToEllipsoid.gif

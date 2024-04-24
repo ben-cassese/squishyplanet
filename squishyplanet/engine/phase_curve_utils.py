@@ -986,7 +986,7 @@ def pre_squish_transform(a, e, f, Omega, i, omega, r, obliq, prec, **kwargs):
 
 
 @jax.jit
-def _emission_profile(
+def _uncorrected_emission_profile(
     x, y, z, r, f1, f2, hotspot_latitude, hotspot_longitude, hotspot_concentration
 ):
     # this will produce and UNNORMALIZED emission sample- we aren't correcting for the
@@ -1029,59 +1029,118 @@ def _emission_profile(
     )
 
 
+# @jax.jit
+# def emission_squish_correction(x, y, z, r, f1, f2):
+#     """
+#     Correction factor for the squishing of the planet due to its oblateness.
+
+#     We're using the
+#     `von Mises-Fisher distribution
+#     <https://https://en.wikipedia.org/wiki/Von_Mises%E2%80%93Fisher_distribution>`_ to
+#     model a hotspot. But, that's defined on the unit sphere, and after compressing it to
+#     the squished planet, the surface denisty of emission intensity will be warped. We
+#     need to correct for that warping here. The input coordinates here are **IN THE
+#     PLANET'S FRAME, NOT THE SKY FRAME.** After getting :math:`x,y,z` samples in the sky
+#     frame, apply the rotation matrix from :func:`pre_squish_transform` to get these.
+
+#     This is based on Algorithm 1 of Marples and Williams 2024 `doi:10.1007/s11075-023-01628-4
+#     <https://doi.org/10.1007/s11075-023-01628-4>`_, which is a rejection-sampling scheme
+#     for drawing points uniformly from the surface of an ellipsoid. In this case, our
+#     samples are not uniformly distributed, since we sampled evenly on the the projected
+#     disk, not the 3D surface. But, since we're still mapping from the planet to the unit
+#     sphere when evaluating the von Mises-Fisher distribution, we need to correct for the
+#     geometry-induced warping. We do that by weighting each point by the inverse of the
+#     probability that they would have been rejected when mapping the unit sphere to the
+#     planet.
+
+#     Args:
+#         x (Array):
+#             The x values of the points on the planet's surface IN THE PLANET'S FRAME
+#         y (Array):
+#             The y values of the points on the planet's surface IN THE PLANET'S FRAME
+#         z (Array):
+#             The z values of the points on the planet's surface IN THE PLANET'S FRAME
+#         r (Array):
+#             The equatorial radius of the planet.
+#         f1 (Array):
+#             The planet's :math:`z` flattening coefficient.
+#         f2 (Array):
+#             The planet's :math:`y` flattening coefficient.
+
+#     Returns:
+#         Array:
+#             The correction factor for the squishing of the planet due to its oblateness.
+
+
+#     """
+#     a = r
+#     b = jnp.sqrt(r**2 * (1 - f2) ** 2)
+#     c = jnp.sqrt(r**2 * (1 - f1) ** 2)
+
+#     # c assumed to be the smallest axis
+#     g = c * jnp.sqrt(x**2 / a**4 + y**2 / b**4 + z**2 / c**4)
+
+#     weight = 1.0 / g
+#     return weight
+
+
 @jax.jit
-def emission_squish_correction(x, y, z, r, f1, f2):
+def corrected_emission_profile(
+    x,
+    y,
+    z,
+    transform,
+    r,
+    f1,
+    f2,
+    hotspot_latitude,
+    hotspot_longitude,
+    hotspot_concentration,
+    **kwargs,
+):
     """
-    Correction factor for the squishing of the planet due to its oblateness.
-
-    We're using the
-    `von Mises-Fisher distribution
-    <https://https://en.wikipedia.org/wiki/Von_Mises%E2%80%93Fisher_distribution>`_ to
-    model a hotspot. But, that's defined on the unit sphere, and after compressing it to
-    the squished planet, the surface denisty of emission intensity will be warped. We
-    need to correct for that warping here. The input coordinates here are **IN THE
-    PLANET'S FRAME, NOT THE SKY FRAME.** After getting :math:`x,y,z` samples in the sky
-    frame, apply the rotation matrix from :func:`pre_squish_transform` to get these.
-
-    This is based on Algorithm 1 of Marples and Williams 2024 `doi:10.1007/s11075-023-01628-4
-    <https://doi.org/10.1007/s11075-023-01628-4>`_, which is a rejection-sampling scheme
-    for drawing points uniformly from the surface of an ellipsoid. In this case, our
-    samples are not uniformly distributed, since we sampled evenly on the the projected
-    disk, not the 3D surface. But, since we're still mapping from the planet to the unit
-    sphere when evaluating the von Mises-Fisher distribution, we need to correct for the
-    geometry-induced warping. We do that by weighting each point by the inverse of the
-    probability that they would have been rejected when mapping the unit sphere to the
-    planet.
-
-    Args:
-        x (Array):
-            The x values of the points on the planet's surface IN THE PLANET'S FRAME
-        y (Array):
-            The y values of the points on the planet's surface IN THE PLANET'S FRAME
-        z (Array):
-            The z values of the points on the planet's surface IN THE PLANET'S FRAME
-        r (Array):
-            The equatorial radius of the planet.
-        f1 (Array):
-            The planet's :math:`z` flattening coefficient.
-        f2 (Array):
-            The planet's :math:`y` flattening coefficient.
-
-    Returns:
-        Array:
-            The correction factor for the squishing of the planet due to its oblateness.
-
-
+    A helper function to :func:`emission_at_timestep`, broken out only to be used for
+    illustrations in :func:`OblateSystem.illustrate`.
     """
-    a = r
-    b = jnp.sqrt(r**2 * (1 - f2) ** 2)
-    c = jnp.sqrt(r**2 * (1 - f1) ** 2)
 
-    # c assumed to be the smallest axis
-    g = c * jnp.sqrt(x**2 / a**4 + y**2 / b**4 + z**2 / c**4)
+    # always one time slice at a time
 
-    weight = 1.0 / g
-    return weight
+    # do this check before you transform into the planet frame
+    mask = ~((x**2 + y**2 < 1) & (z < 0))
+    x, y, z = jnp.matmul(transform, jnp.array([x, y, z, jnp.ones_like(x)]))
+    # correction = emission_squish_correction(x, y, z, r, f1, f2)
+
+    # _uncorrected_emission_profile takes the samples on the planet surface and boosts them onto
+    # a unit sphere. Had the samples been uniformly distributed on the planet's surface,
+    # applying the correction factor to make up for the squishing would be enough. But,
+    # we sampled uniformly on the projected disk, not the 3D surface: they don't occupy
+    # an area of 4pi, just pi. So, we divide by another factor of 4 here.
+
+    # To check this, create a super-concentrated hotspot on a tidally locked planet. The
+    # peak emission should be nearly equal to emitted_scale when the hotspot faces the
+    # observer, since the rest of the contributions are negligible and the area isn't
+    # distorted by viewing geometry
+
+    return (
+        (
+            _uncorrected_emission_profile(
+                x,
+                y,
+                z,
+                r,
+                f1,
+                f2,
+                hotspot_latitude,
+                hotspot_longitude,
+                hotspot_concentration,
+            )
+            * mask
+        )
+        / x.shape[0]
+        #  * correction
+        #  / jnp.sum(correction)
+        #  / 4.0
+    )
 
 
 @jax.jit
@@ -1096,7 +1155,6 @@ def emission_at_timestep(
     hotspot_latitude,
     hotspot_longitude,
     hotspot_concentration,
-    **kwargs,
 ):
     """
     Compute the emitted intensity at a given point on the planet's surface.
@@ -1135,12 +1193,7 @@ def emission_at_timestep(
     """
     # always one time slice at a time
 
-    # do this check before you transform into the planet frame
-    mask = ~((x**2 + y**2 < 1) & (z < 0))
-    x, y, z = jnp.matmul(transform, jnp.array([x, y, z, jnp.ones_like(x)]))
-    correction = emission_squish_correction(x, y, z, r, f1, f2)
-
-    # _emission_profile takes the samples on the planet surface and boosts them onto
+    # _uncorrected_emission_profile takes the samples on the planet surface and boosts them onto
     # a unit sphere. Had the samples been uniformly distributed on the planet's surface,
     # applying the correction factor to make up for the squishing would be enough. But,
     # we sampled uniformly on the projected disk, not the 3D surface: they don't occupy
@@ -1150,26 +1203,19 @@ def emission_at_timestep(
     # peak emission should be nearly equal to emitted_scale when the hotspot faces the
     # observer, since the rest of the contributions are negligible and the area isn't
     # distorted by viewing geometry
-    return (
-        jnp.sum(
-            (
-                _emission_profile(
-                    x,
-                    y,
-                    z,
-                    r,
-                    f1,
-                    f2,
-                    hotspot_latitude,
-                    hotspot_longitude,
-                    hotspot_concentration,
-                )
-                * mask
-            )
-            * correction
+    return jnp.sum(
+        _corrected_emission_profile(
+            x,
+            y,
+            z,
+            transform,
+            r,
+            f1,
+            f2,
+            hotspot_latitude,
+            hotspot_longitude,
+            hotspot_concentration,
         )
-        / jnp.sum(correction)
-        / 4.0
     )
 
 
@@ -1184,8 +1230,6 @@ def emission_phase_curve(
 ):
     """
     Compute the timeseries of the emitted light from the planet.
-
-    CURRENTLY BROKEN, NOT CORRECTING FOR AREA DISTORTION CORRECTLY
 
     This function does a Monte Carlo estimation of the visible flux emitted by the
     planet at each time step assuming that a) the surface intensity is modeled by a

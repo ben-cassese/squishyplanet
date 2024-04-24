@@ -59,6 +59,7 @@ ms per evaluation.
 installation
 quickstart
 geometry
+contributing
 ```
 
 ```{toctree}
@@ -66,11 +67,11 @@ geometry
 :hidden:
 :caption: Tutorials/Demos
 
-tutorials/create_a_lightcurve.ipynb
 tutorials/illustrations.ipynb
 tutorials/lightcurve_compare.ipynb
+tutorials/create_a_lightcurve.ipynb
 tutorials/create_a_phase_curve.ipynb
-tutorials/fit_a_transit.ipynb
+
 ```
 
 
