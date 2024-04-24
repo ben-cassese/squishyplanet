@@ -90,7 +90,7 @@ def light_curve_compare(key, poly_limbdark_order, return_lc=False):
     s = OblateSystem(**state)
     state = s._state
 
-    test_lc = lightcurve(s._state)
+    test_lc = lightcurve(s._state, False)
 
     if not return_lc:
         m = (jaxoplanet_lc != 0) | (test_lc != 0)
