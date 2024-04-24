@@ -4,6 +4,7 @@ jax.config.update("jax_enable_x64", True)
 import jax.numpy as jnp
 
 from quadax import quadgk
+from functools import partial
 
 from squishyplanet.engine.planet_3d import planet_3d_coeffs
 from squishyplanet.engine.planet_2d import planet_2d_coeffs
@@ -74,20 +75,88 @@ def _single_intersection_points(
 
 
 @jax.jit
+def parameterize_2d_helper(projected_r1, projected_r2, projected_theta, xc, yc):
+    """
+    Convert from the alternative sky-projected parameterization to the same format
+    used by the 3D parameterization.
+
+    A good chunk of the code assumes that the planet's center is determined by the
+    orbital elements and that it's outline is derived from an equatorial radius ``r``,
+    a z-flattening ``f1``, a y-flattening ``f2``, and two body-centered rotations
+    ``obliq`` and ``prec``. This are useful to have when working with phase curves that
+    are sensitive to the actual 3D orientation of the planet, but when dealing with
+    transits only, this parameterization is overkill and allows a bunch of degeneracies.
+    So, if only doing transits, it is more convenient to parameterize the planet by
+    its projected radius in the x and y directions, and the angle of the projected
+    ellipse. This function takes in those parameters and returns the same dictionaries
+    you'd get if you fed a full 3D parameterization into
+    :func:`planet_2d.planet_2d_coeffs`.
+
+    Args:
+        projected_r1 (float): The projected "x" radius of the planet.
+        projected_r2 (float): The projected "y" radius of the planet.
+        projected_theta (float): The angle of the projected ellipse.
+
+    Returns:
+        tuple:
+            A tuple of two dictionaries. The first dictionary contains the coefficients
+            of the quadratic equation that describes the projected ellipse. The second
+            dictionary contains coefficients that describe the parametric form of that
+            same ellipse.
+
+    """
+    cos_t = jnp.cos(projected_theta)
+    sin_t = jnp.sin(projected_theta)
+
+    two = {
+        "rho_xx": cos_t**2 / projected_r1**2 + sin_t**2 / projected_r2**2,
+        "rho_xy": (2 * cos_t * sin_t) / projected_r1**2
+        - (2 * cos_t * sin_t) / projected_r2**2,
+        "rho_x0": (-2 * cos_t**2 * xc) / projected_r1**2
+        - (2 * cos_t * yc * sin_t) / projected_r1**2
+        + (2 * cos_t * yc * sin_t) / projected_r2**2
+        - (2 * xc * sin_t**2) / projected_r2**2,
+        "rho_yy": cos_t**2 / projected_r2**2 + sin_t**2 / projected_r1**2,
+        "rho_y0": (-2 * cos_t**2 * yc) / projected_r2**2
+        - (2 * cos_t * xc * sin_t) / projected_r1**2
+        + (2 * cos_t * xc * sin_t) / projected_r2**2
+        - (2 * yc * sin_t**2) / projected_r1**2,
+        "rho_00": (cos_t**2 * xc**2) / projected_r1**2
+        + (cos_t**2 * yc**2) / projected_r2**2
+        + (2 * cos_t * xc * yc * sin_t) / projected_r1**2
+        - (2 * cos_t * xc * yc * sin_t) / projected_r2**2
+        + (yc**2 * sin_t**2) / projected_r1**2
+        + (xc**2 * sin_t**2) / projected_r2**2,
+    }
+
+    para = {
+        "c_x1": projected_r1 * cos_t,
+        "c_x2": -projected_r2 * sin_t,
+        "c_x3": xc,
+        "c_y1": projected_r1 * sin_t,
+        "c_y2": projected_r2 * cos_t,
+        "c_y3": yc,
+    }
+
+    return two, para
+
+
+@jax.jit
 def planet_solution_vec(a, b, g_coeffs, c_x1, c_x2, c_x3, c_y1, c_y2, c_y3):
     """
     Compute the "solution vector" for a 1D path across the star that lies on the outline
     of the planet.
 
-    This computes Eq. 21 of `Agol, Luger, and Foreman-Mackey 2020 <https://ui.adsabs.harvard.edu/abs/2020AJ....159..123A/abstract>`_.
-    But, instead of doing it analytically, this uses the ``quadax`` package to
-    numerically solve the required integrals. For terms s_2 and higher, this is
-    straightforward to do based on the equations in the paper: we simply parameterize
-    the outline of the planet by some angle :math:`\\alpha`, then numerically integrate the dot
-    product of Eq. 62 with that parameterization between the two endpoints of the path.
-    For the first two lower-order terms however, Agol et al. do not provide an
-    equivalent of Eq. 62 and instead provide only the analytic solutions. We therefore
-    use the following as the equivalents for Eq. 62 for these terms:
+    This computes Eq. 21 of `Agol, Luger, and Foreman-Mackey 2020
+    <https://ui.adsabs.harvard.edu/abs/2020AJ....159..123A/abstract>`_. But, instead of
+    doing it analytically, this uses the ``quadax`` package to numerically solve the
+    required integrals. For terms s_2 and higher, this is straightforward to do based on
+    the equations in the paper: we simply parameterize the outline of the planet by
+    some angle :math:`\\alpha`, then numerically integrate the dot product of Eq. 62
+    with that parameterization between the two endpoints of the path. For the first two
+    lower-order terms however, Agol et al. do not provide an equivalent of Eq. 62 and
+    instead provide only the analytic solutions. We therefore use the following as the
+    equivalents for Eq. 62 for these terms:
 
     .. math::
 
@@ -111,9 +180,11 @@ def planet_solution_vec(a, b, g_coeffs, c_x1, c_x2, c_x3, c_y1, c_y2, c_y3):
 
     Args:
         a (float):
-            The starting parameter for the path along the planet's outline, :math:`\\alpha_0`.
+            The starting parameter for the path along the planet's outline,
+            :math:`\\alpha_0`.
         b (float):
-            The ending parameter for the path along the planet's outline, :math:`\\alpha_1`.
+            The ending parameter for the path along the planet's outline,
+            :math:`\\alpha_1`.
         g_coeffs (Array):
             The system-specific limb darkening coefficients in the Green's basis.
             Computed by multiplying the u coefficients with the change of basis matrix
@@ -227,7 +298,8 @@ def star_solution_vec(a, b, g_coeffs, c_x1, c_x2, c_x3, c_y1, c_y2, c_y3):
             we will integrate over is on the star. We convert to the relevant parameters
             internally.
         b (float):
-            The ending parameter for the path along the star's outline, :math:`\\alpha_1`.
+            The ending parameter for the path along the star's outline,
+            :math:`\\alpha_1`.
         g_coeffs (Array):
             The system-specific limb darkening coefficients in the Green's basis.
             Computed by multiplying the u coefficients with the change of basis matrix
@@ -324,8 +396,8 @@ def star_solution_vec(a, b, g_coeffs, c_x1, c_x2, c_x3, c_y1, c_y2, c_y3):
     return solution_vec
 
 
-@jax.jit
-def lightcurve(state):
+@partial(jax.jit, static_argnums=(1,))
+def lightcurve(state, parameterize_with_projected_ellipse):
     """
     The main function for computing a transit light curve.
 
@@ -337,17 +409,27 @@ def lightcurve(state):
     all times. It then solves for the intersection points of the planet and star, and
     if the planet is either partially or fully transiting, numerically solves the
     required 1D integrals that leverage Green's Theorem to compute the blocked flux. The
-    flux-blocking calculations are done sequentially for each timestep using ``jax.lax.scan``,
-    which seemed to be more efficient than vectorizing again while switching between
-    braches with something like ``jax.lax.cond``. Keep these different behaviors in mind
-    when computing dense lightcurves with ~100s of thousands of time steps: the first
-    part will require enough memory to compute and store ~30 values for each step, but
-    then the actual 1D integrals will be computed sequentially.
+    flux-blocking calculations are done sequentially for each timestep using
+    ``jax.lax.scan``, which seemed to be more efficient than vectorizing again while
+    switching between braches with something like ``jax.lax.cond``. Keep these different
+    behaviors in mind when computing dense lightcurves with ~100s of thousands of time
+    steps: the first part will require enough memory to compute and store ~30 values for
+    each step, but then the actual 1D integrals will be computed sequentially.
 
     Args:
         state (dict):
             A dictionary containing all of the keys that are included in an
             :func:`OblateSystem` ``state`` attribute.
+        parameterize_with_projected_ellipse (bool):
+            If ``True``, the planet's outline will be parameterized by the projected
+            ellipse as seen by the observer. If ``False``, the planet's outline will be
+            set by the full 3D parameterization of the planet. When dealing with planets
+            that are not tidally locked and/or far from their host star and/or very
+            close to spherical, you won't be able to tell the difference between these
+            two parameterizations since the projected area won't be changing. In that
+            case, it's better to use the simpler 2D parameterization to avoid the
+            degeneracies and extra computation that can arise from the 3D
+            parameterization. This argument is static for the JIT-compiled function.
 
     Returns:
         Array:
@@ -364,15 +446,6 @@ def lightcurve(state):
     true_anomalies = kepler(mean_anomalies, state["e"])
     state["f"] = true_anomalies
 
-    state["prec"] = jnp.where(state["tidally_locked"], state["f"], state["prec"])
-
-    # the coefficients of the implicit 3d surface
-    three = planet_3d_coeffs(**state)
-    # the coefficients of the implicit 2d surface
-    two = planet_2d_coeffs(**three)
-    # the coefficients of the parametric projected ellipse
-    para = poly_to_parametric(**two)
-
     # convert the u coefficients to g coefficients
     u_coeffs = jnp.ones(state["ld_u_coeffs"].shape[0] + 1) * (-1)
     u_coeffs = u_coeffs.at[1:].set(state["ld_u_coeffs"])
@@ -385,14 +458,31 @@ def lightcurve(state):
     # cartesian position of the planet at each timestep
     positions = skypos(**state)
 
-    # boolean mask, is the planet transiting at each timestep?
-    # possibly_in_transit = (
-    #     (jnp.abs(positions[0, :]) < 1.0 + state["r"])
-    #     * (jnp.abs(positions[1, :]) < 1.0 + state["r"])
-    #     * (positions[2, :] > 0)
-    # )
+    if parameterize_with_projected_ellipse:
+        two, para = parameterize_2d_helper(
+            state["projected_r1"],
+            state["projected_r2"],
+            state["projected_theta"],
+            positions[0, :],
+            positions[1, :],
+        )
+
+        largest_r = jnp.max(jnp.array([state["projected_r1"], state["projected_r2"]]))
+
+    else:
+        # the coefficients of the implicit 3d surface
+        three = planet_3d_coeffs(**state)
+        # the coefficients of the implicit 2d surface
+        two = planet_2d_coeffs(**three)
+        # the coefficients of the parametric projected ellipse
+        para = poly_to_parametric(**two)
+
+        state["prec"] = jnp.where(state["tidally_locked"], state["f"], state["prec"])
+
+        largest_r = state["r"]
+
     possibly_in_transit = (
-        positions[0, :] ** 2 + positions[1, :] ** 2 <= (1.0 + state["r"] * 1.1) ** 2
+        positions[0, :] ** 2 + positions[1, :] ** 2 <= (1.0 + largest_r * 1.1) ** 2
     ) * (positions[2, :] > 0)
 
     def not_on_limb(X):
@@ -405,28 +495,12 @@ def lightcurve(state):
             blocked_flux = (
                 jnp.matmul(g_coeffs, solution_vectors) * normalization_constant
             )
-            # jax.debug.print("s0: {x}", x=solution_vectors[0])
-            # jax.debug.print("s1: {x}", x=solution_vectors[1])
-            # jax.debug.print("s2: {x}", x=solution_vectors[1])
-            # jax.debug.print("g0: {x}", x=g_coeffs[0])
-            # jax.debug.print("g1: {x}", x=g_coeffs[1])
-            # jax.debug.print("g2: {x}", x=g_coeffs[2])
-
-            # jax.debug.print("fully transiting")
-            # jax.debug.print(
-            # "normalization constant: {x}", x=normalization_constant
-            # )
-            # jax.debug.print("g coeffs: {x}", x=g_coeffs)
-            # jax.debug.print("planet solution vector: {x}", x=solution_vectors)
-            # jax.debug.print("planet contribution: {x}", x=blocked_flux)
-            # jax.debug.print("total blocked: {x}\n", x=blocked_flux)
 
             return blocked_flux
 
         def not_transiting(para):
             return 0.0
 
-        # jax.debug.print("center2: {x}", x=para["c_x3"] ** 2 + para["c_y3"] ** 2)
         return jax.lax.cond(
             para["c_x3"] ** 2 + para["c_y3"] ** 2 <= 1,
             fully_transiting,
@@ -436,10 +510,7 @@ def lightcurve(state):
 
     def partially_transiting(X):
         para, xs, ys = X
-        # jax.debug.print("xs: {x}", x=xs)
-        # jax.debug.print("ys: {x}", x=ys)
-        # q = jnp.linalg.norm(jnp.array([xs, ys]))
-        # jax.debug.print("transiting? {x}", x=q < (1 + state["r"]))
+
         alphas = cartesian_intersection_to_parametric_angle(xs, ys, **para)
         alphas = jnp.where(xs != 999, alphas, 2 * jnp.pi)
         alphas = jnp.where(alphas < 0, alphas + 2 * jnp.pi, alphas)
@@ -462,26 +533,20 @@ def lightcurve(state):
         test_val = jnp.sqrt(_x**2 + _y**2)
 
         def testval_inside_star(_):
-            # jax.debug.print("inside")
             solution_vectors = planet_solution_vec(
                 alphas[0], alphas[1], g_coeffs, **para
             )
-            # jax.debug.print("planet solution: {x}", x=solution_vectors)
             planet_contribution = (
                 jnp.matmul(solution_vectors, g_coeffs) * normalization_constant
             )
             return planet_contribution
 
         def testval_outside_star(_):
-            # jax.debug.print("outside")
-            # print(alphas)
             leg1_solution_vec = planet_solution_vec(
                 alphas[1], 2 * jnp.pi, g_coeffs, **para
             )
-            # jax.debug.print("leg 1 solution: {x}", x=leg1_solution_vec)
             leg1 = jnp.matmul(leg1_solution_vec, g_coeffs)
             leg2_solution_vec = planet_solution_vec(0.0, alphas[0], g_coeffs, **para)
-            # jax.debug.print("leg 2 solution: {x}", x=leg2_solution_vec)
             leg2 = jnp.matmul(leg2_solution_vec, g_coeffs)
             planet_contribution = (leg1 + leg2) * normalization_constant
             return planet_contribution
@@ -497,18 +562,7 @@ def lightcurve(state):
             jnp.matmul(star_solution_vectors, g_coeffs) * normalization_constant
         )
 
-        # jax.debug.print("partially transiting")
-        # jax.debug.print(
-        # "normalization constant: {x}", x=normalization_constant
-        # )
-        # jax.debug.print("g coeffs: {x}", x=g_coeffs)
-        # jax.debug.print("alphas: {x}", x=alphas)
-        # jax.debug.print("star solution: {x}", x=star_solution_vectors)
-        # jax.debug.print("star contribution: {x}", x=star_contribution)
-        # jax.debug.print("planet contribution: {x}", x=planet_contribution)
-
         total_blocked = planet_contribution + star_contribution
-        # jax.debug.print("total blocked: {x}\n", x=total_blocked)
 
         return total_blocked
 
@@ -518,14 +572,8 @@ def lightcurve(state):
             xs,
             ys,
         ) = _single_intersection_points(**indv_two)
-        # jax.debug.print("transiting decision func")
-        # jax.debug.print("para: {x}", x=indv_para)
-        # jax.debug.print("two: {x}", x=indv_two)
-        # #jax.debug.print("")
-        # jax.debug.print("xs: {x}", x=xs)
-        # jax.debug.print("ys: {x}", x=ys)
+
         on_limb = jnp.sum(xs) != 999 * 4
-        # jax.debug.print("on_limb: {x}", x=on_limb)
 
         return jax.lax.cond(
             on_limb,

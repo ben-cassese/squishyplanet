@@ -94,8 +94,9 @@ class OblateSystem:
             the "season" of the northern hemisphere at periastron passage.)
         r (float, [Rstar], default=None):
             The equatorial radius of the planet. This will always be the largest of the
-            3 axes of the triaxial ellipsoid. A required parameter, will raise an error
-            if not provided.
+            3 axes of the triaxial ellipsoid. Either this or the entire set of
+            ``projected_r1``, ``projected_r2``, and ``projected_theta`` must be
+            provided.
         f1 (float, [Dimensionless], default=0.0):
             The fractional difference between the (longest) equatorial and polar radii
             of the planet. This is defined as :math:`(R_{eq} - R_{pol}) / R_{eq}`.
@@ -112,8 +113,8 @@ class OblateSystem:
                 \\frac{I(\mu)}{I_0} = - \Sigma_{i=0}^N u_i (1 - \mu)^i
 
             for some order polynomial :math:`N`. See
-            `Agol, Luger, and Foreman-Mackey 2020 <https://ui.adsabs.harvard.edu/abs/2020AJ....159..123A/abstract>`_
-            for more.
+            `Agol, Luger, and Foreman-Mackey 2020
+            <https://ui.adsabs.harvard.edu/abs/2020AJ....159..123A/abstract>`_ for more.
         hotspot_latitude (float, [Radian], default=0.0):
             The latitude of a potential hotspot on the planet. This is defined according
             to the "physics" convention of spherical coordinates, not in the geography
@@ -139,6 +140,18 @@ class OblateSystem:
             The log of the "jitter" term included in likelihood calculations. The jitter
             is added in quadrature to the provided uncertainties to account for any
             unmodeled noise in the data.
+        projected_r1 (float, [Rstar], default=0.0):
+            The length of the semi-major axis of the projected ellipse. This is only
+            relevant if ``parameterize_with_projected_ellipse`` is set to ``True``,
+            which will override ``r``, ``f1``, ``f2``, ``obliq``, and ``prec``.
+        projected_r2 (float, [Rstar], default=0.0):
+            The length of the semi-minor axis of the projected ellipse. This is only
+            relevant if ``parameterize_with_projected_ellipse`` is set to ``True``,
+            which will override ``r``, ``f1``, ``f2``, ``obliq``, and ``prec``.
+        projected_theta (float, [Radian], default=0.0):
+            The angle of the semi-major axis of the projected ellipse. This is only
+            relevant if ``parameterize_with_projected_ellipse`` is set to ``True``,
+            which will override ``r``, ``f1``, ``f2``, ``obliq``, and ``prec``.
         tidally_locked (bool, default=True):
             Whether the planet is tidally locked to the star. If ``True``, then ``prec``
             will always be set equal to the true anomaly, meaning the same face of the
@@ -159,6 +172,8 @@ class OblateSystem:
             captures the effects of the star's radial velocity changing and boosting the
             total flux/pushing some flux into/out of the bandpass of the observation.
             Here, it is modeled as a simple sinusoidal variation with 2 peaks per orbit.
+        parameterize_with_projected_ellipse (bool, default=False):
+
         phase_curve_nsamples (int, default=50_000):
             The number of random samples of the planet's surface to draw when performing
             Monte Carlo estimates of the emitted/reflected flux. A larger number will
@@ -204,11 +219,15 @@ class OblateSystem:
         stellar_doppler_alpha=1e-6,
         systematic_trend_coeffs=jnp.array([0.0, 0.0]),
         log_jitter=-10,
+        projected_r1=0.0,
+        projected_r2=0.0,
+        projected_theta=0.0,
         tidally_locked=True,
         compute_reflected_phase_curve=False,
         compute_emitted_phase_curve=False,
         compute_stellar_ellipsoidal_variations=False,
         compute_stellar_doppler_variations=False,
+        parameterize_with_projected_ellipse=False,
         phase_curve_nsamples=50_000,
         random_seed=0,
         data=jnp.array([1.0]),
@@ -239,11 +258,15 @@ class OblateSystem:
             "stellar_doppler_alpha",
             "systematic_trend_coeffs",
             "log_jitter",
+            "projected_r1",
+            "projected_r2",
+            "projected_theta",
             "tidally_locked",
             "compute_reflected_phase_curve",
             "compute_emitted_phase_curve",
             "compute_stellar_ellipsoidal_variations",
             "compute_stellar_doppler_variations",
+            "parameterize_with_projected_ellipse",
             "phase_curve_nsamples",
             "random_seed",
             "data",
@@ -355,6 +378,30 @@ class OblateSystem:
         if len(jnp.unique(jnp.array(shapes))) > 2:
             raise ValueError(
                 "All parameters must be scalars or arrays of the same shape."
+            )
+
+        if self._state["parameterize_with_projected_ellipse"]:
+            assert self._state["projected_r1"] > 0, (
+                "projected_r1 must be greater than 0 if "
+                "parameterize_with_projected_ellipse is True"
+            )
+            assert self._state["projected_r2"] > 0, (
+                "projected_r2 must be greater than 0 if "
+                "parameterize_with_projected_ellipse is True"
+            )
+            assert (
+                not self._state["compute_reflected_phase_curve"]
+                & self._state["compute_emitted_phase_curve"]
+                & self._state["compute_stellar_ellipsoidal_variations"]
+                & self._state["compute_stellar_doppler_variations"],
+                (
+                    "parameterize_with_projected_ellipse is incompatible with "
+                    "phase curve calculations"
+                ),
+            )
+            assert self._state["tidally_locked"] == False, (
+                "parameterize_with_projected_ellipse is incompatible with "
+                "tidally_locked=True"
             )
 
     def _illustrate_helper(self, times=None, true_anomalies=None, nsamples=50_000):
@@ -522,16 +569,16 @@ class OblateSystem:
                 (e.g. BJD) will work. Provide either this or ``true_anomalies`` but not
                 both.
             true_anomalies (array-like, [Radian], default=None):
-                The true anomalies at which to illustrate the system. Provide either this
-                or ``times`` but not both.
+                The true anomalies at which to illustrate the system. Provide either
+                this or ``times`` but not both.
             orbit (bool, default=True):
                 Whether to plot a trace of the planet's orbital path
             reflected (bool, default=False):
                 Whether to color in the planet according to its reflected flux profile.
                 Can optionally include this or ``emitted`` but not both.
             emitted (bool, default=False):
-                Whether to color in the planet according to its emitted flux profile. Can
-                optionally include this or ``reflected`` but not both.
+                Whether to color in the planet according to its emitted flux profile.
+                Can optionally include this or ``reflected`` but not both.
             star_fill (bool, default=True):
                 Whether to color in the star according to its limb darkening profile.
                 Note that the lowest color contour is bounded at zero, so if you have an
@@ -807,7 +854,7 @@ def _lightcurve(
     # always compute the primary transit and trend
     for key in params.keys():
         state[key] = params[key]
-    transit = lightcurve(state)
+    transit = lightcurve(state, state["parameterize_with_projected_ellipse"])
     trend = jnp.polyval(state["systematic_trend_coeffs"], state["times"])
 
     # if you don't want any phase curve stuff, you're done

@@ -20,7 +20,6 @@ sys.path.insert(
 
 project = "squishyplanet"
 copyright = "2024, Ben Cassese"
-author = "Ben Cassese"
 release = "0.0.1"
 
 # -- General configuration ---------------------------------------------------
@@ -60,6 +59,7 @@ html_theme_options = {
     "repository_branch": "main",
     "use_repository_button": True,
     "use_download_button": True,
+    "show_prev_next": False,
 }
 
 html_context = {"default_mode": "light"}
