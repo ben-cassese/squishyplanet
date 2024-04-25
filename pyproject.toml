@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "squishyplanet"
 version = "0.0.1"
-requires-python = ">=3.8"
+requires-python = ">=3.9"
 dependencies = [
     "requests",
     "jax",
@@ -40,9 +40,6 @@ include-package-data = true
 
 [tool.black]
 line-length = 88
-
-# [tool.pytest]
-# testpaths = ["squishyplanet"]
 
 [tool.coverage.run]
 omit = [
