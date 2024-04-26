@@ -75,7 +75,7 @@ def _single_intersection_points(
 
 
 @jax.jit
-def parameterize_2d_helper(projected_r1, projected_r2, projected_theta, xc, yc):
+def parameterize_2d_helper(projected_r, projected_f, projected_theta, xc, yc):
     """
     Convert from the alternative sky-projected parameterization to the same format
     used by the 3D parameterization.
@@ -93,8 +93,8 @@ def parameterize_2d_helper(projected_r1, projected_r2, projected_theta, xc, yc):
     :func:`planet_2d.planet_2d_coeffs`.
 
     Args:
-        projected_r1 (float): The projected "x" radius of the planet.
-        projected_r2 (float): The projected "y" radius of the planet.
+        projected_r (float): The projected "x" radius of the planet.
+        projected_f (float): The flattening of the projected ellipse.
         projected_theta (float): The angle of the projected ellipse.
 
     Returns:
@@ -105,36 +105,37 @@ def parameterize_2d_helper(projected_r1, projected_r2, projected_theta, xc, yc):
             same ellipse.
 
     """
+    projected_r2 = projected_r * (1 - projected_f)
     cos_t = jnp.cos(projected_theta)
     sin_t = jnp.sin(projected_theta)
 
     two = {
-        "rho_xx": cos_t**2 / projected_r1**2 + sin_t**2 / projected_r2**2,
-        "rho_xy": (2 * cos_t * sin_t) / projected_r1**2
+        "rho_xx": cos_t**2 / projected_r**2 + sin_t**2 / projected_r2**2,
+        "rho_xy": (2 * cos_t * sin_t) / projected_r**2
         - (2 * cos_t * sin_t) / projected_r2**2,
-        "rho_x0": (-2 * cos_t**2 * xc) / projected_r1**2
-        - (2 * cos_t * yc * sin_t) / projected_r1**2
+        "rho_x0": (-2 * cos_t**2 * xc) / projected_r**2
+        - (2 * cos_t * yc * sin_t) / projected_r**2
         + (2 * cos_t * yc * sin_t) / projected_r2**2
         - (2 * xc * sin_t**2) / projected_r2**2,
-        "rho_yy": cos_t**2 / projected_r2**2 + sin_t**2 / projected_r1**2,
+        "rho_yy": cos_t**2 / projected_r2**2 + sin_t**2 / projected_r**2,
         "rho_y0": (-2 * cos_t**2 * yc) / projected_r2**2
-        - (2 * cos_t * xc * sin_t) / projected_r1**2
+        - (2 * cos_t * xc * sin_t) / projected_r**2
         + (2 * cos_t * xc * sin_t) / projected_r2**2
-        - (2 * yc * sin_t**2) / projected_r1**2,
-        "rho_00": (cos_t**2 * xc**2) / projected_r1**2
+        - (2 * yc * sin_t**2) / projected_r**2,
+        "rho_00": (cos_t**2 * xc**2) / projected_r**2
         + (cos_t**2 * yc**2) / projected_r2**2
-        + (2 * cos_t * xc * yc * sin_t) / projected_r1**2
+        + (2 * cos_t * xc * yc * sin_t) / projected_r**2
         - (2 * cos_t * xc * yc * sin_t) / projected_r2**2
-        + (yc**2 * sin_t**2) / projected_r1**2
+        + (yc**2 * sin_t**2) / projected_r**2
         + (xc**2 * sin_t**2) / projected_r2**2,
     }
 
     para = {
-        "c_x1": projected_r1 * cos_t,
-        "c_x2": -projected_r2 * sin_t,
+        "c_x1": jnp.ones_like(xc) * (projected_r * cos_t),
+        "c_x2": jnp.ones_like(xc) * (-projected_r2 * sin_t),
         "c_x3": xc,
-        "c_y1": projected_r1 * sin_t,
-        "c_y2": projected_r2 * cos_t,
+        "c_y1": jnp.ones_like(xc) * (projected_r * sin_t),
+        "c_y2": jnp.ones_like(xc) * (projected_r2 * cos_t),
         "c_y3": yc,
     }
 
@@ -396,7 +397,7 @@ def star_solution_vec(a, b, g_coeffs, c_x1, c_x2, c_x3, c_y1, c_y2, c_y3):
     return solution_vec
 
 
-@partial(jax.jit, static_argnums=(1,))
+@partial(jax.jit, static_argnames=("parameterize_with_projected_ellipse",))
 def lightcurve(state, parameterize_with_projected_ellipse):
     """
     The main function for computing a transit light curve.
@@ -460,24 +461,24 @@ def lightcurve(state, parameterize_with_projected_ellipse):
 
     if parameterize_with_projected_ellipse:
         two, para = parameterize_2d_helper(
-            state["projected_r1"],
-            state["projected_r2"],
+            state["projected_r"],
+            state["projected_f"],
             state["projected_theta"],
             positions[0, :],
             positions[1, :],
         )
-
-        largest_r = jnp.max(jnp.array([state["projected_r1"], state["projected_r2"]]))
+        r2 = state["projected_r"] * (1 - state["projected_f"])
+        largest_r = jnp.max(jnp.array([state["projected_r"], r2]))
 
     else:
+        state["prec"] = jnp.where(state["tidally_locked"], state["f"], state["prec"])
+
         # the coefficients of the implicit 3d surface
         three = planet_3d_coeffs(**state)
         # the coefficients of the implicit 2d surface
         two = planet_2d_coeffs(**three)
         # the coefficients of the parametric projected ellipse
         para = poly_to_parametric(**two)
-
-        state["prec"] = jnp.where(state["tidally_locked"], state["f"], state["prec"])
 
         largest_r = state["r"]
 

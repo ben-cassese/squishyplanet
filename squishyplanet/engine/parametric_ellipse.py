@@ -9,9 +9,27 @@ import jax.numpy as jnp
 # and the final value for c_y1 is off. everything is fine at f=1e-5 though, so leaving
 # for now
 @jax.jit
-def _poly_to_parametric_helper(
-    rho_xx, rho_xy, rho_x0, rho_yy, rho_y0, rho_00, **kwargs
-):
+def poly_to_parametric_helper(rho_xx, rho_xy, rho_x0, rho_yy, rho_y0, rho_00, **kwargs):
+    """
+    A helper function for :func:`poly_to_parametric`.
+
+    Args:
+        rho_xx (Array [Dimensionless]): Coefficient of x^2
+        rho_xy (Array [Dimensionless]): Coefficient of xy
+        rho_x0 (Array [Dimensionless]): Coefficient of x
+        rho_yy (Array [Dimensionless]): Coefficient of y^2
+        rho_y0 (Array [Dimensionless]): Coefficient of y
+        rho_00 (Array [Dimensionless]): Constant term
+
+    Returns:
+        Tuple:
+            - r1 (Array [Rstar]): Semi-major axis of the projected ellipse
+            - r2 (Array [Rstar]): Semi-minor axis of the projected ellipse
+            - xc (Array [Rstar]): x-coordinate of the center of the ellipse
+            - yc (Array [Rstar]): y-coordinate of the center of the ellipse
+            - cosa (Array [Dimensionless]): Cosine of the rotation angle
+            - sina (Array [Dimensionless]): Sine of the rotation angle
+    """
     rho_00 -= 1
 
     # the center of the ellipse
@@ -76,7 +94,7 @@ def poly_to_parametric(rho_xx, rho_xy, rho_x0, rho_yy, rho_y0, rho_00):
                 x = c_{x1} * \\cos(\\alpha) + c_{x2} * \\sin(\\alpha) + c_{x3}
                 y = c_{y1} * \\cos(\\alpha) + c_{y2} * \\sin(\\alpha) + c_{y3}
     """
-    r1, r2, xc, yc, cosa, sina = _poly_to_parametric_helper(
+    r1, r2, xc, yc, cosa, sina = poly_to_parametric_helper(
         rho_xx, rho_xy, rho_x0, rho_yy, rho_y0, rho_00
     )
 

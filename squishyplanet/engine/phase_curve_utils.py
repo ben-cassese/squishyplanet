@@ -3,7 +3,7 @@ import jax
 jax.config.update("jax_enable_x64", True)
 import jax.numpy as jnp
 
-from squishyplanet.engine.parametric_ellipse import _poly_to_parametric_helper
+from squishyplanet.engine.parametric_ellipse import poly_to_parametric_helper
 from squishyplanet.engine.planet_2d import planet_2d_coeffs
 
 ########################################################################################
@@ -55,7 +55,7 @@ def _xy_on_surface(
     **kwargs,
 ):
     # n = n.shape[0]
-    r1, r2, xc, yc, cosa, sina = _poly_to_parametric_helper(
+    r1, r2, xc, yc, cosa, sina = poly_to_parametric_helper(
         rho_xx, rho_xy, rho_x0, rho_yy, rho_y0, rho_00
     )
 
@@ -677,7 +677,7 @@ def reflected_normalization(
     rotated_planet_2d_coeffs = planet_2d_coeffs(**rotated_planet_3d_coeffs)
 
     # return rotated_planet_2d_coeffs
-    r1, r2, _, _, _, _ = _poly_to_parametric_helper(**rotated_planet_2d_coeffs)
+    r1, r2, _, _, _, _ = poly_to_parametric_helper(**rotated_planet_2d_coeffs)
     area_seen_by_star = jnp.pi * r1 * r2
 
     return flux_density * area_seen_by_star
