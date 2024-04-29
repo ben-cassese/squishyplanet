@@ -8,7 +8,11 @@ from functools import partial
 import pprint
 import matplotlib.pyplot as plt
 
-from squishyplanet.engine.planet_3d import planet_3d_coeffs
+from squishyplanet.engine.planet_3d import (
+    planet_3d_coeffs,
+    extended_illumination_offsets,
+    planet_3d_coeffs_extended_illumination,
+)
 from squishyplanet.engine.planet_2d import planet_2d_coeffs
 from squishyplanet.engine.parametric_ellipse import (
     poly_to_parametric_helper,
@@ -29,6 +33,7 @@ from squishyplanet.engine.phase_curve_utils import (
     lambertian_reflection,
     corrected_emission_profile,
     reflected_phase_curve,
+    extended_illumination_reflected_phase_curve,
     emission_phase_curve,
     phase_curve,
     stellar_ellipsoidal_variations,
@@ -131,7 +136,7 @@ class OblateSystem:
         hotspot_concentration (float, default=0.2):
             The "concentration" of the hotspot. This is the :math:`\kappa` parameter in
             the von Mises-Fisher distribution that describes the hotspot.
-        reflected_albedo (float, default=1.0):
+        geometric_albedo (float, default=1.0):
             The (spatialy uniform) albedo of the planet. This is the fraction of light
             that is reflected, though the directional-dependent scattering is dictated
             by Lambert's cosine law.
@@ -158,6 +163,12 @@ class OblateSystem:
             The angle of the semi-major axis of the projected ellipse. This is only
             relevant if ``parameterize_with_projected_ellipse`` is set to ``True``,
             which will override ``r``, ``f1``, ``f2``, ``obliq``, and ``prec``.
+        extended_illumination_npts (int, default=1):
+            The number of points used to sample the star's projected disk as seen by
+            the planet when calculating the reflected flux and accounting for the star's
+            extended size. Closely follows the implementation in ``starry``,
+            specifically Sec. 4.1 of `Luger et al. 2022
+            <https://ui.adsabs.harvard.edu/abs/2022AJ....164....4L/abstract>`_.
         tidally_locked (bool, default=True):
             Whether the planet is tidally locked to the star. If ``True``, then ``prec``
             will always be set equal to the true anomaly, meaning the same face of the
@@ -240,7 +251,7 @@ class OblateSystem:
         hotspot_latitude=0.0,
         hotspot_longitude=0.0,
         hotspot_concentration=0.2,
-        reflected_albedo=1.0,
+        geometric_albedo=1.0,
         emitted_scale=1e-6,
         stellar_ellipsoidal_alpha=1e-6,
         stellar_doppler_alpha=1e-6,
@@ -249,6 +260,7 @@ class OblateSystem:
         projected_r=0.0,
         projected_f=0.0,
         projected_theta=0.0,
+        extended_illumination_npts=1,
         tidally_locked=True,
         compute_reflected_phase_curve=False,
         compute_emitted_phase_curve=False,
@@ -318,6 +330,27 @@ class OblateSystem:
             self._state["stencil"] = (
                 None  # never used in this case, but to keep the state consistent
             )
+
+        # for extended illumination reflection curves
+
+        # based on starry._core.core.py's OpsReflected(OpsYlm) class
+        # create a grid of points uniformly distributed on the projected disk of the
+        # sta from an observer along the z-axis
+        N = int(2 + jnp.sqrt(self._state["extended_illumination_npts"] * 4 / jnp.pi))
+        dx = jnp.linspace(-1, 1, N)
+        dx, dy = jnp.meshgrid(dx, dx)
+
+        # here is a difference with the starry implementation, which I think contains an
+        # error. it leaves off the sqrt, and consequently the points are uniformly
+        # distributed on the unit disk but don't all lie on the unit sphere
+        dz = jnp.sqrt(1 - dx**2 - dy**2)
+        # dz = 1 - dx**2 - dy**2
+        source_dx = dx[dz > 0].flatten()
+        source_dy = dy[dz > 0].flatten()
+        source_dz = dz[dz > 0].flatten()
+        pts = jnp.array([source_dx, source_dy, source_dz]).T
+        self._state["extended_illumination_points"] = pts
+        self._state["extended_illumination_npts"] = len(pts)
 
         # everything below here is just an instantaneous snapshot mostly for plotting,
         # these will all vary with different parameter inputs
@@ -898,6 +931,7 @@ class OblateSystem:
             oversample=self._state["oversample"],
             random_seed=self._state["random_seed"],
             phase_curve_nsamples=self._state["phase_curve_nsamples"],
+            extended_illumination_npts=self._state["extended_illumination_npts"],
             state=self._state,
             params=params,
         )
@@ -938,6 +972,7 @@ class OblateSystem:
             oversample=self._state["oversample"],
             random_seed=self._state["random_seed"],
             phase_curve_nsamples=self._state["phase_curve_nsamples"],
+            extended_illumination_npts=self._state["extended_illumination_npts"],
             state=self._state,
             params=params,
         )
@@ -954,6 +989,7 @@ class OblateSystem:
         5,
         6,
         7,
+        8,
     ),
 )
 def _lightcurve(
@@ -965,6 +1001,7 @@ def _lightcurve(
     oversample,
     random_seed,
     phase_curve_nsamples,
+    extended_illumination_npts,
     state,
     params,
 ):
@@ -1009,15 +1046,18 @@ def _lightcurve(
 
     # just the reflected component
     if compute_reflected_phase_curve & (not compute_emitted_phase_curve):
-        reflected = reflected_phase_curve(
-            sample_radii, sample_thetas, two, three, state, x_c, y_c, z_c
-        )
+        if extended_illumination_npts == 1:
+            reflected = reflected_phase_curve(
+                sample_radii, sample_thetas, two, three, state, x_c, y_c, z_c
+            )
+        else:
+            offsets = extended_illumination_offsets(**state)
+            three = planet_3d_coeffs_extended_illumination(**state, offsets=offsets)
+            two = planet_2d_coeffs(**three)
+            reflected = extended_illumination_reflected_phase_curve(
+                sample_radii, sample_thetas, two, three, state, x_c, y_c, z_c, offsets
+            )
         emitted = 0.0
-        # it really didn't make a difference in speed here
-        # reflected = jax.vmap(
-        #     reflected_phase_curve, in_axes=(0, 0, None, None, None, None, None, None)
-        # )(sample_radii, sample_thetas, two, three, state, x_c, y_c, z_c)
-        # reflected = jnp.mean(reflected, axis=0)
 
     # just the emitted component
     elif (not compute_reflected_phase_curve) & compute_emitted_phase_curve:
@@ -1026,10 +1066,32 @@ def _lightcurve(
 
     # both reflected and emitted components. this function shares some of the
     # computation between the two, so it's a bit faster than running them separately
-    elif compute_reflected_phase_curve & compute_emitted_phase_curve:
+    elif (
+        compute_reflected_phase_curve
+        & compute_emitted_phase_curve
+        & (extended_illumination_npts == 1)
+    ):
         reflected, emitted = phase_curve(
             sample_radii, sample_thetas, two, three, state, x_c, y_c, z_c
         )
+
+    elif (
+        compute_reflected_phase_curve
+        & compute_emitted_phase_curve
+        & (extended_illumination_npts != 1)
+    ):
+        if extended_illumination_npts == 1:
+            reflected = reflected_phase_curve(
+                sample_radii, sample_thetas, two, three, state, x_c, y_c, z_c
+            )
+        else:
+            offsets = extended_illumination_offsets(**state)
+            three = planet_3d_coeffs_extended_illumination(**state, offsets=offsets)
+            two = planet_2d_coeffs(**three)
+            reflected = extended_illumination_reflected_phase_curve(
+                sample_radii, sample_thetas, two, three, state, x_c, y_c, z_c, offsets
+            )
+        emitted = emission_phase_curve(sample_radii, sample_thetas, two, three, state)
 
     ####################################################
     # compute the star's contribution to the phase curve
@@ -1054,7 +1116,10 @@ def _lightcurve(
     else:
         doppler = 0.0
 
+    ####################################################
     # put it all together
+    ####################################################
+
     oversampled_curve = transit + trend + reflected + emitted + ellipsoidal + doppler
     if oversample > 1:
         c = (oversampled_curve.reshape(-1, oversample) * state["stencil"][None, :]).sum(
@@ -1076,6 +1141,7 @@ def _lightcurve(
         5,
         6,
         7,
+        8,
     ),
 )
 def _loglike(
@@ -1087,6 +1153,7 @@ def _loglike(
     oversample,
     random_seed,
     phase_curve_nsamples,
+    extended_illumination_npts,
     state,
     params,
 ):
@@ -1099,6 +1166,7 @@ def _loglike(
         oversample,
         random_seed,
         phase_curve_nsamples,
+        extended_illumination_npts,
         state,
         params,
     )

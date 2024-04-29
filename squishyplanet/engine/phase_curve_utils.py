@@ -607,7 +607,7 @@ def lambertian_reflection(surface_star_cos_angle, x, y, z):
     return (
         surface_star_cos_angle
         * (surface_star_cos_angle > 0)
-        * ~((x**2 + y**2 < 1) & (z < 0))
+        # * ~((x**2 + y**2 < 1) & (z < 0))
     )
 
 
@@ -618,6 +618,9 @@ def reflected_normalization(
     x_c,
     y_c,
     z_c,
+    xo=0.0,
+    yo=0.0,
+    zo=0.0,
     **kwargs,
 ):
     """
@@ -645,6 +648,15 @@ def reflected_normalization(
         x_c (Array): The x coordinate of the center of the planet.
         y_c (Array): The y coordinate of the center of the planet.
         z_c (Array): The z coordinate of the center of the planet.
+        xo (float or Array):
+            An offset to add to the x coordinate of the center of the planet, used when
+            correcting for extended source illuminations. Default is 0.0.
+        yo (float or Array):
+            An offset to add to the y coordinate of the center of the planet, used when
+            correcting for extended source illuminations. Default is 0.0.
+        zo (float or Array):
+            An offset to add to the z coordinate of the center of the planet, used when
+            correcting for extended source illuminations. Default is 0.0.
         **kwargs:
             Additional unused keyword arguments, included so that we can pass in
             a larger state dictionary that includes all of the required parameters along
@@ -654,38 +666,53 @@ def reflected_normalization(
         Array: The normalization factor for the reflected light.
 
     """
+    x_c = x_c - xo
+    y_c = y_c - yo
+    z_c = z_c - zo
+
     sep_squared = x_c**2 + y_c**2 + z_c**2
     # flux_density = 1 / (4 * jnp.pi * sep_squared)
     # following the starry normalization:
     flux_density = 1 / (jnp.pi * sep_squared)
 
-    rotated_planet_3d_coeffs = planet_from_star(
-        three["p_xx"],
-        three["p_xy"],
-        three["p_xz"],
-        three["p_x0"],
-        three["p_yy"],
-        three["p_yz"],
-        three["p_y0"],
-        three["p_zz"],
-        three["p_z0"],
-        three["p_00"],
-        x_c,
-        y_c,
-        z_c,
-    )
-    rotated_planet_2d_coeffs = planet_2d_coeffs(**rotated_planet_3d_coeffs)
+    # rotated_planet_3d_coeffs = planet_from_star(
+    #     three["p_xx"],
+    #     three["p_xy"],
+    #     three["p_xz"],
+    #     three["p_x0"],
+    #     three["p_yy"],
+    #     three["p_yz"],
+    #     three["p_y0"],
+    #     three["p_zz"],
+    #     three["p_z0"],
+    #     three["p_00"],
+    #     x_c,
+    #     y_c,
+    #     z_c,
+    # )
+    # rotated_planet_2d_coeffs = planet_2d_coeffs(**rotated_planet_3d_coeffs)
 
-    # return rotated_planet_2d_coeffs
-    r1, r2, _, _, _, _ = poly_to_parametric_helper(**rotated_planet_2d_coeffs)
-    area_seen_by_star = jnp.pi * r1 * r2
+    # # return rotated_planet_2d_coeffs
+    # r1, r2, _, _, _, _ = poly_to_parametric_helper(**rotated_planet_2d_coeffs)
+    # area_seen_by_star = jnp.pi * r1 * r2
 
-    return flux_density * area_seen_by_star
+    return flux_density  # * area_seen_by_star
+    # return flux_density, area_seen_by_star
 
 
 @jax.jit
 def reflected_phase_curve(
-    sample_radii, sample_thetas, two, three, state, x_c, y_c, z_c
+    sample_radii,
+    sample_thetas,
+    two,
+    three,
+    state,
+    x_c,
+    y_c,
+    z_c,
+    xo=jnp.array([0.0]),
+    yo=jnp.array([0.0]),
+    zo=jnp.array([0.0]),
 ):
     """
     Compute the timeseries of light reflected from  the planet.
@@ -721,6 +748,15 @@ def reflected_phase_curve(
         x_c (Array): The x coordinate of the center of the planet.
         y_c (Array): The y coordinate of the center of the planet.
         z_c (Array): The z coordinate of the center of the planet.
+        xo (Array):
+            An offset to add to the x coordinate of the center of the planet, used when
+            correcting for extended source illuminations. Default is 0.0.
+        yo (Array):
+            An offset to add to the y coordinate of the center of the planet, used when
+            correcting for extended source illuminations. Default is 0.0.
+        zo (Array):
+            An offset to add to the z coordinate of the center of the planet, used when
+            correcting for extended source illuminations. Default is 0.0.
 
 
     Returns:
@@ -745,6 +781,11 @@ def reflected_phase_curve(
         three["p_yz"] = jnp.ones_like(x_c) * three["p_yz"]
         three["p_zz"] = jnp.ones_like(x_c) * three["p_zz"]
 
+    if x_c.shape != xo.shape:
+        xo = jnp.ones_like(x_c) * xo
+        yo = jnp.ones_like(x_c) * yo
+        zo = jnp.ones_like(x_c) * zo
+
     def scan_func(carry, scan_over):
         (
             rho_xx,
@@ -766,10 +807,13 @@ def reflected_phase_curve(
             x_c,
             y_c,
             z_c,
+            xo,
+            yo,
+            zo,
         ) = scan_over
-        x_c = jnp.array([x_c])
-        y_c = jnp.array([y_c])
-        z_c = jnp.array([z_c])
+        x_c = jnp.array([x_c]) - xo
+        y_c = jnp.array([y_c]) - yo
+        z_c = jnp.array([z_c]) - zo
 
         x, y, z = sample_surface(
             sample_radii,
@@ -809,6 +853,9 @@ def reflected_phase_curve(
         surface_star_angle = surface_star_cos_angle(n, x_c, y_c, z_c)
         lamb = lambertian_reflection(surface_star_angle, x, y, z)
 
+        # mask = ~(((x - xo) ** 2 + (y - yo) ** 2 < 1) & ((z - zo) < 0))
+        # lamb = lamb * mask
+
         return None, jnp.sum(lamb) / sample_radii.shape[0]
 
     flux = jax.lax.scan(
@@ -834,12 +881,37 @@ def reflected_phase_curve(
             x_c,
             y_c,
             z_c,
+            xo,
+            yo,
+            zo,
         ),
     )[1]
 
-    norm = reflected_normalization(two, three, x_c, y_c, z_c)
+    norm = reflected_normalization(two, three, x_c, y_c, z_c, xo, yo, zo)
 
-    return flux * norm * state["reflected_albedo"]
+    return flux * norm * state["geometric_albedo"]
+
+
+@jax.jit
+def extended_illumination_reflected_phase_curve(
+    sample_radii, sample_thetas, two, three, state, x_c, y_c, z_c, offsets
+):
+    # def scan_func(carry, scan_over):
+    #     two, three = scan_over
+    #     return None, reflected_phase_curve(
+    #         sample_radii, sample_thetas, two, three, state, x_c, y_c, z_c
+    #     )
+
+    # reflected = jax.lax.scan(scan_func,None,(two, three))[1]
+    # return jnp.mean(reflected, axis=0)
+
+    xo, yo, zo = offsets[..., 0], offsets[..., 1], offsets[..., 2]
+    reflected = jax.vmap(
+        reflected_phase_curve,
+        in_axes=(None, None, 0, 0, None, None, None, None, 0, 0, 0),
+    )(sample_radii, sample_thetas, two, three, state, x_c, y_c, z_c, xo, yo, zo)
+    # return jnp.mean(reflected, axis=0)
+    return reflected
 
 
 ########################################################################################

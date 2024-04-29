@@ -3,6 +3,8 @@ import jax
 jax.config.update("jax_enable_x64", True)
 import jax.numpy as jnp
 
+from squishyplanet.engine.kepler import skypos
+
 
 def _p_xx(a, e, f, Omega, i, omega, r, obliq, prec, f1, f2):
     return (
@@ -560,4 +562,115 @@ def planet_3d_coeffs(a, e, f, Omega, i, omega, r, obliq, prec, f1, f2, **kwargs)
         "p_zz": _p_zz(a, e, f, Omega, i, omega, r, obliq, prec, f1, f2),
         "p_z0": _p_z0(a, e, f, Omega, i, omega, r, obliq, prec, f1, f2),
         "p_00": _p_00(a, e, f, Omega, i, omega, r, obliq, prec, f1, f2),
+    }
+
+
+def extended_illumination_offsets(
+    a, e, f, Omega, i, omega, extended_illumination_points, **kwargs
+):
+
+    xc, yc, zc = skypos(a, e, f, Omega, i, omega)
+    # rotate those points to be from the perspective of an observer at the center of the
+    # planet
+    x = jnp.array([xc, yc, zc])
+    x = x / jnp.linalg.norm(x, axis=0)
+    thetas = -jnp.arccos(x[-1])
+    phis = -jnp.arctan2(x[0], x[1])
+
+    rot_x = lambda theta: jnp.array(
+        [
+            [1, 0, 0],
+            [0, jnp.cos(theta), -jnp.sin(theta)],
+            [0, jnp.sin(theta), jnp.cos(theta)],
+        ]
+    )
+    rot_z = lambda phi: jnp.array(
+        [[jnp.cos(phi), -jnp.sin(phi), 0], [jnp.sin(phi), jnp.cos(phi), 0], [0, 0, 1]]
+    )
+
+    rotate_pt = lambda theta, phi, pt: jnp.dot(rot_z(phi), jnp.dot(rot_x(theta), pt))
+    func = lambda pt: jax.vmap(rotate_pt, in_axes=(0, 0, None))(thetas, phis, pt)
+    pts = jax.vmap(func)(extended_illumination_points)
+    return pts / jnp.linalg.norm(pts, axis=2)[..., None]
+
+
+@jax.jit
+def planet_3d_coeffs_extended_illumination(
+    a,
+    e,
+    f,
+    Omega,
+    i,
+    omega,
+    r,
+    obliq,
+    prec,
+    f1,
+    f2,
+    offsets,
+    **kwargs,
+):
+    """
+    Generate many sets of p coefficients that describe same planet offset from its
+    true position by different amounts.
+
+    Since the star is not actually a point source, we slightly underestimate the
+    area of the illuminated portion of the planet. The limb of the star can "see around
+    the horizon", and this extra illumination will affect the reflected portion of a
+    phase curve. To crudely account for this, we can break the star into many point
+    sources distributed over the portion of the star that is visible from the planet,
+    then add their resulting lightcurves. This isn't perfect for a few reasons: how
+    should we distribute this point sources, and how should we weight them? Also, for
+    a non-spherical planet, what do we mean by "the portion of the star that is visible
+    from the planet"? For now, we avoid those questions by assigning equal intensities
+    to a set of points distributed uniformly over the portion of the hemisphere of the
+    star that would be visible to an observer at the center of the planet.
+
+    Args:
+
+    """
+
+    if prec.shape != f.shape:
+        prec = jnp.ones_like(f) * prec
+
+    unshifted = planet_3d_coeffs(a, e, f, Omega, i, omega, r, obliq, prec, f1, f2)
+    p_xx = unshifted["p_xx"][None, :]
+    p_xy = unshifted["p_xy"][None, :]
+    p_xz = unshifted["p_xz"][None, :]
+    p_x0 = unshifted["p_x0"][None, :]
+    p_yy = unshifted["p_yy"][None, :]
+    p_yz = unshifted["p_yz"][None, :]
+    p_y0 = unshifted["p_y0"][None, :]
+    p_zz = unshifted["p_zz"][None, :]
+    p_z0 = unshifted["p_z0"][None, :]
+    p_00 = unshifted["p_00"][None, :]
+
+    # surface_pt_index, f_index, xyz_index
+    xo = -offsets[..., 0]
+    yo = -offsets[..., 1]
+    zo = -offsets[..., 2]
+
+    # CoefficientRules[(pxx x^2 + pxy x y + pxz x z + px0 x + pyy y^2 +
+    # pyz y z + py0 y + pzz z^2 + pz0 z + p00 /. {x -> x - xo,
+    # y -> y - yo, z -> z - zo}), {x, y, z}]
+    return {
+        "p_xx": jnp.ones_like(xo) * p_xx,
+        "p_xy": jnp.ones_like(xo) * p_xy,
+        "p_xz": jnp.ones_like(xo) * p_xz,
+        "p_x0": p_x0 - 2 * p_xx * xo - p_xy * yo - p_xz * zo,
+        "p_yy": jnp.ones_like(xo) * p_yy,
+        "p_yz": jnp.ones_like(xo) * p_yz,
+        "p_y0": p_y0 - p_xy * xo - 2 * p_yy * yo - p_yz * zo,
+        "p_zz": jnp.ones_like(xo) * p_zz,
+        "p_z0": p_z0 - p_xz * xo - p_yz * yo - 2 * p_zz * zo,
+        "p_00": p_00
+        - p_x0 * xo
+        + p_xx * xo**2
+        - p_y0 * yo
+        + p_xy * xo * yo
+        + p_yy * yo**2
+        - p_z0 * zo
+        + p_xz * xo * zo
+        + p_yz * yo * zo
+        + p_zz * zo**2,
     }
