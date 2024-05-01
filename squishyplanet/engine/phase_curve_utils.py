@@ -590,7 +590,7 @@ def lambertian_reflection(surface_star_cos_angle, x, y, z):
     albedo, though is still always assumed to be uniform).
 
     This function will also mask out any points on the planet's surface that are on the
-    wrong side of the terminator or blocked by the star during secondary eclipse.
+    wrong side of the terminator.
 
     Args:
         surface_star_cos_angle (Array): The cosine of the angle between the planet's
@@ -865,8 +865,8 @@ def reflected_phase_curve(
         surface_star_angle = surface_star_cos_angle(n, x_c, y_c, z_c)
         lamb = lambertian_reflection(surface_star_angle, x, y, z)
 
-        # mask = ~(((x + xo) ** 2 + (y + yo) ** 2 < 1) & ((z + zo) < 0))
-        # lamb = lamb * mask
+        mask = ~(((x + xo) ** 2 + (y + yo) ** 2 < 1) & ((z + zo) < 0))
+        lamb = lamb * mask
 
         return None, jnp.sum(lamb) / sample_radii.shape[0]
 
@@ -901,29 +901,31 @@ def reflected_phase_curve(
 
     norm = reflected_normalization(two, three, x_c, y_c, z_c, xo, yo, zo)
 
-    return flux * norm * state["geometric_albedo"]
+    return flux * norm * state["albedo"]
 
 
+# still having trouble with this, leaving it for a specific enhancement after 0.1.0
 @jax.jit
 def extended_illumination_reflected_phase_curve(
     sample_radii, sample_thetas, two, three, state, x_c, y_c, z_c, offsets
 ):
-    # def scan_func(carry, scan_over):
-    #     two, three = scan_over
-    #     return None, reflected_phase_curve(
-    #         sample_radii, sample_thetas, two, three, state, x_c, y_c, z_c
-    #     )
+    pass
+    # # def scan_func(carry, scan_over):
+    # #     two, three = scan_over
+    # #     return None, reflected_phase_curve(
+    # #         sample_radii, sample_thetas, two, three, state, x_c, y_c, z_c
+    # #     )
 
-    # reflected = jax.lax.scan(scan_func,None,(two, three))[1]
-    # return jnp.mean(reflected, axis=0)
+    # # reflected = jax.lax.scan(scan_func,None,(two, three))[1]
+    # # return jnp.mean(reflected, axis=0)
 
-    xo, yo, zo = offsets[..., 0], offsets[..., 1], offsets[..., 2]
-    reflected = jax.vmap(
-        reflected_phase_curve,
-        in_axes=(None, None, 0, 0, None, None, None, None, 0, 0, 0),
-    )(sample_radii, sample_thetas, two, three, state, x_c, y_c, z_c, xo, yo, zo)
-    # return jnp.mean(reflected, axis=0)
-    return reflected
+    # xo, yo, zo = offsets[..., 0], offsets[..., 1], offsets[..., 2]
+    # reflected = jax.vmap(
+    #     reflected_phase_curve,
+    #     in_axes=(None, None, 0, 0, None, None, None, None, 0, 0, 0),
+    # )(sample_radii, sample_thetas, two, three, state, x_c, y_c, z_c, xo, yo, zo)
+    # # return jnp.mean(reflected, axis=0)
+    # return reflected
 
 
 ########################################################################################

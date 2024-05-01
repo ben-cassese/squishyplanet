@@ -136,7 +136,7 @@ class OblateSystem:
         hotspot_concentration (float, default=0.2):
             The "concentration" of the hotspot. This is the :math:`\kappa` parameter in
             the von Mises-Fisher distribution that describes the hotspot.
-        geometric_albedo (float, default=1.0):
+        albedo (float, default=1.0):
             The (spatialy uniform) albedo of the planet. This is the fraction of light
             that is reflected, though the directional-dependent scattering is dictated
             by Lambert's cosine law.
@@ -169,6 +169,8 @@ class OblateSystem:
             extended size. Closely follows the implementation in ``starry``,
             specifically Sec. 4.1 of `Luger et al. 2022
             <https://ui.adsabs.harvard.edu/abs/2022AJ....164....4L/abstract>`_.
+            IMPLEMENTATION IS INCOMPLETE, WILL RAISE A NOTIMPLEMENTEDERROR IF SET TO
+            ANYTHING OTHER THAN 1.
         tidally_locked (bool, default=True):
             Whether the planet is tidally locked to the star. If ``True``, then ``prec``
             will always be set equal to the true anomaly, meaning the same face of the
@@ -251,7 +253,7 @@ class OblateSystem:
         hotspot_latitude=0.0,
         hotspot_longitude=0.0,
         hotspot_concentration=0.2,
-        geometric_albedo=1.0,
+        albedo=1.0,
         emitted_scale=1e-6,
         stellar_ellipsoidal_alpha=1e-6,
         stellar_doppler_alpha=1e-6,
@@ -331,25 +333,30 @@ class OblateSystem:
                 None  # never used in this case, but to keep the state consistent
             )
 
-        # for extended illumination reflection curves
+        # # for extended illumination reflection curves
+        # actually, still having trouble with this, so setting aside for now--
+        # leaving it for a specific enhancement after 0.1.0
+        if self._state["compute_reflected_phase_curve"] > 1:
+            raise NotImplementedError(
+                "Extended illumination reflection curves are not yet implemented"
+            )
+        # # based on starry._core.core.py's OpsReflected(OpsYlm) class
+        # # create a grid of points uniformly distributed on the projected disk of the
+        # # sta from an observer along the z-axis
+        # N = int(2 + jnp.sqrt(self._state["extended_illumination_npts"] * 4 / jnp.pi))
 
-        # based on starry._core.core.py's OpsReflected(OpsYlm) class
-        # create a grid of points uniformly distributed on the projected disk of the
-        # sta from an observer along the z-axis
-        N = int(2 + jnp.sqrt(self._state["extended_illumination_npts"] * 4 / jnp.pi))
-
-        # note these points will be squished closer together during calculations to
-        # account for the a-dependent extent of the star from the planet's perspective
-        dx = jnp.linspace(-1 + 1e-12, 1 - 1e-12, N)
-        dx, dy = jnp.meshgrid(dx, dx)
-        # dz = jnp.sqrt(1 - dx**2 - dy**2)
-        dz = 1 - dx**2 - dy**2
-        source_dx = dx[dz > 0].flatten()
-        source_dy = dy[dz > 0].flatten()
-        source_dz = dz[dz > 0].flatten()
-        pts = jnp.array([source_dx, source_dy, jnp.sqrt(source_dz)]).T
-        self._state["extended_illumination_points"] = pts
-        self._state["extended_illumination_npts"] = len(pts)
+        # # note these points will be squished closer together during calculations to
+        # # account for the a-dependent extent of the star from the planet's perspective
+        # dx = jnp.linspace(-1 + 1e-12, 1 - 1e-12, N)
+        # dx, dy = jnp.meshgrid(dx, dx)
+        # # dz = jnp.sqrt(1 - dx**2 - dy**2)
+        # dz = 1 - dx**2 - dy**2
+        # source_dx = dx[dz > 0].flatten()
+        # source_dy = dy[dz > 0].flatten()
+        # source_dz = dz[dz > 0].flatten()
+        # pts = jnp.array([source_dx, source_dy, jnp.sqrt(source_dz)]).T
+        # self._state["extended_illumination_points"] = pts
+        # self._state["extended_illumination_npts"] = len(pts)
 
         # everything below here is just an instantaneous snapshot mostly for plotting,
         # these will all vary with different parameter inputs
@@ -459,6 +466,7 @@ class OblateSystem:
                 | (key == "exposure_time")
                 | (key == "oversample")
                 | (key == "oversample_correction_order")
+                | (key == "extended_illumination_npts")
             ):
                 continue
             elif type(self._state[key]) == bool:

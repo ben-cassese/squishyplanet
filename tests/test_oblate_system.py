@@ -31,7 +31,14 @@ def test_limb_darkening_profile_helper():
         z = system.limb_darkening_profile(jnp.linspace(0, 1, n))
         z *= jnp.linspace(0, 1, n)
 
-        assert jnp.allclose(jnp.trapezoid(z, jnp.linspace(0, 1, n)) * 2 * jnp.pi, 1.0)
+        # the ui changed for jnp in #20524, don't want to limit versions just for
+        # this though
+        try:
+            val = jnp.trapezoid(z, jnp.linspace(0, 1, n)) * 2 * jnp.pi
+        except:
+            val = jnp.trapz(z, jnp.linspace(0, 1, n)) * 2 * jnp.pi
+
+        assert jnp.allclose(val, 1.0)
 
 
 def test_illustrations():
