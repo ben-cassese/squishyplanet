@@ -36,11 +36,12 @@ extensions = [
     "nbsphinx",
     "sphinx_automodapi.automodapi",
     "myst_parser",
+    "sphinxcontrib.video",
     # "sphinx.ext.pngmath",
 ]
 
 templates_path = ["_templates"]
-exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
+exclude_patterns = ["_build", "Thumbs.db", ".DS_Store", "visualizations"]
 source_suffix = [".rst", ".md"]
 
 

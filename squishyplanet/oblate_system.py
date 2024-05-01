@@ -337,18 +337,17 @@ class OblateSystem:
         # create a grid of points uniformly distributed on the projected disk of the
         # sta from an observer along the z-axis
         N = int(2 + jnp.sqrt(self._state["extended_illumination_npts"] * 4 / jnp.pi))
-        dx = jnp.linspace(-1, 1, N)
-        dx, dy = jnp.meshgrid(dx, dx)
 
-        # here is a difference with the starry implementation, which I think contains an
-        # error. it leaves off the sqrt, and consequently the points are uniformly
-        # distributed on the unit disk but don't all lie on the unit sphere
-        dz = jnp.sqrt(1 - dx**2 - dy**2)
-        # dz = 1 - dx**2 - dy**2
+        # note these points will be squished closer together during calculations to
+        # account for the a-dependent extent of the star from the planet's perspective
+        dx = jnp.linspace(-1 + 1e-12, 1 - 1e-12, N)
+        dx, dy = jnp.meshgrid(dx, dx)
+        # dz = jnp.sqrt(1 - dx**2 - dy**2)
+        dz = 1 - dx**2 - dy**2
         source_dx = dx[dz > 0].flatten()
         source_dy = dy[dz > 0].flatten()
         source_dz = dz[dz > 0].flatten()
-        pts = jnp.array([source_dx, source_dy, source_dz]).T
+        pts = jnp.array([source_dx, source_dy, jnp.sqrt(source_dz)]).T
         self._state["extended_illumination_points"] = pts
         self._state["extended_illumination_npts"] = len(pts)
 
@@ -414,7 +413,9 @@ class OblateSystem:
             A dictionary of all the parameters of the system, including those specified
             by the user, default values, and those calculated by combinations of the
             two.
+
         """
+
         # we internally changed "times" if oversample > 1, but we alwasy bin it back
         # down to the original times, so we can undo that expansion here
         s = copy.deepcopy(self._state)
@@ -743,6 +744,7 @@ class OblateSystem:
             return value.
 
         """
+
         if emitted:
             assert (
                 reflected == False
@@ -855,9 +857,10 @@ class OblateSystem:
 
         Returns:
             Array:
-            The limb darkening profile of the star at the given radius.
+                The limb darkening profile of the star at the given radius.
 
         """
+
         u_coeffs = jnp.ones(self._state["ld_u_coeffs"].shape[0] + 1) * (-1)
         u_coeffs = u_coeffs.at[1:].set(self._state["ld_u_coeffs"])
         g_coeffs = jnp.matmul(self._state["greens_basis_transform"], u_coeffs)
@@ -915,7 +918,9 @@ class OblateSystem:
                 }
             >>> system = OblateSystem(**state)
             >>> system.lightcurve()
+
         """
+
         return _lightcurve(
             compute_reflected_phase_curve=self._state["compute_reflected_phase_curve"],
             compute_emitted_phase_curve=self._state["compute_emitted_phase_curve"],

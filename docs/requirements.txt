@@ -9,3 +9,4 @@ nbsphinx
 sphinx_automodapi
 sphinx-book-theme
 myst_parser
+sphinxcontrib-video

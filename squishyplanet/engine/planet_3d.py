@@ -570,12 +570,31 @@ def extended_illumination_offsets(
 ):
 
     xc, yc, zc = skypos(a, e, f, Omega, i, omega)
+
+    # account for the fact that an observer at the center of the planet couldn't see
+    # the whole star: the effective disk is shrunk
+    r = jnp.linalg.norm(jnp.array([xc, yc, zc]))
+    r_eff = jnp.sqrt(-1 + r**2) / r
+    extended_illumination_points = extended_illumination_points.at[:, 0].set(
+        r_eff * extended_illumination_points[:, 0]
+    )
+    extended_illumination_points = extended_illumination_points.at[:, 1].set(
+        r_eff * extended_illumination_points[:, 1]
+    )
+    extended_illumination_points = extended_illumination_points.at[:, 2].set(
+        jnp.sqrt(
+            1
+            - extended_illumination_points[:, 0] ** 2
+            - extended_illumination_points[:, 1] ** 2
+        )
+    )
+
     # rotate those points to be from the perspective of an observer at the center of the
     # planet
     x = jnp.array([xc, yc, zc])
     x = x / jnp.linalg.norm(x, axis=0)
-    thetas = -jnp.arccos(x[-1])
-    phis = -jnp.arctan2(x[0], x[1])
+    thetas = jnp.arccos(x[-1])
+    phis = jnp.arctan2(x[0], x[1])
 
     rot_x = lambda theta: jnp.array(
         [
@@ -646,9 +665,9 @@ def planet_3d_coeffs_extended_illumination(
     p_00 = unshifted["p_00"][None, :]
 
     # surface_pt_index, f_index, xyz_index
-    xo = -offsets[..., 0]
-    yo = -offsets[..., 1]
-    zo = -offsets[..., 2]
+    xo = offsets[..., 0]
+    yo = offsets[..., 1]
+    zo = offsets[..., 2]
 
     # CoefficientRules[(pxx x^2 + pxy x y + pxz x z + px0 x + pyy y^2 +
     # pyz y z + py0 y + pzz z^2 + pz0 z + p00 /. {x -> x - xo,

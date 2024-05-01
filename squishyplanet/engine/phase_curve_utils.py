@@ -604,11 +604,24 @@ def lambertian_reflection(surface_star_cos_angle, x, y, z):
 
     """
     # return jnp.maximum(0, surface_star_angle)
-    return (
-        surface_star_cos_angle
-        * (surface_star_cos_angle > 0)
-        # * ~((x**2 + y**2 < 1) & (z < 0))
-    )
+    return surface_star_cos_angle * (surface_star_cos_angle > 0)
+
+
+@jax.jit
+def _henyey_greenstein(g, theta):
+    return 0.5 * (1 - g1**2) / (1 + g1**2 - 2 * g * jnp.cos(theta)) ** (1.5)
+
+
+@jax.jit
+def _two_term_henyey_greenstein(gf, gb, scatter_f, theta):
+    return scatter_f * _henyey_greenstein(gf, theta) + (
+        1 - scatter_f
+    ) * _henyey_greenstein(gb, theta)
+
+
+@jax.jit
+def _rayleigh_scattering(theta):
+    return (3 / 4) * (1 + jnp.cos(theta) ** 2)
 
 
 @jax.jit
@@ -675,29 +688,28 @@ def reflected_normalization(
     # following the starry normalization:
     flux_density = 1 / (jnp.pi * sep_squared)
 
-    # rotated_planet_3d_coeffs = planet_from_star(
-    #     three["p_xx"],
-    #     three["p_xy"],
-    #     three["p_xz"],
-    #     three["p_x0"],
-    #     three["p_yy"],
-    #     three["p_yz"],
-    #     three["p_y0"],
-    #     three["p_zz"],
-    #     three["p_z0"],
-    #     three["p_00"],
-    #     x_c,
-    #     y_c,
-    #     z_c,
-    # )
-    # rotated_planet_2d_coeffs = planet_2d_coeffs(**rotated_planet_3d_coeffs)
+    rotated_planet_3d_coeffs = planet_from_star(
+        three["p_xx"],
+        three["p_xy"],
+        three["p_xz"],
+        three["p_x0"],
+        three["p_yy"],
+        three["p_yz"],
+        three["p_y0"],
+        three["p_zz"],
+        three["p_z0"],
+        three["p_00"],
+        x_c,
+        y_c,
+        z_c,
+    )
+    rotated_planet_2d_coeffs = planet_2d_coeffs(**rotated_planet_3d_coeffs)
 
     # # return rotated_planet_2d_coeffs
-    # r1, r2, _, _, _, _ = poly_to_parametric_helper(**rotated_planet_2d_coeffs)
-    # area_seen_by_star = jnp.pi * r1 * r2
+    r1, r2, _, _, _, _ = poly_to_parametric_helper(**rotated_planet_2d_coeffs)
+    area_seen_by_star = jnp.pi * r1 * r2
 
-    return flux_density  # * area_seen_by_star
-    # return flux_density, area_seen_by_star
+    return flux_density * area_seen_by_star
 
 
 @jax.jit
@@ -853,7 +865,7 @@ def reflected_phase_curve(
         surface_star_angle = surface_star_cos_angle(n, x_c, y_c, z_c)
         lamb = lambertian_reflection(surface_star_angle, x, y, z)
 
-        # mask = ~(((x - xo) ** 2 + (y - yo) ** 2 < 1) & ((z - zo) < 0))
+        # mask = ~(((x + xo) ** 2 + (y + yo) ** 2 < 1) & ((z + zo) < 0))
         # lamb = lamb * mask
 
         return None, jnp.sum(lamb) / sample_radii.shape[0]

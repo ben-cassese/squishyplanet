@@ -8,7 +8,7 @@ squishyplanet
 
 ``squishyplanet`` is a relatively lightweight package for creating transit light curves and phase curves of non-spherical exoplanets. It can generate the model, but then leaves the choice of inference framework up to you.
 
-We recommend that potential users start with the [geometry visualizations](geometry.md) to get a sense of the coordinate system and how the planet is defined. 
+We recommend that potential users start with the [geometry visualizations](geometry.rst) to get a sense of the coordinate system and how the planet is defined. 
 
 ## A summary:
 
@@ -20,7 +20,7 @@ Even with this reliance on numerical solutions though, thanks to `JAX` and its a
 
 From the [quickstart](quickstart.ipynb) guide:
 
-![oblate_vs_spherical](oblate_vs_spherical.png)
+![oblate_vs_spherical](./_static/oblate_vs_spherical.png)
 
 <span style="font-size:larger;">Phase Curves</span>
 
