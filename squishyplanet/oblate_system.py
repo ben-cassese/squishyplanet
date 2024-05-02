@@ -775,7 +775,7 @@ class OblateSystem:
 
         star = plt.Circle((0, 0), 1, color="black", fill=False)
         ax.add_artist(star)
-        if star_fill:
+        if star_fill & (not jnp.all(self._state["ld_u_coeffs"] == 0)):
             # lifted from engine.polynomial_limb_darkened_transit
             u_coeffs = jnp.ones(self._state["ld_u_coeffs"].shape[0] + 1) * (-1)
             u_coeffs = u_coeffs.at[1:].set(self._state["ld_u_coeffs"])
@@ -802,6 +802,9 @@ class OblateSystem:
             ax.contourf(
                 X, Y, Z, cmap="copper", levels=jnp.linspace(min_val, max_val, 20)
             )
+        elif star_fill:
+            fill = plt.Circle((0, 0), 1, color="orange", fill=True, alpha=0.5)
+            ax.add_artist(fill)
 
         if orbit:
             ax.plot(
