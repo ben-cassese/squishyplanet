@@ -37,7 +37,10 @@ Documentation = "https://squishyplanet.readthedocs.io/en/latest/"
 
 [tool.setuptools]
 include-package-data = true
-packages = ["squishyplanet"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["squishyplanet", "squishyplanet.*"]
 
 [tool.black]
 line-length = 88
