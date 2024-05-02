@@ -42,7 +42,7 @@ See the [installation instructions](https://squishyplanet.readthedocs.io/en/late
     volume = {},
     number = {},
     author = {},
-    title = {squishyplanet: non-spherical exoplanets in JAX},
+    title = {squishyplanet: modeling transits of non-spherical exoplanets in JAX},
     journal = {}
 }
 ```

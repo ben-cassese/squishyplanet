@@ -114,7 +114,7 @@ where $\\tilde{u}$ is the "limb darkening basis" and $\\vec{u}$ is the vector of
     \tilde{g}_{n}=\begin{cases}
     1&n=0\\ z&n=1\\ (n+2)z^{n}-nz^{n-2}&n\ge2\end{cases}
 
-in Eq. 14. Our total flux is now $\tilde{u}^T \vec{u} = \tilde{g}^T \vec{g}$ This somewhat odd-looking basis is chosen because it enables a surprisingly elegant form for applying Green's theorem to compute the blocked flux. If we also define $G_{n}(z) = z^n (-y \\hat{x} + x \\hat{y})$ (Eq. 62), note that:
+in Eq. 14. Our total flux is now $\\tilde{u}^T \\vec{u} = \\tilde{g}^T \\vec{g}$ This somewhat odd-looking basis is chosen because it enables a surprisingly elegant form for applying Green's theorem to compute the blocked flux. If we also define $G_{n}(z) = z^n (-y \\hat{x} + x \\hat{y})$ (Eq. 62), note that:
 
 .. math::
 
