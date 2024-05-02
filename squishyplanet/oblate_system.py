@@ -140,10 +140,9 @@ class OblateSystem:
             The (spatialy uniform) albedo of the planet. This is the fraction of light
             that is reflected, though the directional-dependent scattering is dictated
             by Lambert's cosine law.
-        emitted_scale (float, default=1.0):
-            The total emitted flux of the planet, in units of un-occulted stellar flux.
-            The von Mises-Fisher distribution integrates to 1, and this factor scales
-            the resulting emission profile.
+        emitted_scale (float, default=1e-5):
+            A scale factor that sets the amplitude of the the emitted flux of the
+            planet.
         systematic_trend_coeffs (array-like, default=jnp.array([0.0,0.0])):
             The coefficients that determine the polynomial trend in time added to the
             lightcurves. Used to optionally model long-term drifts in observed data.
@@ -254,7 +253,7 @@ class OblateSystem:
         hotspot_longitude=0.0,
         hotspot_concentration=0.2,
         albedo=1.0,
-        emitted_scale=1e-6,
+        emitted_scale=1e-5,
         stellar_ellipsoidal_alpha=1e-6,
         stellar_doppler_alpha=1e-6,
         systematic_trend_coeffs=jnp.array([0.0, 0.0]),
@@ -520,6 +519,16 @@ class OblateSystem:
             assert (
                 self._state["exposure_time"] is not None
             ), "exposure_time must be provided if oversample > 1"
+
+        if self._state["compute_stellar_ellipsoidal_variations"]:
+            assert (
+                self._state["e"] == 0.0
+            ), "Stellar ellipsoidal variations are only valid for circular orbits"
+
+        if self._state["compute_stellar_doppler_variations"]:
+            assert (
+                self._state["e"] == 0.0
+            ), "Stellar doppler variations are only valid for circular orbits"
 
     def _illustrate_helper(self, times=None, true_anomalies=None, nsamples=50_000):
 
@@ -1108,6 +1117,9 @@ def _lightcurve(
                 sample_radii, sample_thetas, two, three, state, x_c, y_c, z_c, offsets
             )
         emitted = emission_phase_curve(sample_radii, sample_thetas, two, three, state)
+    else:
+        reflected = 0.0
+        emitted = 0.0
 
     ####################################################
     # compute the star's contribution to the phase curve

@@ -162,8 +162,7 @@ cython_debug/
 *.DS_Store
 
 # manim
-*.aux
-*.svg
-*.tex
-*.dvi
-*@2*
+docs/_static/media/images/*
+docs/_static/media/jupyter/*
+docs/_static/media/Tex/*
+docs/_static/media/texts/*

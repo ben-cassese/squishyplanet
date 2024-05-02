@@ -3,32 +3,30 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive. -->
 
-squishyplanet
+squishyplanet 
 =============
 
-``squishyplanet`` is a relatively lightweight package for creating transit light curves and phase curves of non-spherical exoplanets. It can generate the model, but then leaves the choice of inference framework up to you.
+<div align="center"> <img src="./_static/media/videos/_static/480p15/Banner_ManimCE_v0.17.3.gif" width="50%"> </div>
 
-We recommend that potential users start with the [geometry visualizations](geometry.rst) to get a sense of the coordinate system and how the planet is defined. 
 
-## A summary:
+``squishyplanet`` is a relatively lightweight package for creating transit lightcurves and phase curves of non-spherical exoplanets.
 
-<span style="font-size:larger;">Transits</span>
+Most of the time, assuming that an exoplanet is a perfect sphere is a great approximation. However, in cases where we both a) expect the planet to be slightly deformed (either through gravitational interaction with its host star or through its own rapid rotation) and b) have high-precision data, fitting for its triaxial shape can provide additional constraints on the planet's interior properties and evolution. ``squishyplanet`` can generate models of these triaxial planets, then leaves the choice of inference framework up to you.
 
-The transit portion can handle arbitrary order polynomial limb darkening by following most of the algorithm presented in [Agol, Luger, and Foreman-Mackey 2020](https://ui.adsabs.harvard.edu/abs/2020AJ....159..123A/abstract). However, where that publication pushes through to derive analytic expressions (which is possible but challenging when working with spherical planets), we don't even attempt  such wizardry for our triaxial planets and instead numerically integrate the final flux-blocking step.
+In the limiting case where the planet is forced to be spherical, `squishyplanet` is designed to be as accurate as [jaxoplanet](https://jax.exoplanet.codes/en/latest/) and [starry](https://starry.readthedocs.io/en/latest/) (see the [Compare with jaxo/exoplanet notebook](tutorials/lightcurve_compare.ipynb) and [Create a phase curve](tutorials/create_a_lightcurve.ipynb)). Since ``squishyplanet`` uses a new implementation of the polynomial limb darkening model presented in [Agol, Luger, and Foreman-Mackey 2020](https://ui.adsabs.harvard.edu/abs/2020AJ....159..123A/abstract), it can handle complex limb darkening profiles even while accounting for the planet's non-circular, potentially time-varying, projected shape.
 
-Even with this reliance on numerical solutions though, thanks to `JAX` and its ability  to just-in-time compile functions, these transit integrals are still relatively fast.  Users computing transits only can expect speeds slightly slower than but comparable to  [jaxoplanet](https://jax.exoplanet.codes/en/latest/). Also, in the limiting case where  the planet is forced to be spherical, `squishyplanet` is designed to be just as accurate as `jaxoplanet`. See the [Compare with jaxo/exoplanet notebook](tutorials/lightcurve_compare.ipynb) for more details.
+Though unsurprisingly it is generally slower than `jaxoplanet` given its increased reliance on numerical solutions and more complex underlying model, `squishyplanet` is also built on `JAX` and can be just-in-time compiled for speed. Users can expect reasonably-sized transit-only calculations to take ~10s of ms. However, phase curve calculations, which rely on Monte Carlo integrations at each timestep, are much slower than transit calculations. So, users should expect phase curve evaluations to be much slower, on the order of 100s of ms per evaluation. Be aware of this when selecting an inference framework if trying to fit actual data. 
 
-From the [quickstart](quickstart.ipynb) guide:
+Also note that although `JAX` can technically compute the gradient of the likelihood function with respect to the model parameters, as of now, these calculations take *significantly longer* than the forward model evaluations. This is a performance issue that may be revisited in the future, but for now, gradient-dependent techniques like HMC are likely impractical with `squishyplanet`.
 
-![oblate_vs_spherical](./_static/oblate_vs_spherical.png)
-
-<span style="font-size:larger;">Phase Curves</span>
-
-`squishyplanet` can also compute reflected and emitted phase curves from the planet, as well as simple ellipsoidal and doppler variations from the star. Admittedly, the implementation of these features is much more crude than the transit portion: where that involves a lot of math/optimization, any component involving the planet is calculated  via brute-force Monte Carlo integration. So, while the transit portion is relatively fast, users should expect phase curve evaluations to be much slower, on the order of 100s of ms per evaluation.
+We recommend that potential users start with the [geometry visualizations](geometry.rst) to get a sense of the coordinate system and how the planet is defined. Those interested in contributing to the code, or who find issues/want some clarification, should check out the [contributing](contributing.md) page and open an issue or pull request. Happy squishing!
 
 ## Attribution
 
 \[insert JOSS citation/bibtex here someday\]
+
+
+
 
 ```{toctree}
 :maxdepth: 1

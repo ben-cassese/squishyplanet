@@ -53,6 +53,7 @@ html_copy_source = True
 html_show_sourcelink = True
 html_sourcelink_suffix = ""
 html_title = "squishyplanet"
+html_favicon = "_static/jupiter.png"
 html_static_path = ["_static"]
 
 html_theme_options = {
@@ -62,6 +63,11 @@ html_theme_options = {
     "use_repository_button": True,
     "use_download_button": True,
     "show_prev_next": False,
+    "logo": {
+        "text": "squishyplanet",
+        "image_light": "_static/squishyplanet.png",
+        "image_dark": "_static/squishyplanet.png",
+    },
 }
 
 html_context = {"default_mode": "light"}

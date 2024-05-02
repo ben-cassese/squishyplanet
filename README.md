@@ -8,6 +8,8 @@
 
 A package for modeling non-spherical exoplanets.
 
+![image](docs/_static/media/videos/_static/480p15/Banner_ManimCE_v0.17.3.gif)
+
 ## Documentation
 
 The docs for ``squishyplanet`` are hosted on [Read the Docs](https://squishyplanet.readthedocs.io/en/latest/). See those for installation instructions, example usage, and API documentation.

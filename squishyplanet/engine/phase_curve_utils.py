@@ -1194,6 +1194,8 @@ def corrected_emission_profile(
     # do this check before you transform into the planet frame
     mask = ~((x**2 + y**2 < 1) & (z < 0))
     x, y, z = jnp.matmul(transform, jnp.array([x, y, z, jnp.ones_like(x)]))
+
+    #
     # correction = emission_squish_correction(x, y, z, r, f1, f2)
 
     # _uncorrected_emission_profile takes the samples on the planet surface and boosts them onto
@@ -1245,8 +1247,6 @@ def emission_at_timestep(
     """
     Compute the emitted intensity at a given point on the planet's surface.
 
-    Corrects for distortion between sphere and ellipsoid, and for viewing geometry.
-
     Args:
         x (Array):
             The x values of the points on the planet's surface in the sky frame
@@ -1290,7 +1290,7 @@ def emission_at_timestep(
     # observer, since the rest of the contributions are negligible and the area isn't
     # distorted by viewing geometry
     return jnp.sum(
-        _corrected_emission_profile(
+        corrected_emission_profile(
             x,
             y,
             z,
@@ -1687,6 +1687,6 @@ def phase_curve(sample_radii, sample_thetas, two, three, state, x_c, y_c, z_c):
     reflected_norm = reflected_normalization(two, three, x_c, y_c, z_c)
 
     return (
-        fluxes[0] * reflected_norm * state["reflected_albedo"],
+        fluxes[0] * reflected_norm * state["albedo"],
         fluxes[1] * state["emitted_scale"],
     )  # the reflected and emitted contributions
