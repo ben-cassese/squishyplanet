@@ -105,16 +105,16 @@ We assume the star's intensity profile is described as:
 
 .. math::
 
-    \frac{I(\mu)}{I_0} = 1 - u_1(1-\mu) - u_2(1-\mu)^2 - ... - u_n(1-\mu)^n = \tilde{u}^T \vec{u}
+    \frac{I(z)}{I_0} = 1 - u_1(1-z) - u_2(1-z)^2 - ... - u_n(1-z)^n = \tilde{u}^T \vec{u}
 
-where $\\tilde{u}$ is the "limb darkening basis" and $\\vec{u}$ is the vector of limb darkening coefficients (Eq. 3). We then find the change of basis matrix that converts $\\tilde{u}$ into the "Green's basis" $\\tilde{g}$, which takes the form:
+where $\\tilde{u}$ is the "limb darkening basis" and $\\vec{u}$ is the vector of limb darkening coefficients (Eq. 3). We then find the change of basis matrix that converts $\\vec{u}$ into $\\vec{g}$, a transformed set of coeffients, that we will multiply with the "Green's basis", $\\tilde{g}$. This new basis takes the form:
 
 .. math::
 
     \tilde{g}_{n}=\begin{cases}
     1&n=0\\ z&n=1\\ (n+2)z^{n}-nz^{n-2}&n\ge2\end{cases}
 
-in Eq. 14. Our total flux is now $\\tilde{u}^T \\vec{u} = \\tilde{g}^T \\vec{g}$ This somewhat odd-looking basis is chosen because it enables a surprisingly elegant form for applying Green's theorem to compute the blocked flux. If we also define $G_{n}(z) = z^n (-y \\hat{x} + x \\hat{y})$ (Eq. 62), note that:
+in Eq. 14. Our total flux is now $\\tilde{u}^T \\vec{u} = \\tilde{g}^T \\vec{g}$, where $\\vec{g}$ is our vector of transformed $u$ coefficients. This somewhat odd-looking basis is chosen because it enables a surprisingly elegant form for applying Green's theorem to compute the blocked flux. If we also define $G_{n}(z) = z^n (-y \\hat{x} + x \\hat{y})$ (Eq. 62), note that:
 
 .. math::
 

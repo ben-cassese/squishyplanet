@@ -909,15 +909,20 @@ def reflected_phase_curve(
 def extended_illumination_reflected_phase_curve(
     sample_radii, sample_thetas, two, three, state, x_c, y_c, z_c, offsets
 ):
+    """
+    WIP, not yet implemented. Hiding behind a NotImplementedError when setting
+    `extended_illumination_npts` to anything greater than 1 when initializing an
+    :class:`OblateSystem` object.
+    """
     pass
-    # # def scan_func(carry, scan_over):
-    # #     two, three = scan_over
-    # #     return None, reflected_phase_curve(
-    # #         sample_radii, sample_thetas, two, three, state, x_c, y_c, z_c
-    # #     )
+    # def scan_func(carry, scan_over):
+    #     two, three = scan_over
+    #     return None, reflected_phase_curve(
+    #         sample_radii, sample_thetas, two, three, state, x_c, y_c, z_c
+    #     )
 
-    # # reflected = jax.lax.scan(scan_func,None,(two, three))[1]
-    # # return jnp.mean(reflected, axis=0)
+    # reflected = jax.lax.scan(scan_func,None,(two, three))[1]
+    # return jnp.mean(reflected, axis=0)
 
     # xo, yo, zo = offsets[..., 0], offsets[..., 1], offsets[..., 2]
     # reflected = jax.vmap(
@@ -1504,6 +1509,18 @@ def stellar_doppler_variations(true_anomalies, stellar_doppler_alpha, period):
 
     A simple sinusoid model with a phase of 90 degrees at primary transit meant to
     capture Doppler boosting/flux falling in and out of the bandpass.
+
+    Args:
+        true_anomalies (Array):
+            The true anomaly of the planet at each time step.
+        stellar_doppler_alpha (float):
+            The amplitude of the Doppler variations.
+        period (float):
+            The orbital period of the planet.
+
+    Returns:
+        Array:
+            The contribution to the phase curve from the star's Doppler variations.
     """
 
     amp = stellar_doppler_alpha  # / period**(-1/3)

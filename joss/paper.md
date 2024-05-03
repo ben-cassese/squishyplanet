@@ -19,6 +19,8 @@ authors:
   - name: Malena Rice
     orcid: 0000-0002-7670-670X
     affiliation: 2
+  - name: Avishi Poddar
+    affiliation: 1
   - name: David Kipping
     orcid: 0000-0002-4365-7366
     affliation: 1
@@ -38,7 +40,7 @@ bibliography: paper.bib
 
 # Summary
 
-Although the majority of exoplanets are expected to be nearly spherical, a subset is expected to be distinctly oblate or even triaxial. These include both gas giants that are close to their host stars and are consequently stretched by tidal forces, and those that orbit further out but likely rotate rapidly due to an inability to shed a large angular momentum budget inherited from their formation. These shape deformations will imprint themselves on the resulting transit lightcurve, especially during ingress and egress as the planet partially overlaps with the limb of the star. Correctly modeling/fitting for the parameters that describe deviations from a perfect sphere could enable new insights into planetary structure and eliminate the biases that result from fitting a mis-specified spherical model. We present `squishyplanet`, a JAX-based Python package that implements an extension of the polynomial limb-darkened transit model presented in @alfm to non-spherical (triaxial) planets, as well as routines for modeling reflection and emission phase curves.
+Although the majority of exoplanets are expected to be nearly spherical, a subset is expected to be distinctly oblate or even triaxial. These include both gas giants that are close to their host stars and are consequently stretched by tidal forces, and those that orbit further out but likely rotate rapidly due to an inability to shed a large angular momentum budget inherited from their formation. These shape deformations will imprint themselves on the resulting transit lightcurve, especially during ingress and egress as the planet partially overlaps with the limb of the star. Correctly modeling/fitting for the parameters that describe deviations from a perfect sphere could enable new insights into planetary structure and eliminate the biases that result from fitting a mis-specified spherical model. We present `squishyplanet`, a `JAX`-based Python package that implements an extension of the polynomial limb-darkened transit model presented in @alfm to non-spherical (triaxial) planets, as well as routines for modeling reflection and emission phase curves.
 
 
 # Statement of need
@@ -57,12 +59,12 @@ To illustrate the effects of shape deformation on a lightcurve, consider \autore
 
 The amplitude of these effects are quite small compared to the full depth of the transit, but could be easily detectable with a facility such as JWST, which now routinely achieves a white-light precision of a few 10s of ppm [@ERS_prism].
 
-We leave a detailed description of the mathematics and a corresponding series of visualizations for the online documentation. There we also include confirmation that our implementation, when modeling the limiting case of a spherical planet, agrees with previous well-tested models even for high-order polynomial limb darkening laws. More specifically, we show that that lightcurves of spherical planets generated with `squishyplanet` deviate by no more than 100 ppb from those generated with  `jaxoplanet` [@jaxoplanet], the JAX-based rewrite of the popular transit modeling package `exoplanet` [@exoplanet] that also implements the arbitrary-order polynomial limb darkening algorithm presented in @alfm. Finally, we demonstrate `squishyplanet`'s limited support for phase curve modeling. 
+We leave a detailed description of the mathematics and a corresponding series of visualizations for the online documentation. There we also include confirmation that our implementation, when modeling the limiting case of a spherical planet, agrees with previous well-tested models even for high-order polynomial limb darkening laws. More specifically, we show that that lightcurves of spherical planets generated with `squishyplanet` deviate by no more than 100 ppb from those generated with  `jaxoplanet` [@jaxoplanet], the `JAX`-based rewrite of the popular transit modeling package `exoplanet` [@exoplanet] that also implements the arbitrary-order polynomial limb darkening algorithm presented in @alfm. Finally, we demonstrate `squishyplanet`'s limited support for phase curve modeling. 
 
 We hope that a publicly-available, well-documented, and highly accurate model for non-spherical exoplanet transits will enable thorough studies of planets' shapes and lead to more data-grounded constraints on their interior structures.
 
 # Acknowledgements
 
-We acknowledge many helpful discussions with Avishi Poddar at the early stages of this project. ``squishyplanet`` also relies on ``quadax`` [@quadax], an open-source library for numerical quadrature and integration using JAX.
+`squishyplanet` relies on `quadax` [@quadax], an open-source library for numerical quadrature and integration in `JAX`. `squishyplanet` also uses the Kepler's equation solver from `jaxoplanet` [@jaxoplanet] and the finite exposure time correction from `starry` [@starry]. `squishyplanet` is built with the `JAX` library [@jax]. We thank the developers of these packages for their work and for making their code available to the community.
 
 # References

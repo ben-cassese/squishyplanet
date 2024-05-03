@@ -511,38 +511,43 @@ def planet_3d_coeffs(a, e, f, Omega, i, omega, r, obliq, prec, f1, f2, **kwargs)
     two are length N).
 
     Args:
-        a (Array [Rstar]): Semi-major axis of the orbit in units of R_star
-        e (Array [Dimensionless]): Eccentricity of the orbit
-        f (Array [Radian]): True anomaly, the angle between the direction of periapsis
-                            and the current position of the planet as seen from
-                            the star.
-        Omega (Array [Radian]): Longitude of the ascending node
-        i (Array [Radian]): Orbital inclination
-        omega (Array [Radian]): Argument of periapsis
-        r (Array [Rstar]): Equitorial radius of the planet, in units of R_star
-        obliq (Array [Radian]): Obliquity, the angle between the planet's orbital plane
-                                and its equatorial plane. Defined when the planet is at
-                                periapsis with an Omega of zero as a rotation around the
-                                sky-frame y-axis, such that a positive obliquity tips
-                                the planet's north pole away from the star.
-        prec (Array [Radian]): Precession angle, or equivalently the longitude of
-                               ascending node of the planet's equatorial plane. This
-                               is defined at periapsis with an Omega of zero as a
-                               rotation about the sky-frame z-axis.
-        f1 (Array [Dimensionless]): The flattening coefficient of the planet that
-                                    describes the compression along the planet's polar
-                                    axis. A value of 0.0 indicates no flattening. f1
-                                    must always be larger than f2.
-        f2 (Array [Dimensionless]): The flattening coefficient of the planet that
-                                    describes the compression along the planet's
-                                    "y" axis, the vector in its equatorial plane that is
-                                    perpendicular to the direction of motion at
-                                    periapsis, assuming the 0.0 obliquity. f2 must
-                                    always be smaller than f1.
+        a (Array [Rstar]):
+            Semi-major axis of the orbit in units of R_star
+        e (Array [Dimensionless]):
+            Eccentricity of the orbit
+        f (Array [Radian]):
+            True anomaly, the angle between the direction of periapsis and the current
+            position of the planet as seen from the star.
+        Omega (Array [Radian]):
+            Longitude of the ascending node
+        i (Array [Radian]):
+            Orbital inclination
+        omega (Array [Radian]):
+            Argument of periapsis
+        r (Array [Rstar]):
+            Equatorial radius of the planet, in units of R_star
+        obliq (Array [Radian]):
+            Obliquity, the angle between the planet's orbital plane and its equatorial
+            plane. Defined when the planet is at periapsis with an Omega of zero as a
+            rotation around the sky-frame y-axis, such that a positive obliquity tips
+            the planet's north pole away from the star.
+        prec (Array [Radian]):
+            Precession angle, or equivalently the longitude of ascending node of the
+            planet's equatorial plane. This is defined at periapsis with an Omega of
+             zero as a rotation about the sky-frame z-axis.
+        f1 (Array [Dimensionless]):
+            The flattening coefficient of the planet that describes the compression
+            along the planet's polar axis. A value of 0.0 indicates no flattening.
+        f2 (Array [Dimensionless]):
+            The flattening coefficient of the planet that describes the compression
+            along the planet's "y" axis, the vector in its equatorial plane that is
+            perpendicular to the direction of motion at periapsis, assuming the 0.0
+            obliquity.
+        **kwargs:
+            Unused additional keyword arguments. These are included so that we can can
+            take in a larger state dictionary that includes all of the required
+            parameters along with other unnecessary ones.
 
-        **kwargs: Unused additional keyword arguments. These are included so that we
-                    can can take in a larger state dictionary that includes all of the
-                    required parameters along with other unnecessary ones.
     Returns:
         dict:
             A dictionary with keys representing different coefficient names and
@@ -568,6 +573,44 @@ def planet_3d_coeffs(a, e, f, Omega, i, omega, r, obliq, prec, f1, f2, **kwargs)
 def extended_illumination_offsets(
     a, e, f, Omega, i, omega, extended_illumination_points, **kwargs
 ):
+    """
+    Generate a set of points uniformly distributed on the portion of the star visible
+    from the planet.
+
+    This takes a spherical cap of points centered on the north pole of the star,
+    squishes them together so they'd all be visible from the planet, and then rotates
+    them to be centered on the sub-planet point on the star.
+
+    Args:
+        a (Array [Rstar]):
+            Semi-major axis of the orbit in units of R_star
+        e (Array [Dimensionless]):
+            Eccentricity of the orbit
+        f (Array [Radian]):
+            True anomaly, the angle between the direction of periapsis and the current
+            position of the planet as seen from the star.
+        Omega (Array [Radian]):
+            Longitude of the ascending node
+        i (Array [Radian]):
+            Orbital inclination
+        omega (Array [Radian]):
+            Argument of periapsis
+        extended_illumination_points (Array):
+            A set of points lying on a unit hemisphere centered at the origin that are
+            evenly distributed across the projected disk when viewed from above. Created
+            in during initialization of an :class:`OblateSystem` object.
+        **kwargs:
+            Unused additional keyword arguments. These are included so that we can can
+            take in a larger state dictionary that includes all of the required
+            parameters along with other unnecessary ones.
+
+    Returns:
+        Array:
+            A set of points on the star that are visible from the planet, evenly
+            distributed across the projected disk of the star as seen by the planet, and
+            centered on the sub-planet point on the star.
+
+    """
 
     xc, yc, zc = skypos(a, e, f, Omega, i, omega)
 
@@ -646,6 +689,53 @@ def planet_3d_coeffs_extended_illumination(
     star that would be visible to an observer at the center of the planet.
 
     Args:
+        a (Array [Rstar]):
+            Semi-major axis of the orbit in units of R_star
+        e (Array [Dimensionless]):
+            Eccentricity of the orbit
+        f (Array [Radian]):
+            True anomaly, the angle between the direction of periapsis and the current
+            position of the planet as seen from the star.
+        Omega (Array [Radian]):
+            Longitude of the ascending node
+        i (Array [Radian]):
+            Orbital inclination
+        omega (Array [Radian]):
+            Argument of periapsis
+        r (Array [Rstar]):
+            Equatorial radius of the planet, in units of R_star
+        obliq (Array [Radian]):
+            Obliquity, the angle between the planet's orbital plane and its equatorial
+            plane. Defined when the planet is at periapsis with an Omega of zero as a
+            rotation around the sky-frame y-axis, such that a positive obliquity tips
+            the planet's north pole away from the star.
+        prec (Array [Radian]):
+            Precession angle, or equivalently the longitude of ascending node of the
+            planet's equatorial plane. This is defined at periapsis with an Omega of
+             zero as a rotation about the sky-frame z-axis.
+        f1 (Array [Dimensionless]):
+            The flattening coefficient of the planet that describes the compression
+            along the planet's polar axis. A value of 0.0 indicates no flattening.
+        f2 (Array [Dimensionless]):
+            The flattening coefficient of the planet that describes the compression
+            along the planet's "y" axis, the vector in its equatorial plane that is
+            perpendicular to the direction of motion at periapsis, assuming the 0.0
+            obliquity.
+        offsets (Array [Rstar]):
+            An array of offsets from the planet's true position. Each offset is a
+            3-element array representing the x, y, and z offsets from the planet's
+            true position in units of R_star. Used when splitting the star into many
+            point sources to account for extended illumination.
+        **kwargs:
+            Unused additional keyword arguments. These are included so that we can can
+            take in a larger state dictionary that includes all of the required
+            parameters along with other unnecessary ones.
+
+    Returns:
+        dict:
+            A dictionary similar to the one returned by :func:`planet_3d_coeffs`, but
+            with now describing the planet after being translated by the provided
+            offsets.
 
     """
 
