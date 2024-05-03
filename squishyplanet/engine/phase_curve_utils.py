@@ -865,7 +865,7 @@ def reflected_phase_curve(
         surface_star_angle = surface_star_cos_angle(n, x_c, y_c, z_c)
         lamb = lambertian_reflection(surface_star_angle, x, y, z)
 
-        mask = ~(((x + xo) ** 2 + (y + yo) ** 2 < 1) & ((z + zo) < 0))
+        mask = ~(((x - xo) ** 2 + (y - yo) ** 2 < 1) & ((z - zo) < 0))
         lamb = lamb * mask
 
         return None, jnp.sum(lamb) / sample_radii.shape[0]
@@ -914,7 +914,7 @@ def extended_illumination_reflected_phase_curve(
     `extended_illumination_npts` to anything greater than 1 when initializing an
     :class:`OblateSystem` object.
     """
-    pass
+    # pass
     # def scan_func(carry, scan_over):
     #     two, three = scan_over
     #     return None, reflected_phase_curve(
@@ -924,13 +924,13 @@ def extended_illumination_reflected_phase_curve(
     # reflected = jax.lax.scan(scan_func,None,(two, three))[1]
     # return jnp.mean(reflected, axis=0)
 
-    # xo, yo, zo = offsets[..., 0], offsets[..., 1], offsets[..., 2]
-    # reflected = jax.vmap(
-    #     reflected_phase_curve,
-    #     in_axes=(None, None, 0, 0, None, None, None, None, 0, 0, 0),
-    # )(sample_radii, sample_thetas, two, three, state, x_c, y_c, z_c, xo, yo, zo)
-    # # return jnp.mean(reflected, axis=0)
-    # return reflected
+    xo, yo, zo = offsets[..., 0], offsets[..., 1], offsets[..., 2]
+    reflected = jax.vmap(
+        reflected_phase_curve,
+        in_axes=(None, None, 0, 0, None, None, None, None, 0, 0, 0),
+    )(sample_radii, sample_thetas, two, three, state, x_c, y_c, z_c, xo, yo, zo)
+    # return jnp.mean(reflected, axis=0)
+    return reflected
 
 
 ########################################################################################

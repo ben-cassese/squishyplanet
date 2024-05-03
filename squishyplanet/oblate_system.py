@@ -335,27 +335,27 @@ class OblateSystem:
         # # for extended illumination reflection curves
         # actually, still having trouble with this, so setting aside for now--
         # leaving it for a specific enhancement after 0.1.0
-        if self._state["compute_reflected_phase_curve"] > 1:
-            raise NotImplementedError(
-                "Extended illumination reflection curves are not yet implemented"
-            )
-        # # based on starry._core.core.py's OpsReflected(OpsYlm) class
-        # # create a grid of points uniformly distributed on the projected disk of the
-        # # sta from an observer along the z-axis
-        # N = int(2 + jnp.sqrt(self._state["extended_illumination_npts"] * 4 / jnp.pi))
+        # if self._state["compute_reflected_phase_curve"] > 1:
+        #     raise NotImplementedError(
+        #         "Extended illumination reflection curves are not yet implemented"
+        #     )
+        # based on starry._core.core.py's OpsReflected(OpsYlm) class
+        # create a grid of points uniformly distributed on the projected disk of the
+        # sta from an observer along the z-axis
+        N = int(2 + jnp.sqrt(self._state["extended_illumination_npts"] * 4 / jnp.pi))
 
-        # # note these points will be squished closer together during calculations to
-        # # account for the a-dependent extent of the star from the planet's perspective
-        # dx = jnp.linspace(-1 + 1e-12, 1 - 1e-12, N)
-        # dx, dy = jnp.meshgrid(dx, dx)
-        # # dz = jnp.sqrt(1 - dx**2 - dy**2)
-        # dz = 1 - dx**2 - dy**2
-        # source_dx = dx[dz > 0].flatten()
-        # source_dy = dy[dz > 0].flatten()
-        # source_dz = dz[dz > 0].flatten()
-        # pts = jnp.array([source_dx, source_dy, jnp.sqrt(source_dz)]).T
-        # self._state["extended_illumination_points"] = pts
-        # self._state["extended_illumination_npts"] = len(pts)
+        # note these points will be squished closer together during calculations to
+        # account for the a-dependent extent of the star from the planet's perspective
+        dx = jnp.linspace(-1 + 1e-12, 1 - 1e-12, N)
+        dx, dy = jnp.meshgrid(dx, dx)
+        # dz = jnp.sqrt(1 - dx**2 - dy**2)
+        dz = 1 - dx**2 - dy**2
+        source_dx = dx[dz > 0].flatten()
+        source_dy = dy[dz > 0].flatten()
+        source_dz = dz[dz > 0].flatten()
+        pts = jnp.array([source_dx, source_dy, jnp.sqrt(source_dz)]).T
+        self._state["extended_illumination_points"] = pts
+        self._state["extended_illumination_npts"] = len(pts)
 
         # everything below here is just an instantaneous snapshot mostly for plotting,
         # these will all vary with different parameter inputs
