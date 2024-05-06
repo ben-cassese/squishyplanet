@@ -653,7 +653,7 @@ def extended_illumination_offsets(
     rotate_pt = lambda theta, phi, pt: jnp.dot(rot_z(phi), jnp.dot(rot_x(theta), pt))
     func = lambda pt: jax.vmap(rotate_pt, in_axes=(0, 0, None))(thetas, phis, pt)
     pts = jax.vmap(func)(extended_illumination_points)
-    return pts / jnp.linalg.norm(pts, axis=2)[..., None]
+    return pts
 
 
 @jax.jit

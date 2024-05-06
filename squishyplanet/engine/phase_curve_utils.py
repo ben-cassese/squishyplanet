@@ -1653,6 +1653,9 @@ def phase_curve(sample_radii, sample_thetas, two, three, state, x_c, y_c, z_c):
         surface_star_angle = surface_star_cos_angle(n, x_c, y_c, z_c)
         lamb = lambertian_reflection(surface_star_angle, x, y, z)
 
+        mask = ~(((x) ** 2 + (y) ** 2 < 1) & ((z) < 0))
+        lamb = lamb * mask
+
         # emission stuff
         em = emission_at_timestep(
             x,
