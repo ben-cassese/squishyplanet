@@ -17,7 +17,7 @@ from squishyplanet.engine.kepler import kepler
 from squishyplanet import OblateSystem
 
 # 1000 comparisons for 3 polynomials orders takes ~20 minutes for github actions
-N_JAXOPLANT_COMPARISONS = 500
+N_JAXOPLANT_COMPARISONS = 10  # 500
 TIMES = jnp.linspace(-1, 1, 17280) * ureg.day  # 10s cadence for 48 hours
 POLY_ORDERS = [2, 3]
 

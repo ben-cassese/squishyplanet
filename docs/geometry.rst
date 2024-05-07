@@ -1,17 +1,17 @@
 Geometry visualizations
 ========================
 
-All of ``squishyplanet``'s calculations rely on a geometric description of a planet in 3D space. All of the translatations/rotations can be tough to visualize, so we try to walk through them here.
+All of ``squishyplanet``'s calculations rely on a geometric description of a planet in 3D space. These translatations/rotations can be tough to visualize, so here we try to break down the underlying process step by step.
 
 3D Orientation
 ^^^^^^^^^^^^^^
 
-We begin in a cartesian coordinate system centered on the planet, oriented so that its north pole falls along the :math:`z`-axis. The planet starts as a sphere with radius $r$, then we compress the sphere along two axes to create a triaxial sphereoid.
+We begin in a cartesian coordinate system centered on the planet, oriented so that its north pole falls along the :math:`z`-axis. The planet starts out as a sphere with radius $r$, then is flattened into a triaxial sphereoid via compression along two axes.
 
 The $f_1$ flattening term controls the difference between polar and equatorial radii. You might expect a non-zero $f_1$ for a rapidly spinning planet that bulges out in the middle due to centrifugal forces. Jupiter and Saturn have measured $f_1$ values of
 `0.06 <https://nssdc.gsfc.nasa.gov/planetary/factsheet/jupiterfact.html>`_ and `0.098 <https://nssdc.gsfc.nasa.gov/planetary/factsheet/saturnfact.html>`_, respectively.
 
-The $f_2$ flattening term controls the difference between the two equatorial radii. You might expect a non-zero $f_2$ for a planet that's very close to its host star and is deformed by tidal forces.
+The $f_2$ flattening term controls the difference between the two equatorial radii. You might expect a non-zero $f_2$ for a planet that's very close to its host star and is deformed by tidal forces. In our coordinate system, the $y$-axis is the one that gets squished by $f_2$, meaning that after these compressions, the planet still extends out to $x=r$, while its maximum $z$ extent is $r(1-f_1)$ and its maximum $y$ extent is $r(1-f_2)$.
 
 .. video:: _static/media/videos/_static/480p15/sections/SquishyPlanet_0000.mp4
    :loop:
@@ -23,7 +23,7 @@ After we compress the planet, we orient it with respect to its own orbital plane
    :loop:
    :autoplay:
 
-Next we translate the planet to the correct phase-dependent location within its orbital frame. These are set by the usual transformations:
+Next we translate the planet to the correct phase-dependent location within its orbital plane. These are set by the usual transformations:
 
 .. math::
     \begin{align*}
@@ -79,7 +79,7 @@ The purpose of `squishyplanet.engine.planet_2d.planet_coeffs_2d <https://squishy
 Parametric Form
 ^^^^^^^^^^^^^^^
 
-This is helpful, but still not the most convenient form for further calculations. We will compute the time-dependent flux blocked by the planet using part the algorithm in `Agol, Luger, and Foreman-Mackey 2020 <https://ui.adsabs.harvard.edu/abs/2020AJ....159..123A/abstract>`_. This requires tracing out the boundary of the flux-blocking area and applying Green's theorem to compute the enclosed flux. When the planet overlaps the limb of the star, the portion bounded by the stellar edge is easy to parameterize: it's just a circle. The portion bounded by the planet's edge is more complicated though, so we recast the implicit equation in a parametric form:
+This is helpful, but still not the most convenient form for further calculations. We will compute the time-dependent flux blocked by the planet using part the algorithm in `Agol, Luger, and Foreman-Mackey 2020 <https://ui.adsabs.harvard.edu/abs/2020AJ....159..123A/abstract>`_. This requires tracing out the boundary of the flux-blocking area and applying Green's theorem to compute the enclosed flux. When the planet overlaps the limb of the star, the portion bounded by the stellar edge is easy to parameterize: it's just a circle. The portion bounded by the planet's edge is more complicated though, so we recast the implicit 2D equation in a parametric form:
 
 .. math::
     \begin{align*}
@@ -87,19 +87,19 @@ This is helpful, but still not the most convenient form for further calculations
     y(\alpha) &= c_{y1} \cos(\alpha) + c_{y2} \sin(\alpha) + c_{y3}
     \end{align*}
 
+The purpose of `squishyplanet.engine.parametric_ellipse.poly_to_parametric <https://squishyplanet.readthedocs.io/en/latest/engine.html#parametric_ellipse.poly_to_parametric?>`_ is to convert between the $\\rho$ and $c$ coefficients.
+
+We can now fully describe the boundary of the flux-blocking area as a 1D parametric curve: it'll be a piecewise curve when the planet overlaps with the limb of the star, and just the outline of the planet itself when it's fully in transit. This description lets us numerically integrate the equations that are largely solved analytically in `Agol, Luger, and Foreman-Mackey 2020 <https://ui.adsabs.harvard.edu/abs/2020AJ....159..123A/abstract>`_, which describe the flux blocked by 2D shape overlapping a portion of a stellar disk described by a polynomial limb darkening law.
+
 .. video:: _static/media/videos/_static/480p15/Transit.mp4
    :loop:
    :autoplay:
-
-The purpose of `squishyplanet.engine.parametric_ellipse.poly_to_parametric <https://squishyplanet.readthedocs.io/en/latest/engine.html#parametric_ellipse.poly_to_parametric?>`_ is to convert between the $\\rho$ and $c$ coefficients.
 
 
 Green's Basis
 ^^^^^^^^^^^^^
 
-With the planet's outline in this form, we can fully describe the boundary of the flux-blocking area as a 1D parametric curve even when the planet overlaps with the limb of the star. This in turn lets us numerically integrate the equations that are largely solved analytically in `Agol, Luger, and Foreman-Mackey 2020 <https://ui.adsabs.harvard.edu/abs/2020AJ....159..123A/abstract>`_, which describe the flux blocked by 2D shape blocking a portion of a stellar disk described by a polynomial limb darkening law.
-
-We happily leave a detailed explanation of this process to that impressive and thorough paper. However, we have made two additions when modifying the algorithm for this more general case that are worth documenting. 
+We happily leave a detailed explanation of this process to Agol et al., who provide an excellent description of the algorithm in the paper above (which includes links to code examples and complete derivations). However, when adapting the algorithm for this more general case we have made two additions that are worth documenting. 
 
 We assume the star's intensity profile is described as:
 
@@ -107,14 +107,14 @@ We assume the star's intensity profile is described as:
 
     \frac{I(z)}{I_0} = 1 - u_1(1-z) - u_2(1-z)^2 - ... - u_n(1-z)^n = \tilde{u}^T \vec{u}
 
-where $\\tilde{u}$ is the "limb darkening basis" and $\\vec{u}$ is the vector of limb darkening coefficients (Eq. 3). We then find the change of basis matrix that converts $\\vec{u}$ into $\\vec{g}$, a transformed set of coeffients, that we will multiply with the "Green's basis", $\\tilde{g}$. This new basis takes the form:
+where $\\tilde{u}$ is the "limb darkening basis" and $\\vec{u}$ is the vector of limb darkening coefficients (Eq. 3). We then find the change of basis matrix $A$ that converts $\\vec{u}$ into $\\vec{g}$, a transformed set of coeffients, that we will multiply with the "Green's basis", $\\tilde{g}$. This new basis takes the form:
 
 .. math::
 
     \tilde{g}_{n}=\begin{cases}
     1&n=0\\ z&n=1\\ (n+2)z^{n}-nz^{n-2}&n\ge2\end{cases}
 
-in Eq. 14. Our total flux is now $\\tilde{u}^T \\vec{u} = \\tilde{g}^T \\vec{g}$, where $\\vec{g}$ is our vector of transformed $u$ coefficients. This somewhat odd-looking basis is chosen because it enables a surprisingly elegant form for applying Green's theorem to compute the blocked flux. If we also define $G_{n}(z) = z^n (-y \\hat{x} + x \\hat{y})$ (Eq. 62), note that:
+in Eq. 14. Our total flux is now $\\tilde{u}^T \\vec{u} = \\tilde{g}^T A \\vec{u} =  \\tilde{g}^T \\vec{g}$, where $\\vec{g}$ is our vector of transformed $u$ coefficients. This somewhat odd-looking basis is chosen because it enables a surprisingly elegant form for applying Green's theorem to compute the blocked flux. If we also define $G_{n}(z) = z^n (-y \\hat{x} + x \\hat{y})$ (Eq. 62), note that:
 
 .. math::
 
@@ -124,11 +124,11 @@ Now we can use a 1D integral of $G_n(\\mu)$ dotted with a closed path $dr$ to co
 
 .. math::
 
-     \int \int I(x,y) dA = \int \int \left( \frac{dG_{n,y}}{dx} - \frac{dG_{n,x}}{dy} \right) dx dy = \oint G_n(\mu) \cdot dr
+     \int \int I(x,y) dA = \int \int \left( \frac{dG_{n,y}}{dx} - \frac{dG_{n,x}}{dy} \right) dx dy = \oint G_n(z) \cdot dr
 
 Where $\dr$ is $\\{dx, dy\\} = \\{dx(\\alpha), dy(\\alpha)\\}$ from the parametric form of the ellipse above.
 
-Summing these integrals over all $n$ gives the total flux enclosed by the path. But, the above works only for $n\\geq2$, and Agol, Luger, and Foreman-Mackey 2020 do not explicitly give $G_0$ and $G_1$. They don't need to, since for a spherical planet they can skip straight to analytic solutions for these low-order laws. Indeed, they go on to derive analytic solutions even for these higher-order terms, and only report the explicit form of $G_n$ as an intermediate step. However, since our planets aren't spherical, their projected outlines are no longer simple circles, so we need to compute these integrals numerically even for the lowest-order terms.
+Summing these integrals over all $n$ gives the total flux enclosed by the path. But, the above works only for $n\\geq2$, and Agol, Luger, and Foreman-Mackey 2020 do not explicitly provide $G_0$ and $G_1$. They don't need to, since for a spherical planet they can skip straight to analytic solutions for these low-order laws. Indeed, they go on to derive analytic solutions even for these higher-order terms, and only report the explicit form of $G_n$ as an intermediate step. However, since our planets aren't spherical, their projected outlines are no longer simple circles, so we need to compute these integrals numerically even for the lowest-order terms.
 
 We use the following forms for $G_0$ and $G_1$:
 
@@ -163,13 +163,14 @@ At each timestep, the workflow is then the following:
 
     a. Marching fully around the edge of the planet from $\\alpha = 0$ to $\\alpha = 2\\pi$, numerically integrate the flux encountered in the Green's Basis.
 
+Note that `squishyplanet` does not actually scan through these steps at each time step as written since certain steps can be efficiently vectorized across all times at once. But this is essentially what's happening under the hood.
 
 Note on Tidal Locking/Changing Projected Area
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Note that in this animation, the planet's sky-projected ellipse does not change size or orientation as a function of phase. As mentioned above, that's because this planet is not tidally locked. In this case, it's overkill to use the full 3D parameterization of the planet, since there's an infinite number of flattening/rotation combinations that will get you this same 2D ellipse. This is why when dealing with non-locked planets, users have the option to set ``parameterize_with_projected_elipse`` to ``True`` when creating a :ref:`OblateSystem` object. With this flag enabled, instead of supplying values like ``r``, ``f1``, ``f2``, ``obliq``, and ``prec``, you can just supply ``projected_r``, ``projected_f``, and ``projected_theta``. See `Create a transit lightcurve <https://squishyplanet.readthedocs.io/en/latest/tutorials/create_a_lightcurve.html>`_ for more.
+Note that in the above animations, the planet's sky-projected ellipse does not change size or orientation as a function of phase. As mentioned above, that's because this planet is not tidally locked: changing its true anomaly just translates it within its orbital plane, it does not automatically rotate it as well. In this case, it's overkill to use the full 3D parameterization of the planet, since there's an infinite number of flattening/rotation combinations that will get you this same 2D ellipse. This is why when dealing with non-locked planets, users have the option to set ``parameterize_with_projected_elipse`` to ``True`` when creating a :ref:`OblateSystem` object. With this flag enabled, instead of supplying values like ``r``, ``f1``, ``f2``, ``obliq``, and ``prec``, you can just supply ``projected_r``, ``projected_f``, and ``projected_theta``. See `Create a transit lightcurve <https://squishyplanet.readthedocs.io/en/latest/tutorials/create_a_lightcurve.html>`_ for more.
 
-However, if we're dealing with a tidally locked planet, ``squishyplanet`` will keep track of how the planet's projected outline changes with phase. Unlike the non-tidally locked case where the difference between oblate and spherical planets shows up almost entirely during ingress and egress, the time-varying area of a tidally locked planet's projected ellipse can cause significant differences in the light curve at all transit phases. See how the shape of the planet's projected ellipse changes as a function of phase in the video below, and again `Create a transit lightcurve <https://squishyplanet.readthedocs.io/en/latest/tutorials/create_a_lightcurve.html>`_ for more.
+However, if we're dealing with a tidally locked planet, ``squishyplanet`` will keep track of how the planet's projected outline changes with phase. Unlike the non-tidally locked case where the difference between oblate and spherical planets shows up almost entirely during ingress and egress, the time-varying area of a tidally locked planet's projected ellipse can cause significant differences in the lightcurve at all transit phases. See how the shape of the planet's projected ellipse changes as a function of phase in the video below, and again `Create a transit lightcurve <https://squishyplanet.readthedocs.io/en/latest/tutorials/create_a_lightcurve.html>`_ for more.
 
 .. video:: _static/media/videos/_static/480p15/TidalLocking.mp4
    :loop:
