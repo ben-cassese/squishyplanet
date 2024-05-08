@@ -154,3 +154,171 @@ def test_illustrations():
         figsize=(8, 8),
     )
     plt.close()
+
+
+def test_lightcurve():
+    state = {
+        "times": jnp.linspace(-1, 1, 1000),
+        "tidally_locked": True,
+        "compute_reflected_phase_curve": True,
+        "compute_emitted_phase_curve": True,
+        "compute_stellar_ellipsoidal_variations": True,
+        "compute_stellar_doppler_variations": True,
+        "parameterize_with_projected_ellipse": False,
+        "projected_r": 0.0,
+        "projected_f": 0.0,
+        "projected_theta": 0.0,
+        "phase_curve_nsamples": 50_000,
+        "random_seed": 0,
+        "exposure_time": 0.0,
+        "oversample": 1,
+        "oversample_correction_order": 2,
+        "e": 0.0,
+        "Omega": jnp.pi,
+        "omega": 0.0,
+        "obliq": 0.0,
+        "prec": 0.0,
+        "hotspot_latitude": -jnp.pi / 2,
+        "t_peri": 0.5,
+        "period": 1.0,
+        "a": 4.0,
+        "i": jnp.pi,
+        "r": 0.1,
+        "f1": 0.0,
+        "f2": 0.0,
+        "ld_u_coeffs": jnp.array([0.1, 0.04]),
+        "hotspot_longitude": 0.0,
+        "hotspot_concentration": 0.2,
+        "albedo": 1.0,
+        "emitted_scale": 1e-5,
+        "stellar_ellipsoidal_alpha": 1e-6,
+        "stellar_doppler_alpha": 1e-6,
+        "systematic_trend_coeffs": jnp.array([0.0, 0.0]),
+        "log_jitter": -10.0,
+        "data": jnp.array([1.0]),
+        "uncertainties": jnp.array([0.01]),
+    }
+    planet = OblateSystem(**state)
+    _ = planet.lightcurve()
+    for key, value in tqdm(state.items()):
+        if (type(value) != int) & (type(value) != bool):
+            new_val = value + 0.01
+            _ = planet.lightcurve({key: new_val})
+
+    # now toggle the other settings
+    state["tidall_locked"] = True
+    planet = OblateSystem(**state)
+    _ = planet.lightcurve()
+    for key, value in tqdm(state.items()):
+        if (type(value) != int) & (type(value) != bool):
+            new_val = value + 0.01
+            _ = planet.lightcurve({key: new_val})
+
+    state["tidall_locked"] = False
+    state["parameterize_with_projected_ellipse"] = True
+    planet = OblateSystem(**state)
+    _ = planet.lightcurve()
+    for key, value in tqdm(state.items()):
+        if (type(value) != int) & (type(value) != bool):
+            new_val = value + 0.01
+            _ = planet.lightcurve({key: new_val})
+
+    # do the reflected and emitted separately, then together
+    state["parameterize_with_projected_ellipse"] = False
+    state["compute_reflected_phase_curve"] = True
+    planet = OblateSystem(**state)
+    _ = planet.lightcurve()
+    for key, value in tqdm(state.items()):
+        if (type(value) != int) & (type(value) != bool):
+            new_val = value + 0.01
+            _ = planet.lightcurve({key: new_val})
+
+    state["compute_reflected_phase_curve"] = False
+    state["compute_emitted_phase_curve"] = True
+    planet = OblateSystem(**state)
+    _ = planet.lightcurve()
+    for key, value in tqdm(state.items()):
+
+        if (type(value) != int) & (type(value) != bool):
+            new_val = value + 0.01
+            _ = planet.lightcurve({key: new_val})
+
+    state["compute_reflected_phase_curve"] = True
+    state["compute_emitted_phase_curve"] = True
+    planet = OblateSystem(**state)
+    _ = planet.lightcurve()
+    for key, value in tqdm(state.items()):
+        if (type(value) != int) & (type(value) != bool):
+            new_val = value + 0.01
+            _ = planet.lightcurve({key: new_val})
+
+    # now the stellar variations
+    state["compute_reflected_phase_curve"] = False
+    state["compute_emitted_phase_curve"] = False
+    state["compute_stellar_ellipsoidal_variations"] = True
+    state["compute_stellar_doppler_variations"] = True
+    planet = OblateSystem(**state)
+    _ = planet.lightcurve()
+    for key, value in tqdm(state.items()):
+
+        if (type(value) != int) & (type(value) != bool):
+            new_val = value + 0.01
+            _ = planet.lightcurve({key: new_val})
+
+    # everyone together
+    state["compute_reflected_phase_curve"] = True
+    state["compute_emitted_phase_curve"] = True
+    state["compute_stellar_ellipsoidal_variations"] = True
+    state["compute_stellar_doppler_variations"] = True
+    planet = OblateSystem(**state)
+    _ = planet.lightcurve()
+    for key, value in tqdm(state.items()):
+        if (type(value) != int) & (type(value) != bool):
+            new_val = value + 0.01
+            _ = planet.lightcurve({key: new_val})
+
+
+def test_loglike():
+    state = {
+        "times": jnp.linspace(-1, 1, 1000),
+        "data": jnp.ones(1000),
+        "uncertainties": jnp.ones(1000) * 0.01,
+        "tidally_locked": True,
+        "compute_reflected_phase_curve": True,
+        "compute_emitted_phase_curve": True,
+        "compute_stellar_ellipsoidal_variations": True,
+        "compute_stellar_doppler_variations": True,
+        "parameterize_with_projected_ellipse": False,
+        "projected_r": 0.0,
+        "projected_f": 0.0,
+        "projected_theta": 0.0,
+        "phase_curve_nsamples": 50_000,
+        "random_seed": 0,
+        "exposure_time": 0.0,
+        "oversample": 1,
+        "oversample_correction_order": 2,
+        "e": 0.0,
+        "Omega": jnp.pi,
+        "omega": 0.0,
+        "obliq": 0.0,
+        "prec": 0.0,
+        "hotspot_latitude": -jnp.pi / 2,
+        "t_peri": 0.5,
+        "period": 1.0,
+        "a": 4.0,
+        "i": jnp.pi,
+        "r": 0.1,
+        "f1": 0.0,
+        "f2": 0.0,
+        "ld_u_coeffs": jnp.array([0.1, 0.04]),
+        "hotspot_longitude": 0.0,
+        "hotspot_concentration": 0.2,
+        "albedo": 1.0,
+        "emitted_scale": 1e-5,
+        "stellar_ellipsoidal_alpha": 1e-6,
+        "stellar_doppler_alpha": 1e-6,
+        "systematic_trend_coeffs": jnp.array([0.0, 0.0]),
+        "log_jitter": -10.0,
+    }
+    planet = OblateSystem(**state)
+    _ = planet.loglike()
