@@ -216,6 +216,9 @@ def test_lightcurve():
 
     state["tidally_locked"] = False
     state["parameterize_with_projected_ellipse"] = True
+    state["projected_r"] = 0.1
+    state["projected_f"] = 0.1
+    state["projected_theta"] = 0.1
     planet = OblateSystem(**state)
     _ = planet.lightcurve()
     for key, value in state.items():
