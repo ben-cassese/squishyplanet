@@ -500,7 +500,7 @@ class OblateSystem:
                 | self._state["compute_stellar_ellipsoidal_variations"]
                 | self._state["compute_stellar_doppler_variations"]
             ), (
-                "parameterize_with_projected_ellipse is incompatible with phase"
+                "parameterize_with_projected_ellipse is incompatible with phase "
                 "curve calculations"
             )
 

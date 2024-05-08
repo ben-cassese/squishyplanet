@@ -159,15 +159,15 @@ def test_illustrations():
 def test_lightcurve():
     state = {
         "times": jnp.linspace(-1, 1, 1000),
-        "tidally_locked": True,
-        "compute_reflected_phase_curve": True,
-        "compute_emitted_phase_curve": True,
-        "compute_stellar_ellipsoidal_variations": True,
-        "compute_stellar_doppler_variations": True,
-        "parameterize_with_projected_ellipse": False,
-        "projected_r": 0.0,
-        "projected_f": 0.0,
-        "projected_theta": 0.0,
+        "tidally_locked": False,
+        "compute_reflected_phase_curve": False,
+        "compute_emitted_phase_curve": False,
+        "compute_stellar_ellipsoidal_variations": False,
+        "compute_stellar_doppler_variations": False,
+        "parameterize_with_projected_ellipse": True,
+        "projected_r": 0.1,
+        "projected_f": 0.1,
+        "projected_theta": 0.1,
         "phase_curve_nsamples": 50_000,
         "random_seed": 0,
         "exposure_time": 0.0,
@@ -206,6 +206,14 @@ def test_lightcurve():
             _ = planet.lightcurve({key: new_val})
 
     # now toggle the other settings
+    state["parameterize_with_projected_ellipse"] = False
+    planet = OblateSystem(**state)
+    _ = planet.lightcurve()
+    for key, value in state.items():
+        if (type(value) != int) & (type(value) != bool):
+            new_val = value + 0.01
+            _ = planet.lightcurve({key: new_val})
+
     state["tidally_locked"] = True
     planet = OblateSystem(**state)
     _ = planet.lightcurve()
@@ -214,20 +222,7 @@ def test_lightcurve():
             new_val = value + 0.01
             _ = planet.lightcurve({key: new_val})
 
-    state["tidally_locked"] = False
-    state["parameterize_with_projected_ellipse"] = True
-    state["projected_r"] = 0.1
-    state["projected_f"] = 0.1
-    state["projected_theta"] = 0.1
-    planet = OblateSystem(**state)
-    _ = planet.lightcurve()
-    for key, value in state.items():
-        if (type(value) != int) & (type(value) != bool):
-            new_val = value + 0.01
-            _ = planet.lightcurve({key: new_val})
-
     # do the reflected and emitted separately, then together
-    state["parameterize_with_projected_ellipse"] = False
     state["compute_reflected_phase_curve"] = True
     planet = OblateSystem(**state)
     _ = planet.lightcurve()
