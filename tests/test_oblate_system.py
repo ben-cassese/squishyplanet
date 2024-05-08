@@ -206,7 +206,7 @@ def test_lightcurve():
             _ = planet.lightcurve({key: new_val})
 
     # now toggle the other settings
-    state["tidall_locked"] = True
+    state["tidally_locked"] = True
     planet = OblateSystem(**state)
     _ = planet.lightcurve()
     for key, value in state.items():
@@ -214,7 +214,7 @@ def test_lightcurve():
             new_val = value + 0.01
             _ = planet.lightcurve({key: new_val})
 
-    state["tidall_locked"] = False
+    state["tidally_locked"] = False
     state["parameterize_with_projected_ellipse"] = True
     planet = OblateSystem(**state)
     _ = planet.lightcurve()
