@@ -200,7 +200,7 @@ def test_lightcurve():
     }
     planet = OblateSystem(**state)
     _ = planet.lightcurve()
-    for key, value in tqdm(state.items()):
+    for key, value in state.items():
         if (type(value) != int) & (type(value) != bool):
             new_val = value + 0.01
             _ = planet.lightcurve({key: new_val})
@@ -209,7 +209,7 @@ def test_lightcurve():
     state["tidall_locked"] = True
     planet = OblateSystem(**state)
     _ = planet.lightcurve()
-    for key, value in tqdm(state.items()):
+    for key, value in state.items():
         if (type(value) != int) & (type(value) != bool):
             new_val = value + 0.01
             _ = planet.lightcurve({key: new_val})
@@ -218,7 +218,7 @@ def test_lightcurve():
     state["parameterize_with_projected_ellipse"] = True
     planet = OblateSystem(**state)
     _ = planet.lightcurve()
-    for key, value in tqdm(state.items()):
+    for key, value in state.items():
         if (type(value) != int) & (type(value) != bool):
             new_val = value + 0.01
             _ = planet.lightcurve({key: new_val})
@@ -228,7 +228,7 @@ def test_lightcurve():
     state["compute_reflected_phase_curve"] = True
     planet = OblateSystem(**state)
     _ = planet.lightcurve()
-    for key, value in tqdm(state.items()):
+    for key, value in state.items():
         if (type(value) != int) & (type(value) != bool):
             new_val = value + 0.01
             _ = planet.lightcurve({key: new_val})
@@ -237,7 +237,7 @@ def test_lightcurve():
     state["compute_emitted_phase_curve"] = True
     planet = OblateSystem(**state)
     _ = planet.lightcurve()
-    for key, value in tqdm(state.items()):
+    for key, value in state.items():
 
         if (type(value) != int) & (type(value) != bool):
             new_val = value + 0.01
@@ -247,7 +247,7 @@ def test_lightcurve():
     state["compute_emitted_phase_curve"] = True
     planet = OblateSystem(**state)
     _ = planet.lightcurve()
-    for key, value in tqdm(state.items()):
+    for key, value in state.items():
         if (type(value) != int) & (type(value) != bool):
             new_val = value + 0.01
             _ = planet.lightcurve({key: new_val})
@@ -259,7 +259,7 @@ def test_lightcurve():
     state["compute_stellar_doppler_variations"] = True
     planet = OblateSystem(**state)
     _ = planet.lightcurve()
-    for key, value in tqdm(state.items()):
+    for key, value in state.items():
 
         if (type(value) != int) & (type(value) != bool):
             new_val = value + 0.01
@@ -272,7 +272,7 @@ def test_lightcurve():
     state["compute_stellar_doppler_variations"] = True
     planet = OblateSystem(**state)
     _ = planet.lightcurve()
-    for key, value in tqdm(state.items()):
+    for key, value in state.items():
         if (type(value) != int) & (type(value) != bool):
             new_val = value + 0.01
             _ = planet.lightcurve({key: new_val})
