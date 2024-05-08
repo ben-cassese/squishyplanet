@@ -468,7 +468,12 @@ def lightcurve(state, parameterize_with_projected_ellipse):
             positions[1, :],
         )
         r2 = state["projected_r"] * (1 - state["projected_f"])
-        largest_r = jnp.max(jnp.array([state["projected_r"], r2]))
+        r1 = state["projected_r"]
+        # force the shapes to match: if user inputs a scaler for one value but the
+        # others are still (1,) there'd be a problem. all is fine if they're all
+        # scalars or all arrays though
+        r1 = jnp.ones_like(r2) * r1
+        largest_r = jnp.max(jnp.array([r1, r2]))
 
     else:
         state["prec"] = jnp.where(state["tidally_locked"], state["f"], state["prec"])
