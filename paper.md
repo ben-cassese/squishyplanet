@@ -24,7 +24,7 @@ authors:
     affiliation: 1
   - name: David Kipping
     orcid: 0000-0002-4365-7366
-    affliation: 1
+    affiliation: 1
 affiliations:
  - name: Dept. of Astronomy, Columbia University, 550 W 120th Street, New York NY 10027, USA
    index: 1
