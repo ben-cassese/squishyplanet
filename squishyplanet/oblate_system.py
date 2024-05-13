@@ -942,6 +942,7 @@ class OblateSystem:
         """
 
         return _lightcurve(
+            tidally_locked=self._state["tidally_locked"],
             compute_reflected_phase_curve=self._state["compute_reflected_phase_curve"],
             compute_emitted_phase_curve=self._state["compute_emitted_phase_curve"],
             compute_stellar_ellipsoidal_variations=self._state[
@@ -983,6 +984,7 @@ class OblateSystem:
 
         """
         return _loglike(
+            tidally_locked=self._state["tidally_locked"],
             compute_reflected_phase_curve=self._state["compute_reflected_phase_curve"],
             compute_emitted_phase_curve=self._state["compute_emitted_phase_curve"],
             compute_stellar_ellipsoidal_variations=self._state[
@@ -1015,9 +1017,11 @@ class OblateSystem:
         6,
         7,
         8,
+        9,
     ),
 )
 def _lightcurve(
+    tidally_locked,
     compute_reflected_phase_curve,
     compute_emitted_phase_curve,
     compute_stellar_ellipsoidal_variations,
@@ -1058,6 +1062,14 @@ def _lightcurve(
         jax.random.key(random_seed),
         jnp.arange(phase_curve_nsamples),
     )
+
+    # solve Kepler's equation to get the true anomalies
+    time_deltas = state["times"] - state["t_peri"]
+    mean_anomalies = 2 * jnp.pi * time_deltas / state["period"]
+    true_anomalies = kepler(mean_anomalies, state["e"])
+    state["f"] = true_anomalies
+    if tidally_locked:
+        state["prec"] = state["f"]
 
     # technically these are all calculated in "transit", but since phase
     # curves are a) rare and b) expensive, we'll just do it again to keep
@@ -1125,21 +1137,16 @@ def _lightcurve(
     # compute the star's contribution to the phase curve
     ####################################################
 
-    if compute_stellar_ellipsoidal_variations | compute_stellar_doppler_variations:
-        time_deltas = state["times"] - state["t_peri"]
-        mean_anomalies = 2 * jnp.pi * time_deltas / state["period"]
-        true_anomalies = kepler(mean_anomalies, state["e"])
-
     if compute_stellar_ellipsoidal_variations:
         ellipsoidal = stellar_ellipsoidal_variations(
-            true_anomalies, state["stellar_ellipsoidal_alpha"], state["period"]
+            state["f"], state["stellar_ellipsoidal_alpha"], state["period"]
         )
     else:
         ellipsoidal = 0.0
 
     if compute_stellar_doppler_variations:
         doppler = stellar_doppler_variations(
-            true_anomalies, state["stellar_doppler_alpha"], state["period"]
+            state["f"], state["stellar_doppler_alpha"], state["period"]
         )
     else:
         doppler = 0.0
@@ -1170,9 +1177,11 @@ def _lightcurve(
         6,
         7,
         8,
+        9,
     ),
 )
 def _loglike(
+    tidally_locked,
     compute_reflected_phase_curve,
     compute_emitted_phase_curve,
     compute_stellar_ellipsoidal_variations,
@@ -1186,6 +1195,7 @@ def _loglike(
     params,
 ):
     lc = _lightcurve(
+        tidally_locked,
         compute_reflected_phase_curve,
         compute_emitted_phase_curve,
         compute_stellar_ellipsoidal_variations,

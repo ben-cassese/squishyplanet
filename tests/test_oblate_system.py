@@ -208,6 +208,9 @@ def test_lightcurve():
     state["compute_stellar_ellipsoidal_variations"] = True
     state["compute_stellar_doppler_variations"] = True
 
+    planet = OblateSystem(**state)
+    _ = planet.lightcurve()
+
     # for key, value in state.items():
     #     if (type(value) != int) & (type(value) != bool):
     #         if key in ["times", "data", "uncertainties", "exoposure_time"]:
