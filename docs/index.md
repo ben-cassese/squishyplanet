@@ -37,6 +37,7 @@ installation
 quickstart
 geometry
 contributing
+changelog
 ```
 
 ```{toctree}
