@@ -106,7 +106,7 @@ class OblateSystem:
         r (float, [Rstar], default=None):
             The equatorial radius of the planet. This will always be the largest of the
             3 axes of the triaxial ellipsoid. Either this or the entire set of
-            ``projected_r``, ``projected_f``, and ``projected_theta`` must be
+            ``projected_effective_r``, ``projected_f``, and ``projected_theta`` must be
             provided.
         f1 (float, [Dimensionless], default=0.0):
             The fractional difference between the (longest) equatorial and polar radii
@@ -146,13 +146,13 @@ class OblateSystem:
         systematic_trend_coeffs (array-like, default=jnp.array([0.0,0.0])):
             The coefficients that determine the polynomial trend in time added to the
             lightcurves. Used to optionally model long-term drifts in observed data.
-        log_jitter (float, default=-10):
+        log_jitter (float, default=-jnp.inf):
             The log of the "jitter" term included in likelihood calculations. The jitter
             is added in quadrature to the provided uncertainties to account for any
             unmodeled noise in the data.
-        projected_r (float, [Rstar], default=0.0):
-            The length of the semi-major axis of the projected ellipse. This is only
-            relevant if ``parameterize_with_projected_ellipse`` is set to ``True``,
+        projected_effective_r (float, [Rstar], default=0.0):
+            The radius of a circle with the same area is the projected ellipse. This is
+            only relevant if ``parameterize_with_projected_ellipse`` is set to ``True``,
             which will override ``r``, ``f1``, ``f2``, ``obliq``, and ``prec``.
         projected_f (float, [Dimensionless], default=0.0):
             The flattening value of the projected ellipse. This is only relevant if
@@ -192,7 +192,8 @@ class OblateSystem:
             Here, it is modeled as a simple sinusoidal variation with 2 peaks per orbit.
         parameterize_with_projected_ellipse (bool, default=False):
             Whether to parameterize the planet as a projected ellipse rather than a
-            triaxial ellipsoid. If ``True``, then ``projected_r``, ``projected_f``,
+            triaxial ellipsoid. If ``True``, then ``projected_effective_r``,
+            ``projected_f``, and ``projected_theta`` will be used.
         phase_curve_nsamples (int, default=50_000):
             The number of random samples of the planet's surface to draw when performing
             Monte Carlo estimates of the emitted/reflected flux. A larger number will
@@ -257,8 +258,8 @@ class OblateSystem:
         stellar_ellipsoidal_alpha=1e-6,
         stellar_doppler_alpha=1e-6,
         systematic_trend_coeffs=jnp.array([0.0, 0.0]),
-        log_jitter=-10,
-        projected_r=0.0,
+        log_jitter=-jnp.inf,
+        projected_effective_r=0.0,
         projected_f=0.0,
         projected_theta=0.0,
         extended_illumination_npts=1,
@@ -381,24 +382,31 @@ class OblateSystem:
             self._coeffs_2d = planet_2d_coeffs(**self._coeffs_3d)
             self._para_coeffs_2d = poly_to_parametric(**self._coeffs_2d)
 
-            r1, r2, _, _, _, _ = poly_to_parametric_helper(**self._coeffs_2d)
+            r1, r2, _, _, cosa, sina = poly_to_parametric_helper(**self._coeffs_2d)
             area = jnp.pi * r1 * r2
             effective_r = jnp.sqrt(area / jnp.pi)
-            self._state["effective_projected_r"] = effective_r
+            self._state["projected_effective_r"] = effective_r
+            effective_theta = jnp.arctan(sina / cosa)
+            effective_theta = jnp.where(
+                effective_theta < 0, effective_theta + jnp.pi, effective_theta
+            )
+            self._state["projected_theta"] = effective_theta
+            effective_f = (
+                jnp.max(jnp.array([r1, r2])) - jnp.min(jnp.array([r1, r2]))
+            ) / jnp.max(jnp.array([r1, r2]))
+            self._state["projected_f"] = effective_f
         else:
             self._coeffs_3d = {}
+            area = jnp.pi * self._state["projected_effective_r"] ** 2
+            r1 = jnp.sqrt(area / ((1 - self._state["projected_f"]) * jnp.pi))
+            r2 = r1 * (1 - self._state["projected_f"])
             self._coeffs_2d, self._para_coeffs_2d = parameterize_2d_helper(
-                projected_r=self._state["projected_r"],
+                projected_r=r1,
                 projected_f=self._state["projected_f"],
                 projected_theta=self._state["projected_theta"],
                 xc=self._state["x_c"],
                 yc=self._state["y_c"],
             )
-            r1 = self._state["projected_r"]
-            r2 = r1 * (1 - self._state["projected_f"])
-            area = jnp.pi * r1 * r2
-            effective_r = jnp.sqrt(area / jnp.pi)
-            self._state["effective_projected_r"] = effective_r
 
     def __repr__(self):
         s = pprint.pformat(self.state)
@@ -490,8 +498,8 @@ class OblateSystem:
             )
 
         if self._state["parameterize_with_projected_ellipse"]:
-            assert self._state["projected_r"] > 0, (
-                "projected_r must be greater than 0 if "
+            assert self._state["projected_effective_r"] > 0, (
+                "projected_effective_r must be greater than 0 if "
                 "parameterize_with_projected_ellipse is True"
             )
             assert not (
@@ -598,8 +606,11 @@ class OblateSystem:
 
             else:
                 self._coeffs_3d = {}
+                area = jnp.pi * self._state["projected_effective_r"] ** 2
+                r1 = jnp.sqrt(area / ((1 - self._state["projected_f"]) * jnp.pi))
+                r2 = r1 * (1 - self._state["projected_f"])
                 self._coeffs_2d, self._para_coeffs_2d = parameterize_2d_helper(
-                    projected_r=self._state["projected_r"],
+                    projected_r=r1,
                     projected_f=self._state["projected_f"],
                     projected_theta=self._state["projected_theta"],
                     xc=self._state["x_c"],
