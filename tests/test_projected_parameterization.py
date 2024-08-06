@@ -60,4 +60,12 @@ def test_projected_parameterization():
         planet2 = OblateSystem(**injected_state2)
         lc2 = planet2.lightcurve()
 
+        # looking out for spikes
+        assert jnp.all(lc1 <= 1.0)
+        assert jnp.all(lc2 <= 1.0)
+
+        r = planet1.state["projected_effective_r"][0]
+        assert jnp.min(lc1 >= r**2)
+        assert jnp.min(lc2 >= r**2)
+
         assert jnp.allclose(lc1, lc2)
