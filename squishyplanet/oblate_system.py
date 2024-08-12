@@ -149,7 +149,9 @@ class OblateSystem:
         log_jitter (float, default=-jnp.inf):
             The log of the "jitter" term included in likelihood calculations. The jitter
             is added in quadrature to the provided uncertainties to account for any
-            unmodeled noise in the data.
+            unmodeled noise in the data. This value is the *standard deviation* of the
+            jitter, not the variance. If set to -jnp.inf, the jitter term will not
+            affect the likelihood.
         projected_effective_r (float, [Rstar], default=0.0):
             The radius of a circle with the same area is the projected ellipse. This is
             only relevant if ``parameterize_with_projected_ellipse`` is set to ``True``,
@@ -913,8 +915,8 @@ class OblateSystem:
             intensities=intensities, order=order, mus=mus, rs=rs
         )
 
-    @classmethod
-    def limb_darkening_profile(self, ld_u_coeffs=None, r=None, mu=None):
+    @staticmethod
+    def limb_darkening_profile(ld_u_coeffs=None, r=None, mu=None):
         """
         Compute the limb darkening profile of the star at a given radius.
 
@@ -1282,9 +1284,9 @@ def _loglike(
         state[key] = params[key]
 
     resids = state["data"] - lc
-    var = jnp.exp(state["log_jitter"]) + state["uncertainties"] ** 2
+    var = jnp.exp(state["log_jitter"]) ** 2 + state["uncertainties"] ** 2
 
-    return jnp.sum(-0.5 * (resids**2 / var + jnp.log(var)))
+    return jnp.sum(-0.5 * (resids**2 / var + jnp.log(2 * jnp.pi * var)))
 
 
 @partial(jax.jit, static_argnums=(1,))

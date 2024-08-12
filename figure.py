@@ -7,6 +7,7 @@ from squishyplanet import OblateSystem
 
 
 if __name__ == "__main__":
+    # start by creating a spherical hot Jupiter
     state = {
         "t_peri": -0.25,
         "times": jnp.linspace(-0.1, 0.1, 500),
@@ -17,30 +18,56 @@ if __name__ == "__main__":
         "ld_u_coeffs": jnp.array([0.4, 0.26]),
         "tidally_locked": False,
     }
-
     spherical_planet = OblateSystem(**state)
 
+    # now we want to create a comparable triaxial planet. let's flatten it along
+    # the z and y axes by 10% each
     state["f1"] = 0.1
     state["f2"] = 0.1
+    # but, doing that alone would shrink the area of the planet, so we need to scale
+    # the radius back up to keep the projected area the same (keep in mind that "r"
+    # always refers to the X-axis radius)
     state["r"] = state["r"] / jnp.sqrt(1 - state["f1"])
     triaxial_planet = OblateSystem(**state)
+    # note also that after creating an OblateSystem object, you can access the effective
+    # radius (radius of a spherical planet with the same instantaneous projected area)
+    # through OblateSystem.state["projected_effective_r"]
 
+    # now let's assert that the planet is tidally locked, meaning its projected area
+    # will change over the duration of the transit. we again need to scale the radius
+    # to keep the projected area comparable
     state["tidally_locked"] = True
     state["r"] = 0.1 / jnp.sqrt(1 - state["f1"]) / jnp.sqrt(1 - state["f2"])
     locked_planet = OblateSystem(**state)
 
+    # now let's create a planet that's not tidally locked, but has some obliquity and
+    # precession angle. this will leave us with a fixed ellipse whose projected area
+    # will not change over the duration of the transit, but is now "tipped over" a
+    # little bit. Since we have a non-zero impact parameter, that tipping will make
+    # ingress and egress asymmetrical
     state["tidally_locked"] = False
     state["obliq"] = jnp.pi / 3
     state["prec"] = 0.3
     rolled_planet = OblateSystem(**state)
-    eff = rolled_planet.state["effective_projected_r"][0]
+    eff = rolled_planet.state["projected_effective_r"][0]
     state["r"] *= 0.1 / eff
     rolled_planet = OblateSystem(**state)
+    # note that parameterizing a non-tidally locked planet with obliquity and precession
+    # is overkill and leads to an over-constrained system, since you can create the same
+    # projected ellipse through many combinations of f1, f2, obliq, and prec. However,
+    # if the planet is tidally locked, the degeneracy is broken. if dealing with a
+    # non-tidally locked planet, it's better to set
+    # "parameterize_with_projected_ellipse" to "True", then specify
+    # "projected_effective_r", "projected_effective_f", and "projected_effective_theta".
 
+    # let's generate the lightcurves for all of those planets; we don't need any
+    # arguments since we aren't changing any parameters
     spherical_lc = spherical_planet.lightcurve()
     triaxial_lc = triaxial_planet.lightcurve()
     locked_lc = locked_planet.lightcurve()
     rolled_lc = rolled_planet.lightcurve()
+
+    # then the rest is plotting
 
     colors = ["#0082d5", "#b0e384", "#70005e", "#ff7d9c"]
 
