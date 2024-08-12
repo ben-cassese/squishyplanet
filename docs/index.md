@@ -49,6 +49,7 @@ tutorials/illustrations.ipynb
 tutorials/lightcurve_compare.ipynb
 tutorials/create_a_lightcurve.ipynb
 tutorials/create_a_phase_curve.ipynb
+tutorials/fit_oblate_transit.ipynb
 
 ```
 

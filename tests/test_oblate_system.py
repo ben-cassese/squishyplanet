@@ -14,21 +14,12 @@ def test_limb_darkening_profile_helper():
         key, *subkeys = jax.random.split(key, (3,))
         poly_order = jax.random.randint(subkeys[0], (1,), minval=2, maxval=7)
         poly_order = int(poly_order[0])
-        u_coeffs = jax.random.uniform(key, (poly_order,), minval=0.0, maxval=1.0)
-
-        state = {
-            "t_peri": 0.0,
-            "times": jnp.linspace(0.0, 5, 10),
-            "a": 2.0,
-            "period": 10,
-            "r": 0.1,
-            "ld_u_coeffs": u_coeffs,
-        }
-
-        system = OblateSystem(**state)
+        u_coeffs = jax.random.uniform(subkeys[1], (poly_order,), minval=0.0, maxval=1.0)
 
         n = 100_000
-        z = system.limb_darkening_profile(jnp.linspace(0, 1, n))
+        z = OblateSystem.limb_darkening_profile(
+            ld_u_coeffs=u_coeffs, r=jnp.linspace(0, 1, n)
+        )
         z *= jnp.linspace(0, 1, n)
 
         # the ui changed for jnp in #20524, don't want to limit versions just for
@@ -165,7 +156,7 @@ def test_lightcurve():
         "compute_stellar_ellipsoidal_variations": False,
         "compute_stellar_doppler_variations": False,
         "parameterize_with_projected_ellipse": True,
-        "projected_r": 0.1,
+        "projected_effective_r": 0.1,
         "projected_f": 0.1,
         "projected_theta": 0.1,
         "phase_curve_nsamples": 10,
@@ -305,7 +296,7 @@ def test_loglike():
         "compute_stellar_ellipsoidal_variations": True,
         "compute_stellar_doppler_variations": True,
         "parameterize_with_projected_ellipse": False,
-        "projected_r": 0.0,
+        "projected_effective_r": 0.0,
         "projected_f": 0.0,
         "projected_theta": 0.0,
         "phase_curve_nsamples": 100,
