@@ -106,7 +106,7 @@ class OblateSystem:
         r (float, [Rstar], default=None):
             The equatorial radius of the planet. This will always be the largest of the
             3 axes of the triaxial ellipsoid. Either this or the entire set of
-            ``projected_r``, ``projected_f``, and ``projected_theta`` must be
+            ``projected_effective_r``, ``projected_f``, and ``projected_theta`` must be
             provided.
         f1 (float, [Dimensionless], default=0.0):
             The fractional difference between the (longest) equatorial and polar radii
@@ -146,13 +146,15 @@ class OblateSystem:
         systematic_trend_coeffs (array-like, default=jnp.array([0.0,0.0])):
             The coefficients that determine the polynomial trend in time added to the
             lightcurves. Used to optionally model long-term drifts in observed data.
-        log_jitter (float, default=-10):
+        log_jitter (float, default=-jnp.inf):
             The log of the "jitter" term included in likelihood calculations. The jitter
             is added in quadrature to the provided uncertainties to account for any
-            unmodeled noise in the data.
-        projected_r (float, [Rstar], default=0.0):
-            The length of the semi-major axis of the projected ellipse. This is only
-            relevant if ``parameterize_with_projected_ellipse`` is set to ``True``,
+            unmodeled noise in the data. This value is the *standard deviation* of the
+            jitter, not the variance. If set to -jnp.inf, the jitter term will not
+            affect the likelihood.
+        projected_effective_r (float, [Rstar], default=0.0):
+            The radius of a circle with the same area is the projected ellipse. This is
+            only relevant if ``parameterize_with_projected_ellipse`` is set to ``True``,
             which will override ``r``, ``f1``, ``f2``, ``obliq``, and ``prec``.
         projected_f (float, [Dimensionless], default=0.0):
             The flattening value of the projected ellipse. This is only relevant if
@@ -192,7 +194,8 @@ class OblateSystem:
             Here, it is modeled as a simple sinusoidal variation with 2 peaks per orbit.
         parameterize_with_projected_ellipse (bool, default=False):
             Whether to parameterize the planet as a projected ellipse rather than a
-            triaxial ellipsoid. If ``True``, then ``projected_r``, ``projected_f``,
+            triaxial ellipsoid. If ``True``, then ``projected_effective_r``,
+            ``projected_f``, and ``projected_theta`` will be used.
         phase_curve_nsamples (int, default=50_000):
             The number of random samples of the planet's surface to draw when performing
             Monte Carlo estimates of the emitted/reflected flux. A larger number will
@@ -257,8 +260,8 @@ class OblateSystem:
         stellar_ellipsoidal_alpha=1e-6,
         stellar_doppler_alpha=1e-6,
         systematic_trend_coeffs=jnp.array([0.0, 0.0]),
-        log_jitter=-10,
-        projected_r=0.0,
+        log_jitter=-jnp.inf,
+        projected_effective_r=0.0,
         projected_f=0.0,
         projected_theta=0.0,
         extended_illumination_npts=1,
@@ -381,24 +384,31 @@ class OblateSystem:
             self._coeffs_2d = planet_2d_coeffs(**self._coeffs_3d)
             self._para_coeffs_2d = poly_to_parametric(**self._coeffs_2d)
 
-            r1, r2, _, _, _, _ = poly_to_parametric_helper(**self._coeffs_2d)
+            r1, r2, _, _, cosa, sina = poly_to_parametric_helper(**self._coeffs_2d)
             area = jnp.pi * r1 * r2
             effective_r = jnp.sqrt(area / jnp.pi)
-            self._state["effective_projected_r"] = effective_r
+            self._state["projected_effective_r"] = effective_r
+            effective_theta = jnp.arctan(sina / cosa)
+            effective_theta = jnp.where(
+                effective_theta < 0, effective_theta + jnp.pi, effective_theta
+            )
+            self._state["projected_theta"] = effective_theta
+            effective_f = (
+                jnp.max(jnp.array([r1, r2])) - jnp.min(jnp.array([r1, r2]))
+            ) / jnp.max(jnp.array([r1, r2]))
+            self._state["projected_f"] = effective_f
         else:
             self._coeffs_3d = {}
+            area = jnp.pi * self._state["projected_effective_r"] ** 2
+            r1 = jnp.sqrt(area / ((1 - self._state["projected_f"]) * jnp.pi))
+            r2 = r1 * (1 - self._state["projected_f"])
             self._coeffs_2d, self._para_coeffs_2d = parameterize_2d_helper(
-                projected_r=self._state["projected_r"],
+                projected_r=r1,
                 projected_f=self._state["projected_f"],
                 projected_theta=self._state["projected_theta"],
                 xc=self._state["x_c"],
                 yc=self._state["y_c"],
             )
-            r1 = self._state["projected_r"]
-            r2 = r1 * (1 - self._state["projected_f"])
-            area = jnp.pi * r1 * r2
-            effective_r = jnp.sqrt(area / jnp.pi)
-            self._state["effective_projected_r"] = effective_r
 
     def __repr__(self):
         s = pprint.pformat(self.state)
@@ -490,8 +500,8 @@ class OblateSystem:
             )
 
         if self._state["parameterize_with_projected_ellipse"]:
-            assert self._state["projected_r"] > 0, (
-                "projected_r must be greater than 0 if "
+            assert self._state["projected_effective_r"] > 0, (
+                "projected_effective_r must be greater than 0 if "
                 "parameterize_with_projected_ellipse is True"
             )
             assert not (
@@ -598,8 +608,11 @@ class OblateSystem:
 
             else:
                 self._coeffs_3d = {}
+                area = jnp.pi * self._state["projected_effective_r"] ** 2
+                r1 = jnp.sqrt(area / ((1 - self._state["projected_f"]) * jnp.pi))
+                r2 = r1 * (1 - self._state["projected_f"])
                 self._coeffs_2d, self._para_coeffs_2d = parameterize_2d_helper(
-                    projected_r=self._state["projected_r"],
+                    projected_r=r1,
                     projected_f=self._state["projected_f"],
                     projected_theta=self._state["projected_theta"],
                     xc=self._state["x_c"],
@@ -862,7 +875,48 @@ class OblateSystem:
 
         return
 
-    def limb_darkening_profile(self, r):
+    @staticmethod
+    def fit_limb_darkening_profile(intensities, order=None, mus=None, rs=None):
+        """
+        Convert a stellar limb darkening profile to a polynomial representation.
+
+        Given a set of stellar parameters, one can use a grid of stellar models to compute
+        the limb darkening profile as a function of projected `r` or of
+        `mu = sqrt(1 - r**2)`. These profiles are often then approximated with one of a few
+        common limb darkening "laws", such as the quadratic or 4-parameter non-linear laws.
+        Since `squishyplanet` only supports polynomial limb darkening profiles, but can
+        support nearly arbitrary orders, we can approximate the profile with a polynomial.
+        This is a convenience function for converting between a grid-derived profile and its
+        best-fit polynomial representation in the correct basis for `squishyplanet`.
+
+        Args:
+            intensities (array-like):
+                The relative intensities of the star at a given `mu` or `r`.
+            order (int):
+                The order of the polynomial to fit to the limb darkening profile. Note that
+                in the `squishyplanet` basis, the polynomial is defined as
+                `1 - sum_{i=1}^{order} u_i (1 - mu)^i`, so the number of coefficients is
+                `order`, not `order+1`.
+            mus (array-like, default=None):
+                The `mu` values at which the intensities were computed. If `rs` is not
+                provided, this is required.
+            rs (array-like, default=None):
+                The `r` values at which the intensities were computed. If `mus` is not
+                provided, this is required.
+
+        Returns:
+            array-like:
+                The coefficients of the polynomial representation of the limb darkening
+                profile. These can then be used as the `ld_u_coeffs` parameter in
+                `OblateSystem`.
+
+        """
+        return _fit_limb_darkening_profile(
+            intensities=intensities, order=order, mus=mus, rs=rs
+        )
+
+    @staticmethod
+    def limb_darkening_profile(ld_u_coeffs=None, r=None, mu=None):
         """
         Compute the limb darkening profile of the star at a given radius.
 
@@ -871,31 +925,48 @@ class OblateSystem:
         positive/monotonic.
 
         Args:
-            r (float or array-like):
+            ld_u_coeffs (array-like, default=self.state["ld_u_coeffs"]):
+                The coefficients of the polynomial limb darkening law.
+            r (float or array-like, default=None):
                 The radius at which to compute the limb darkening profile. Must be
-                between 0 and 1.
+                between 0 and 1. If provided, ``mu`` should be ``None``.
+            mu (float or array-like, default=None):
+                The cosine of the angle between the line of sight and the normal to the
+                surface of the star. Must be between 0 and 1. If provided, ``r`` should
+                be ``None``.
 
         Returns:
             Array:
-                The limb darkening profile of the star at the given radius.
+                The limb darkening profile of the star at the given r or mu values.
 
         """
+        assert (mu is None) != (r is None), "Only one of `mu` or `r` should be provided"
 
-        u_coeffs = jnp.ones(self._state["ld_u_coeffs"].shape[0] + 1) * (-1)
-        u_coeffs = u_coeffs.at[1:].set(self._state["ld_u_coeffs"])
-        g_coeffs = jnp.matmul(self._state["greens_basis_transform"], u_coeffs)
+        if ld_u_coeffs is None:
+            ld_u_coeffs = self._state["ld_u_coeffs"]
+            greens_transform = self._state["greens_basis_transform"]
+        else:
+            greens_transform = generate_change_of_basis_matrix(len(ld_u_coeffs))
+
+        if r is None:
+            r = jnp.sqrt(1 - mu**2)
+
+        u_coeffs = jnp.ones(ld_u_coeffs.shape[0] + 1) * (-1)
+        u_coeffs = u_coeffs.at[1:].set(ld_u_coeffs)
+
+        g_coeffs = jnp.matmul(greens_transform, u_coeffs)
 
         # total flux from the star. 1/eq. 28 in Agol, Luger, and Foreman-Mackey 2020
         normalization_constant = 1 / (jnp.pi * (g_coeffs[0] + (2 / 3) * g_coeffs[1]))
 
         def inner(r):
-            us = jnp.ones(self._state["ld_u_coeffs"].shape[0] + 1) * (-1)
-            us = us.at[1:].set(self._state["ld_u_coeffs"])
+            us = jnp.ones(ld_u_coeffs.shape[0] + 1) * (-1)
+            us = us.at[1:].set(ld_u_coeffs)
             mu = jnp.sqrt(1 - r**2)
             powers = jnp.arange(len(us))
             return -jnp.sum(us * (1 - mu) ** powers) * normalization_constant
 
-        if type(r) == float:
+        if (type(r) == float) | (type(r) == int):
             return inner(r)
         else:
             return jax.vmap(inner)(r)
@@ -1213,6 +1284,51 @@ def _loglike(
         state[key] = params[key]
 
     resids = state["data"] - lc
-    var = jnp.exp(state["log_jitter"]) + state["uncertainties"] ** 2
+    var = jnp.exp(state["log_jitter"]) ** 2 + state["uncertainties"] ** 2
 
-    return jnp.sum(-0.5 * (resids**2 / var + jnp.log(var)))
+    return jnp.sum(-0.5 * (resids**2 / var + jnp.log(2 * jnp.pi * var)))
+
+
+@partial(jax.jit, static_argnums=(1,))
+def _fit_limb_darkening_profile(intensities, order=None, mus=None, rs=None):
+    """
+    Convert a stellar limb darkening profile to a polynomial representation.
+
+    Given a set of stellar parameters, one can use a grid of stellar models to compute
+    the limb darkening profile as a function of projected `r` or of
+    `mu = sqrt(1 - r**2)`. These profiles are often then approximated with one of a few
+    common limb darkening "laws", such as the quadratic or 4-parameter non-linear laws.
+    Since `squishyplanet` only supports polynomial limb darkening profiles, but can
+    support nearly arbitrary orders, we can approximate the profile with a polynomial.
+    This is a convenience function for converting between a grid-derived profile and its
+    best-fit polynomial representation in the correct basis for `squishyplanet`.
+
+    Args:
+        intensities (array-like):
+            The relative intensities of the star at a given `mu` or `r`.
+        order (int):
+            The order of the polynomial to fit to the limb darkening profile. Note that
+            in the `squishyplanet` basis, the polynomial is defined as
+            `1 - sum_{i=1}^{order} u_i (1 - mu)^i`, so the number of coefficients is
+            `order`, not `order+1`.
+        mus (array-like, default=None):
+            The `mu` values at which the intensities were computed. If `rs` is not
+            provided, this is required.
+        rs (array-like, default=None):
+            The `r` values at which the intensities were computed. If `mus` is not
+            provided, this is required.
+
+    Returns:
+        array-like:
+            The coefficients of the polynomial representation of the limb darkening
+            profile. These can then be used as the `ld_u_coeffs` parameter in
+            `OblateSystem`.
+
+    """
+    if rs is not None:
+        mus = jnp.sqrt(1 - rs**2)
+    powers = jnp.arange(order + 1)[1:]
+    a = ((1 - mus) ** powers[:, None]).T
+    b = intensities - 1
+    ld_u_coeffs = -jnp.linalg.lstsq(a, b)[0]
+    return ld_u_coeffs

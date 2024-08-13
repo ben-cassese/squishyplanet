@@ -105,6 +105,7 @@ def parameterize_2d_helper(projected_r, projected_f, projected_theta, xc, yc):
             same ellipse.
 
     """
+    # projected_
     projected_r2 = projected_r * (1 - projected_f)
     cos_t = jnp.cos(projected_theta)
     sin_t = jnp.sin(projected_theta)
@@ -130,14 +131,15 @@ def parameterize_2d_helper(projected_r, projected_f, projected_theta, xc, yc):
         + (xc**2 * sin_t**2) / projected_r2**2,
     }
 
-    para = {
-        "c_x1": jnp.ones_like(xc) * (projected_r * cos_t),
-        "c_x2": jnp.ones_like(xc) * (-projected_r2 * sin_t),
-        "c_x3": xc,
-        "c_y1": jnp.ones_like(xc) * (projected_r * sin_t),
-        "c_y2": jnp.ones_like(xc) * (projected_r2 * cos_t),
-        "c_y3": yc,
-    }
+    # para = {
+    #     "c_x1": jnp.ones_like(xc) * (projected_r * cos_t),
+    #     "c_x2": jnp.ones_like(xc) * (-projected_r2 * sin_t),
+    #     "c_x3": xc,
+    #     "c_y1": jnp.ones_like(xc) * (projected_r * sin_t),
+    #     "c_y2": jnp.ones_like(xc) * (projected_r2 * cos_t),
+    #     "c_y3": yc,
+    # }
+    para = poly_to_parametric(**two)
 
     return two, para
 
@@ -328,21 +330,17 @@ def star_solution_vec(a, b, g_coeffs, c_x1, c_x2, c_x3, c_y1, c_y2, c_y3):
     y1 = c_y1 * jnp.cos(a) + c_y2 * jnp.sin(a) + c_y3
     _theta1 = jnp.arctan2(y1, x1)
     _theta1 = jnp.where(_theta1 < 0, _theta1 + 2 * jnp.pi, _theta1)
-    # jax.debug.print("theta1: {x}", x=_theta1)
 
     x2 = c_x1 * jnp.cos(b) + c_x2 * jnp.sin(b) + c_x3
     y2 = c_y1 * jnp.cos(b) + c_y2 * jnp.sin(b) + c_y3
     _theta2 = jnp.arctan2(y2, x2)
     _theta2 = jnp.where(_theta2 < 0, _theta2 + 2 * jnp.pi, _theta2)
-    # jax.debug.print("theta2: {x}", x=_theta2)
 
     theta1 = jnp.where(_theta1 < _theta2, _theta1, _theta2)
     theta2 = jnp.where(_theta1 < _theta2, _theta2, _theta1)
 
     delta = jnp.abs(jnp.arctan2(jnp.sin(theta1 - theta2), jnp.cos(theta1 - theta2)))
-    # jax.debug.print("delta 1: {x}", x=delta)
     delta = theta2 - theta1
-    # jax.debug.print("delta 2: {x}", x=delta)
 
     s0_integrand = lambda t: jnp.cos(t) ** 2
     s1_integrand = lambda t: jnp.where(
@@ -388,8 +386,6 @@ def star_solution_vec(a, b, g_coeffs, c_x1, c_x2, c_x3, c_y1, c_y2, c_y3):
         return s0, s1
 
     s0, s1 = jax.lax.cond(delta < jnp.pi, no_wrap, wrap, delta)
-    # jax.debug.print("s0: {x}", x=s0)
-    # jax.debug.print("s1: {x}", x=s1)
 
     solution_vec = jnp.zeros(g_coeffs.shape[0])
     solution_vec = solution_vec.at[0].set(s0)
@@ -460,15 +456,16 @@ def lightcurve(state, parameterize_with_projected_ellipse):
     positions = skypos(**state)
 
     if parameterize_with_projected_ellipse:
+        area = jnp.pi * state["projected_effective_r"] ** 2
+        r1 = jnp.sqrt(area / ((1 - state["projected_f"]) * jnp.pi))
+        r2 = r1 * (1 - state["projected_f"])
         two, para = parameterize_2d_helper(
-            state["projected_r"],
+            r1,
             state["projected_f"],
             state["projected_theta"],
             positions[0, :],
             positions[1, :],
         )
-        r2 = state["projected_r"] * (1 - state["projected_f"])
-        r1 = state["projected_r"]
         # force the shapes to match: if user inputs a scaler for one value but the
         # others are still (1,) there'd be a problem. all is fine if they're all
         # scalars or all arrays though

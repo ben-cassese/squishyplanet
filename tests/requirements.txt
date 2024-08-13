@@ -1,6 +1,8 @@
+pint<0.24
 jaxoplanet>0.0.1
 scipy
 tqdm
 pytest
 coverage
 matplotlib
+astropy
