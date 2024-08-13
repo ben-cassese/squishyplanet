@@ -56,7 +56,7 @@ However, for a small but growing number of datasets and targets, the reasonablen
 
 To illustrate the effects of shape deformation on a lightcurve, consider \autoref{fig:example}, which shows a selection of differences between time series generated under the assumption of a spherical planet and those generated assuming a planet with Saturn-like flattening. Depending on the obliquity, precession, impact parameter, and whether the planet is tidally locked, we can generate a wide variety of residual lightcurves. In some cases the deviations from a spherical planet occur almost exclusively in the ingress and egress phases of the transit, while others evolve throughout the transit. Some residual curves are mirrored about the transit midpoint, though in general, they will not always be symmetric [@carter_winn_empirical].
 
-![A sampling of differences between transits of spherical and non-spherical planets. A more complete description of how each of these curves were generated can be found in the [online documentation](https://squishyplanet.readthedocs.io/en/latest/tutorials/create_a_lightcurve.html).\label{fig:example}](deviations.png)
+![A sampling of differences between transits of spherical and non-spherical planets. A more complete description of how each of these curves were generated can be found in the [online documentation](https://github.com/ben-cassese/squishyplanet/blob/main/figure.py).\label{fig:example}](deviations.png)
 
 The amplitudes of these effects are quite small compared to the full depth of the transit, but could be detectable with a facility such as JWST, which is capable of a white-light precision of a few 10s of ppm [@ERS_prism].
 
