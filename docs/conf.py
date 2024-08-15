@@ -19,7 +19,6 @@ sys.path.insert(
 
 
 project = "squishyplanet"
-copyright = "2024, Ben Cassese"
 release = "0.0.1"
 
 # -- General configuration ---------------------------------------------------
