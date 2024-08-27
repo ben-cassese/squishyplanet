@@ -1,4 +1,4 @@
-jax
+jax<0.4.29
 quadax
 tqdm
 black

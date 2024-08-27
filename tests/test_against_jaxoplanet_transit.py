@@ -16,10 +16,9 @@ from squishyplanet.engine.polynomial_limb_darkened_transit import lightcurve
 from squishyplanet.engine.kepler import kepler
 from squishyplanet import OblateSystem
 
-# 1000 comparisons for 3 polynomials orders takes ~20 minutes for github actions
-N_JAXOPLANT_COMPARISONS = 500
-TIMES = jnp.linspace(-1, 1, 17280) * ureg.day  # 10s cadence for 48 hours
-POLY_ORDERS = [2, 3]
+N_JAXOPLANT_COMPARISONS = 1000
+TIMES = jnp.linspace(-1, 1, 1728) * ureg.day  # 100s cadence for 48 hours
+POLY_ORDERS = [2, 3, 4]
 
 
 def light_curve_compare(key, poly_limbdark_order, return_lc=False):
@@ -85,6 +84,7 @@ def light_curve_compare(key, poly_limbdark_order, return_lc=False):
         "obliq": 0.0,
         "prec": 0.0,
         "ld_u_coeffs": jnp.array(u),
+        "tidally_locked": False,
     }
 
     s = OblateSystem(**state)

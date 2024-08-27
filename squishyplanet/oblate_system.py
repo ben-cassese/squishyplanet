@@ -78,6 +78,11 @@ class OblateSystem:
         a (float, [Rstar], default=None):
             The semi-major axis of the orbit in units of the radius of the star. A
             required parameter, will raise an error if not provided.
+        tidally_locked (bool, default=None):
+            Whether the planet is tidally locked to the star. If ``True``, then ``prec``
+            will always be set equal to the true anomaly, meaning the same face of the
+            planet will always face the star. A required parameter, will raise an error
+            if not provided.
         e (float, default=0.0):
             The eccentricity of the orbit.
         i (float, [Radian], default=jnp.pi / 2):
@@ -172,10 +177,6 @@ class OblateSystem:
             <https://ui.adsabs.harvard.edu/abs/2022AJ....164....4L/abstract>`_.
             IMPLEMENTATION IS INCOMPLETE, WILL RAISE A NOTIMPLEMENTEDERROR IF SET TO
             ANYTHING OTHER THAN 1.
-        tidally_locked (bool, default=True):
-            Whether the planet is tidally locked to the star. If ``True``, then ``prec``
-            will always be set equal to the true anomaly, meaning the same face of the
-            planet will always face the star.
         compute_reflected_phase_curve (bool, default=False):
             Whether to include flux reflected by the planet when calling
             :func:`lightcurve`.
@@ -242,6 +243,7 @@ class OblateSystem:
         t_peri=None,
         period=None,
         a=None,
+        tidally_locked=None,
         e=0.0,
         i=jnp.pi / 2,
         Omega=jnp.pi,
@@ -265,7 +267,6 @@ class OblateSystem:
         projected_f=0.0,
         projected_theta=0.0,
         extended_illumination_npts=1,
-        tidally_locked=True,
         compute_reflected_phase_curve=False,
         compute_emitted_phase_curve=False,
         compute_stellar_ellipsoidal_variations=False,
