@@ -23,9 +23,6 @@ We recommend that potential users start with the [geometry visualizations](geome
 
 ## Attribution
 
-\[insert JOSS citation/bibtex here someday\]
-
-
 
 
 ```{toctree}

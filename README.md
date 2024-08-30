@@ -27,22 +27,7 @@ See the [installation instructions](https://squishyplanet.readthedocs.io/en/late
 ## Attribution and License
 
  [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
-[hopefully joss badge]
+[![DOI](https://joss.theoj.org/papers/10.21105/joss.06972/status.svg)](https://doi.org/10.21105/joss.06972)
 
-``squishyplanet`` is made freely available under the MIT License. If you use this code in your research, please cite the accompanying JOSS paper. The citation information will be updated once the paper is submitted/accepted.
+``squishyplanet`` is made freely available under the MIT License. If you use this code in your research, please cite the accompanying JOSS paper:
 
-```
-@article{
-    squishyplanet,
-    doi = {},
-    url = {},
-    year = 2024,
-    month = {},
-    publisher = {},
-    volume = {},
-    number = {},
-    author = {},
-    title = {squishyplanet: modeling transits of non-spherical exoplanets in JAX},
-    journal = {}
-}
-```

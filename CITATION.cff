@@ -1,0 +1,62 @@
+cff-version: "1.2.0"
+authors:
+- family-names: Cassese
+  given-names: Ben
+  orcid: "https://orcid.org/0000-0002-9544-0118"
+- family-names: Vega
+  given-names: Justin
+  orcid: "https://orcid.org/0000-0003-1481-8076"
+- family-names: Lu
+  given-names: Tiger
+  orcid: "https://orcid.org/0000-0003-0834-8645"
+- family-names: Rice
+  given-names: Malena
+  orcid: "https://orcid.org/0000-0002-7670-670X"
+- family-names: Poddar
+  given-names: Avishi
+  orcid: "https://orcid.org/0009-0000-5314-5770"
+- family-names: Kipping
+  given-names: David
+  orcid: "https://orcid.org/0000-0002-4365-7366"
+contact:
+- family-names: Cassese
+  given-names: Ben
+  orcid: "https://orcid.org/0000-0002-9544-0118"
+doi: 10.5281/zenodo.13377036
+message: If you use this software, please cite our article in the
+  Journal of Open Source Software.
+preferred-citation:
+  authors:
+  - family-names: Cassese
+    given-names: Ben
+    orcid: "https://orcid.org/0000-0002-9544-0118"
+  - family-names: Vega
+    given-names: Justin
+    orcid: "https://orcid.org/0000-0003-1481-8076"
+  - family-names: Lu
+    given-names: Tiger
+    orcid: "https://orcid.org/0000-0003-0834-8645"
+  - family-names: Rice
+    given-names: Malena
+    orcid: "https://orcid.org/0000-0002-7670-670X"
+  - family-names: Poddar
+    given-names: Avishi
+    orcid: "https://orcid.org/0009-0000-5314-5770"
+  - family-names: Kipping
+    given-names: David
+    orcid: "https://orcid.org/0000-0002-4365-7366"
+  date-published: 2024-08-30
+  doi: 10.21105/joss.06972
+  issn: 2475-9066
+  issue: 100
+  journal: Journal of Open Source Software
+  publisher:
+    name: Open Journals
+  start: 6972
+  title: "squishyplanet: modeling transits of non-spherical exoplanets
+    in JAX"
+  type: article
+  url: "https://joss.theoj.org/papers/10.21105/joss.06972"
+  volume: 9
+title: "`squishyplanet`: modeling transits of non-spherical exoplanets
+  in JAX"
