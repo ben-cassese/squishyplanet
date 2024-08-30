@@ -1,10 +1,11 @@
 # squishyplanet
 
-[![status](https://joss.theoj.org/papers/2b62acea4e4d6c0de73309184861d1e9/status.svg)](https://joss.theoj.org/papers/2b62acea4e4d6c0de73309184861d1e9)
+[![DOI](https://joss.theoj.org/papers/10.21105/joss.06972/status.svg)](https://doi.org/10.21105/joss.06972)
 [![Documentation Status](https://readthedocs.org/projects/squishyplanet/badge/?version=latest)](https://squishyplanet.readthedocs.io/en/latest/?badge=latest)
 ![Build Status](https://github.com/ben-cassese/squishyplanet/actions/workflows/tests.yml/badge.svg)
 [![Coverage Status](https://coveralls.io/repos/github/ben-cassese/squishyplanet/badge.svg?branch=main&service=github)](https://coveralls.io/github/ben-cassese/squishyplanet?branch=main)
 ![PyPI - Version](https://img.shields.io/pypi/v/squishyplanet)
+ [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
 A package for modeling non-spherical exoplanets.
 
@@ -26,8 +27,6 @@ See the [installation instructions](https://squishyplanet.readthedocs.io/en/late
 
 ## Attribution and License
 
- [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
-[![DOI](https://joss.theoj.org/papers/10.21105/joss.06972/status.svg)](https://doi.org/10.21105/joss.06972)
 
 ``squishyplanet`` is made freely available under the MIT License. If you use this code in your research, please cite the accompanying JOSS paper:
 
