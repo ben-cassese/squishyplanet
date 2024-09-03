@@ -23,10 +23,20 @@ We recommend that potential users start with the [geometry visualizations](geome
 
 ## Attribution
 
-\[insert JOSS citation/bibtex here someday\]
-
-
-
+```
+@article{squishyplanet,
+   author = {{Cassese}, Ben and {Vega}, Justin and {Lu}, Tiger and {Rice}, Malena and {Poddar}, Avishi and {Kipping}, David},
+   doi = {10.21105/joss.06972},
+   journal = {Journal of Open Source Software},
+   month = aug,
+   number = {100},
+   pages = {6972},
+   title = {{squishyplanet: modeling transits of non-spherical exoplanets in JAX}},
+   url = {https://joss.theoj.org/papers/10.21105/joss.06972},
+   volume = {9},
+   year = {2024}
+}
+```
 
 ```{toctree}
 :maxdepth: 1
