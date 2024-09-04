@@ -19,11 +19,14 @@ skypos = {a, e, f, \[Omega], i, \[CapitalOmega]}|->Simplify[orb2SkyTransform[{xp
 (* this is x,y,z in the planet's frame as functions of x,y,z in the sky frame *)
 w = Simplify[orb2PlanetTransform[sky2OrbTransform[{x, y, z}, \[Omega], i, \[CapitalOmega]]-{xp[a,e,f], yp[a,e,f], zp[a, e, f]}, \[Phi], \[Theta]]];
 
+(* this is x,y,z in the sky frame as functions of x,y,z in planet frame *)
+q = Simplify[orb2SkyTransform[planet2OrbTransform[{x,y,z},\[Phi],\[Theta]]+{xp[a,e,f],yp[a,e,f],zp[a,e,f]}, \[Omega],i,\[CapitalOmega]]];
+
 files = {
-StringJoin[NotebookDirectory[], "x_x.txt"],
-StringJoin[NotebookDirectory[], "x_y.txt"],
-StringJoin[NotebookDirectory[], "x_z.txt"],
-StringJoin[NotebookDirectory[], "x_0.txt"]
+StringJoin[NotebookDirectory[], "sky2plan-x_x.txt"],
+StringJoin[NotebookDirectory[], "sky2plan-x_y.txt"],
+StringJoin[NotebookDirectory[], "sky2plan-x_z.txt"],
+StringJoin[NotebookDirectory[], "sky2plan-x_0.txt"]
 };
 coeffs = CoefficientRules[w[[1]], {x,y,z}];
 Do[
@@ -31,10 +34,10 @@ Export[files[[v]],
  FortranForm[Simplify[coeffs[[v]][[2]]]]], {v, 1, 4}]
  
 files = {
-StringJoin[NotebookDirectory[], "y_x.txt"],
-StringJoin[NotebookDirectory[], "y_y.txt"],
-StringJoin[NotebookDirectory[], "y_z.txt"],
-StringJoin[NotebookDirectory[], "y_0.txt"]
+StringJoin[NotebookDirectory[], "sky2plan-y_x.txt"],
+StringJoin[NotebookDirectory[], "sky2plan-y_y.txt"],
+StringJoin[NotebookDirectory[], "sky2plan-y_z.txt"],
+StringJoin[NotebookDirectory[], "sky2plan-y_0.txt"]
 };
 coeffs = CoefficientRules[w[[2]], {x,y,z}];
 Do[
@@ -43,10 +46,10 @@ Export[files[[v]],
  
  
 files = {
-StringJoin[NotebookDirectory[], "z_x.txt"],
-StringJoin[NotebookDirectory[], "z_y.txt"],
-StringJoin[NotebookDirectory[], "z_z.txt"],
-StringJoin[NotebookDirectory[], "z_0.txt"]
+StringJoin[NotebookDirectory[], "sky2plan-z_x.txt"],
+StringJoin[NotebookDirectory[], "sky2plan-z_y.txt"],
+StringJoin[NotebookDirectory[], "sky2plan-z_z.txt"],
+StringJoin[NotebookDirectory[], "sky2plan-z_0.txt"]
 };
 coeffs = CoefficientRules[w[[3]], {x,y,z}];
 Do[
@@ -54,6 +57,36 @@ Export[files[[v]],
  FortranForm[Simplify[coeffs[[v]][[2]]]]], {v, 1, 4}]
 
 
-profile = Simplify[(\[Kappa]/(2 Pi (Exp[\[Kappa]] - Exp[-\[Kappa]])) Exp[\[Kappa] ({Sin[\[Alpha]]Cos[\[Beta]], Sin[\[Alpha]]Sin[\[Beta]], Cos[\[Alpha]]} . x)/Sqrt[x . x]] /. {x-> {x,y,z}}) /. {x-> x/r, y-> y/(r(1-f2)), z-> z/(r(1-f1))}];
-
-Export[StringJoin[NotebookDirectory[], "profile.txt"], FortranForm[profile]];
+files = {
+StringJoin[NotebookDirectory[], "plan2sky-x_x.txt"],
+StringJoin[NotebookDirectory[], "plan2sky-x_y.txt"],
+StringJoin[NotebookDirectory[], "plan2sky-x_z.txt"],
+StringJoin[NotebookDirectory[], "plan2sky-x_0.txt"]
+};
+coeffs = CoefficientRules[q[[1]], {x,y,z}];
+Do[
+Export[files[[v]],
+ FortranForm[Simplify[coeffs[[v]][[2]]]]], {v, 1, 4}]
+ 
+files = {
+StringJoin[NotebookDirectory[], "plan2sky-y_x.txt"],
+StringJoin[NotebookDirectory[], "plan2sky-y_y.txt"],
+StringJoin[NotebookDirectory[], "plan2sky-y_z.txt"],
+StringJoin[NotebookDirectory[], "plan2sky-y_0.txt"]
+};
+coeffs = CoefficientRules[q[[2]], {x,y,z}];
+Do[
+Export[files[[v]],
+ FortranForm[Simplify[coeffs[[v]][[2]]]]], {v, 1, 4}]
+ 
+ 
+files = {
+StringJoin[NotebookDirectory[], "plan2sky-z_x.txt"],
+StringJoin[NotebookDirectory[], "plan2sky-z_y.txt"],
+StringJoin[NotebookDirectory[], "plan2sky-z_z.txt"],
+StringJoin[NotebookDirectory[], "plan2sky-z_0.txt"]
+};
+coeffs = CoefficientRules[q[[3]], {x,y,z}];
+Do[
+Export[files[[v]],
+ FortranForm[Simplify[coeffs[[v]][[2]]]]], {v, 1, 4}]
