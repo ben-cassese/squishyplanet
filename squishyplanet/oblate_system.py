@@ -25,7 +25,6 @@ from squishyplanet.engine.polynomial_limb_darkened_transit import (
     parameterize_2d_helper,
 )
 from squishyplanet.engine.phase_curve_utils import (
-    pre_squish_transform,
     generate_sample_radii_thetas,
     sample_surface,
     planet_surface_normal,
@@ -39,6 +38,7 @@ from squishyplanet.engine.phase_curve_utils import (
     stellar_ellipsoidal_variations,
     stellar_doppler_variations,
 )
+from squishyplanet.engine.coordinate_transforms import create_sky_to_planet_transform
 
 
 class OblateSystem:
@@ -657,7 +657,7 @@ class OblateSystem:
 
                 # the emitted brightness profile
                 # need to take the first index since you aren't scanning here
-                transform = pre_squish_transform(**self._state)[0]
+                transform = create_sky_to_planet_transform(**self._state)[0]
                 emission = corrected_emission_profile(
                     x,
                     y,

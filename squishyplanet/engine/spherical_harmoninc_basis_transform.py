@@ -221,5 +221,5 @@ def AFull(lmax):
 
 def generate_spherical_harmonic_basis_transform_matrix(lmax):
     """Return the full change of basis matrix."""
-    af = np.array(AFull(2).evalf()).astype(np.float64)
+    af = np.array(AFull(lmax).evalf()).astype(np.float64)
     return jnp.array(af)

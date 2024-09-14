@@ -24,56 +24,6 @@ def parse_n(n):
     return l.astype(jnp.int64), m.astype(jnp.int64)
 
 
-@jax.jit
-def sph(l, m, theta, phi):
-    """
-    Compute the real spherical harmonics of degree l and order m at specific point(s)
-
-    Only actually used in visualizations, all fluxes are computed using the 1D integral
-    form.
-
-    Args:
-        l (Array, int, shape=(1,)): Degree of the spherical harmonics.
-        m (Array, int, shape=(1,)): Order of the spherical harmonics.
-        theta (Array, shape=(1,)): Polar angle of the point.
-        phi (Array, shape=(1,)): Azimuthal angle of the point.
-
-    Returns:
-        Array: Value of the spherical harmonics at the point(s) (theta, phi).
-    """
-
-    sol = jnp.zeros_like(theta)
-    sol = jnp.where(
-        m < 0,
-        1j
-        / jnp.sqrt(2)
-        * (
-            jsph_harm(m, l, phi, theta, 25)
-            - (-1) ** m * jsph_harm(-m, l, phi, theta, 25)
-        ),
-        sol,
-    )
-    sol = jnp.where(
-        m > 0,
-        1
-        / jnp.sqrt(2)
-        * (
-            jsph_harm(-m, l, phi, theta, 25)
-            + (-1) ** m * jsph_harm(m, l, phi, theta, 25)
-        ),
-        sol,
-    )
-    sol = jnp.where(m == 0, jsph_harm(0, l, phi, theta, 25), sol)
-
-    # man this took awhile to track down: starry *also* throws in a factor of
-    # (2/np.sqrt(np.pi)) to the normalization. Not stated explicitly in the
-    # paper, but must fall out of the normalization to make the "average"
-    # flux 1.0
-    return sol.real * (
-        2 / jnp.sqrt(jnp.pi)
-    )  # / norm  # the imaginary part should be within ~machine precision of 0 anyway
-
-
 @partial(jax.jit, static_argnums=(0))
 def _big_G(n, x, y, z):
     """
@@ -171,3 +121,5 @@ def big_G(n, x, y, z):
 # v = jnp.zeros(9)
 # v = v.at[2].set(1)
 # s_vec.T @ af @ v * 2 / jnp.sqrt(jnp.pi)
+
+# def poly_basis(a1, )
