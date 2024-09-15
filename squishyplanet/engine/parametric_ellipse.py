@@ -4,12 +4,8 @@ jax.config.update("jax_enable_x64", True)
 import jax.numpy as jnp
 
 
-# running into some numerical issues for very narrow ellipses-
-# e.g., the terminator for a spherical planet at f=1e-6. the rhos are ~1e14 there,
-# and the final value for c_y1 is off. everything is fine at f=1e-5 though, so leaving
-# for now
 @jax.jit
-def poly_to_parametric_helper(rho_xx, rho_xy, rho_x0, rho_yy, rho_y0, rho_00, **kwargs):
+def poly_to_parametric_helper(rho_xx, rho_xy, rho_x0, rho_yy, rho_y0, rho_00):
     """
     A helper function for :func:`poly_to_parametric`.
 
@@ -30,38 +26,98 @@ def poly_to_parametric_helper(rho_xx, rho_xy, rho_x0, rho_yy, rho_y0, rho_00, **
             - cosa (Array [Dimensionless]): Cosine of the rotation angle
             - sina (Array [Dimensionless]): Sine of the rotation angle
     """
-    rho_00 -= 1
+    # (* base eq *)
+    # pxx  x^2 + pxy  x  y + px0 x + pyy y^2 + py0 y + p00 == 1
+    # (* normalize to get rid of p0 *)
+    # pxx/(1 - p00)  x^2 + pxy /(1 - p00) x  y + px0/(1 - p00) x +
+    # pyy/(1 - p00) y^2 + py0 /(1 - p00) y == 1
+    # (* solve for the ellipse center *)
+    # CoefficientRules[
+    # pxx/(1 - p00)  x^2 + pxy /(1 - p00) x  y + px0/(1 - p00) x +
+    # pyy/(1 - p00) y^2 + py0 /(1 - p00) y /. {x -> x - xc,
+    # y -> y - yc}, {x, y}]
+    # Solve[{px0/(1 - p00) - (2 pxx xc)/(1 - p00) - (pxy yc)/(1 - p00) == 0,
+    # py0/(1 - p00) - (pxy xc)/(1 - p00) - (2 pyy yc)/(1 - p00) ==
+    # 0 }, {xc, yc}]
+    # (* plug back in *)
+    # Simplify[
+    # CoefficientRules[
+    # pxx/(1 - p00)  x^2 + pxy /(1 - p00) x  y + px0/(1 - p00) x +
+    #     pyy/(1 - p00) y^2 + py0 /(1 - p00) y /. {x -> x - xc,
+    #     y -> y - yc} /. {xc -> -((-pxy py0 + 2 px0 pyy)/(
+    #     pxy^2 - 4 pxx pyy)),
+    #     yc -> -((-px0 pxy + 2 pxx py0)/(pxy^2 - 4 pxx pyy))}, {x, y}]]
+    # (* normalize again to get the final coeffs *)
+    # pxxShift =
+    # Simplify[(pxx/(
+    #     1 - p00)) /(1 - (
+    #     px0 pxy py0 - pxx py0^2 -
+    #     px0^2 pyy)/((-1 + p00) (pxy^2 - 4 pxx pyy)))]
+    # pxyShift =
+    # Simplify[(pxy/(
+    #     1 - p00))/(1 - (
+    #     px0 pxy py0 - pxx py0^2 -
+    #     px0^2 pyy)/((-1 + p00) (pxy^2 - 4 pxx pyy)))]
+    # pyyShift =
+    # Simplify[(pyy/(
+    #     1 - p00)) /(1 - (
+    #     px0 pxy py0 - pxx py0^2 -
+    #     px0^2 pyy)/((-1 + p00) (pxy^2 - 4 pxx pyy)))]
 
     # the center of the ellipse
     xc = (rho_xy * rho_y0 - 2 * rho_yy * rho_x0) / (4 * rho_xx * rho_yy - rho_xy**2)
     yc = (rho_xy * rho_x0 - 2 * rho_xx * rho_y0) / (4 * rho_xx * rho_yy - rho_xy**2)
 
-    # the rotation angle
-    if rho_xx.shape == ():
-        a = jnp.ones((1, 2, 2))
-    else:
-        a = jnp.ones((rho_xx.shape[0], 2, 2))
-    a = a.at[:, 0, 0].set(rho_xx)
-    a = a.at[:, 0, 1].set(rho_xy / 2)
-    a = a.at[:, 1, 0].set(rho_xy / 2)
-    a = a.at[:, 1, 1].set(rho_yy)
-    l, b = jax.vmap(jnp.linalg.eigh, in_axes=(0))(a)
-    lambda_1 = l[:, 0]
-    lambda_2 = l[:, 1]
-    cosa = b[:, 0, 0]
-    sina = b[:, 0, 1]
+    # get new coefficients for the centered ellipse: all others are zero now,
+    # explicitly got rid of rho_00 so there's a lot more divison
+    rho_xx_shift = -(
+        (rho_xx * (rho_xy**2 - 4 * rho_xx * rho_yy))
+        / (
+            (-1 + rho_00) * rho_xy**2
+            - rho_x0 * rho_xy * rho_y0
+            + rho_x0**2 * rho_yy
+            + rho_xx * (rho_y0**2 + 4 * rho_yy - 4 * rho_00 * rho_yy)
+        )
+    )
+    rho_xy_shift = (-(rho_xy**3) + 4 * rho_xx * rho_xy * rho_yy) / (
+        (-1 + rho_00) * rho_xy**2
+        - rho_x0 * rho_xy * rho_y0
+        + rho_x0**2 * rho_yy
+        + rho_xx * (rho_y0**2 + 4 * rho_yy - 4 * rho_00 * rho_yy)
+    )
+    rho_yy_shift = -(
+        (rho_yy * (rho_xy**2 - 4 * rho_xx * rho_yy))
+        / (
+            (-1 + rho_00) * rho_xy**2
+            - rho_x0 * rho_xy * rho_y0
+            + rho_x0**2 * rho_yy
+            + rho_xx * (rho_y0**2 + 4 * rho_yy - 4 * rho_00 * rho_yy)
+        )
+    )
 
-    # the radii
-    k = -(
-        rho_yy * rho_x0**2
-        - rho_xy * rho_x0 * rho_y0
-        + rho_xx * rho_y0**2
-        + rho_xy**2 * rho_00
-        - 4 * rho_xx * rho_yy * rho_00
-    ) / (rho_xy**2 - 4 * rho_xx * rho_yy)
-    r1 = 1 / jnp.sqrt(lambda_1 / k)
-    r2 = 1 / jnp.sqrt(lambda_2 / k)
-    return r1, r2, xc, yc, cosa, sina
+    # get the rotation angle (edge case gives you nans if there's no rotation)
+    theta = jnp.where(
+        rho_xx_shift - rho_yy_shift != 0.0,
+        0.5 * jnp.arctan(rho_xy_shift / (rho_xx_shift - rho_yy_shift)) + jnp.pi / 2,
+        0.0,
+    )
+
+    # get the semi-major and semi-minor axes
+    a = (
+        rho_xx_shift * jnp.cos(theta) ** 2
+        + rho_xy_shift * jnp.cos(theta) * jnp.sin(theta)
+        + rho_yy_shift * jnp.sin(theta) ** 2
+    )
+    b = (
+        rho_xx_shift * jnp.sin(theta) ** 2
+        - rho_xy_shift * jnp.cos(theta) * jnp.sin(theta)
+        + rho_yy_shift * jnp.cos(theta) ** 2
+    )
+
+    r1 = jnp.where(a > b, 1 / jnp.sqrt(a), 1 / jnp.sqrt(b))
+    r2 = jnp.where(a > b, 1 / jnp.sqrt(b), 1 / jnp.sqrt(a))
+
+    return r1, r2, xc, yc, jnp.cos(theta), jnp.sin(theta)
 
 
 @jax.jit
