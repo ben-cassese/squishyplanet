@@ -1,6 +1,11 @@
 Changelog
 ++++++++++
 
+**0.2.1 (09/2024)**
+- Fixes issues `#16
+<https://github.com/ben-cassese/squishyplanet/issues/16>`_ and `#17
+<https://github.com/ben-cassese/squishyplanet/issues/17>`_.
+
 **0.2.0 (08/2024)**
 
 - The ``log_jitter`` term now represents the *standard deviation* of the added noise, not the variance. This brings it in line with the definition of measurement uncertainties.
