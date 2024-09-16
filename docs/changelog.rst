@@ -1,7 +1,12 @@
 Changelog
 ++++++++++
 
+**0.2.2 (09/2024)**
+
+- Added ability to parameterize the planet's orbit via t0, the time of transit center, instead of t_peri. This is useful for fitting systems with non-zero eccentricity.
+
 **0.2.1 (09/2024)**
+
 - Fixes issues `#16
 <https://github.com/ben-cassese/squishyplanet/issues/16>`_ and `#17
 <https://github.com/ben-cassese/squishyplanet/issues/17>`_.

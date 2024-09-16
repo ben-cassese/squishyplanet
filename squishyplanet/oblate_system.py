@@ -19,7 +19,7 @@ from squishyplanet.engine.parametric_ellipse import (
     poly_to_parametric,
 )
 from squishyplanet.engine.greens_basis_transform import generate_change_of_basis_matrix
-from squishyplanet.engine.kepler import kepler, skypos
+from squishyplanet.engine.kepler import kepler, skypos, t0_to_t_peri
 from squishyplanet.engine.polynomial_limb_darkened_transit import (
     lightcurve,
     parameterize_2d_helper,
@@ -70,8 +70,10 @@ class OblateSystem:
             (e.g. BJD) will work. A required parameter, will raise an error if not
             provided.
         t_peri (float, [Days], default=None):
-            The time of periastron passage. A required parameter, will raise an error
-            if not provided.
+            The time of periastron passage. One of ``t_peri`` or ``t0`` must be
+            provided.
+        t0 (float, [Days], default=None):
+            The time of transit center. One of ``t_peri`` or ``t0`` must be provided.
         period (float, [Days], default=None):
             The period of the orbit. A required parameter, will raise an error if not
             provided.
@@ -241,6 +243,7 @@ class OblateSystem:
         self,
         times=None,
         t_peri=None,
+        t0=None,
         period=None,
         a=None,
         tidally_locked=None,
@@ -363,7 +366,11 @@ class OblateSystem:
 
         # everything below here is just an instantaneous snapshot mostly for plotting,
         # these will all vary with different parameter inputs
-        time_deltas = self._state["times"] - self._state["t_peri"]
+        if self._state["t_peri"] is None:
+            tp = t0_to_t_peri(**self._state)
+        else:
+            tp = self._state["t_peri"]
+        time_deltas = self._state["times"] - tp
         mean_anomalies = 2 * jnp.pi * time_deltas / state["period"]
         true_anomalies = kepler(mean_anomalies, state["e"])
         self._state["f"] = true_anomalies
@@ -449,7 +456,15 @@ class OblateSystem:
                     if self._state["parameterize_with_projected_ellipse"]:
                         self._state["r"] = 0.0
                         continue
+                if key == "t_peri":
+                    continue
+                if key == "t0":
+                    continue
                 raise ValueError(f"'{key}' is a required parameter")
+
+        assert (self._state["t_peri"] is None) != (
+            self._state["t0"] is None
+        ), "Exactly one of 't_peri' or 't0' must be specified"
 
         self._state["ld_u_coeffs"] = jnp.array(self._state["ld_u_coeffs"])
         assert (
@@ -486,6 +501,8 @@ class OblateSystem:
                 self._state[key] = jnp.array([self._state[key]])
                 shapes.append(1)
             else:
+                if self._state[key] is None:
+                    continue  # still one None hanging around, either t0 or t_peri
                 if len(self._state[key].shape) > 1:
                     raise ValueError(
                         "All parameters must be scalars or 1D arrays of the same shape."
