@@ -98,9 +98,13 @@ def poly_to_parametric_helper(rho_xx, rho_xy, rho_x0, rho_yy, rho_y0, rho_00):
     # get the rotation angle (edge case gives you nans if there's no rotation)
     theta = jnp.where(
         rho_xx_shift - rho_yy_shift != 0.0,
-        0.5 * jnp.arctan(rho_xy_shift / (rho_xx_shift - rho_yy_shift)) + jnp.pi / 2,
+        0.5 * jnp.arctan2(rho_xy_shift, (rho_xx_shift - rho_yy_shift)) + jnp.pi / 2,
         0.0,
     )
+    theta = jnp.where(theta < 0.0, theta + jnp.pi, theta)
+    # jax.debug.print("{x}", x=theta)
+    cosa = jnp.cos(theta)
+    sina = jnp.sin(theta)
 
     # get the semi-major and semi-minor axes
     a = (
@@ -114,10 +118,10 @@ def poly_to_parametric_helper(rho_xx, rho_xy, rho_x0, rho_yy, rho_y0, rho_00):
         + rho_yy_shift * jnp.cos(theta) ** 2
     )
 
-    r1 = jnp.where(a > b, 1 / jnp.sqrt(a), 1 / jnp.sqrt(b))
-    r2 = jnp.where(a > b, 1 / jnp.sqrt(b), 1 / jnp.sqrt(a))
+    r1 = 1 / jnp.sqrt(a)
+    r2 = 1 / jnp.sqrt(b)
 
-    return r1, r2, xc, yc, jnp.cos(theta), jnp.sin(theta)
+    return r1, r2, xc, yc, cosa, sina
 
 
 @jax.jit
@@ -197,41 +201,17 @@ def cartesian_intersection_to_parametric_angle(
 
     """
 
-    def inner(x, y):
-        def loss(alpha):
-            x_alpha = c_x1 * jnp.cos(alpha) + c_x2 * jnp.sin(alpha) + c_x3
-            y_alpha = c_y1 * jnp.cos(alpha) + c_y2 * jnp.sin(alpha) + c_y3
+    # center the ellipse
+    xs -= c_x3
+    ys -= c_y3
 
-            return (x - x_alpha) ** 2 + (y - y_alpha) ** 2
+    # the x, y positions are now linear combinations of just cosa, sina
+    # linear solve for those
+    inv = jnp.linalg.inv(jnp.array([[c_x1, c_x2], [c_y1, c_y2]]))
+    matrix = jax.vmap(lambda x, y: jnp.matmul(inv, jnp.array([x, y])))(xs, ys)
+    cosa = matrix[:, 0]
+    sina = matrix[:, 1]
 
-        # could have just used autograd, but it's simple enough to do by hand
-        def grad_loss(alpha):
-            return 2 * (c_x2 * jnp.cos(alpha) - c_x1 * jnp.sin(alpha)) * (
-                c_x3 - x + c_x1 * jnp.cos(alpha) + c_x2 * jnp.sin(alpha)
-            ) + 2 * (c_y2 * jnp.cos(alpha) - c_y1 * jnp.sin(alpha)) * (
-                c_y3 - y + c_y1 * jnp.cos(alpha) + c_y2 * jnp.sin(alpha)
-            )
-
-        def scan_func(alpha, _):
-            # rarely, but sometimes, it actually reaches loss=0 and grad=0
-            # in that case, it throws nans when it tries to divide and everything
-            # following that is wrong
-            l = loss(alpha)
-            g = grad_loss(alpha)
-
-            def not_converged(alpha):
-                return alpha - l / g, None
-
-            def converged(alpha):
-                return alpha, None
-
-            return jax.lax.cond(jnp.abs(g) > 1e-16, not_converged, converged, alpha)
-
-        # if it starts on the actual value, will get nans
-        # previously had it start at 0, but in idealized cases used for testing it really is 0
-        return jax.lax.scan(scan_func, 0.123, None, length=50)[0]
-
-    alphas = jax.vmap(inner)(xs, ys)
-    alphas = jnp.mod(alphas, 2 * jnp.pi)
-    alphas = jnp.where(alphas < 0, alphas + 2 * jnp.pi, alphas)
-    return alphas
+    # convert to alpha
+    alpha = jnp.arctan2(sina, cosa)
+    return alpha

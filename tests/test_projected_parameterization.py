@@ -68,4 +68,10 @@ def test_projected_parameterization():
         assert jnp.min(lc1 >= r**2)
         assert jnp.min(lc2 >= r**2)
 
+        # single point outliers
+        diff = jnp.diff(lc1)
+        assert jnp.abs(jnp.argmax(diff) - jnp.argmin(diff)) != 1
+        diff = jnp.diff(lc2)
+        assert jnp.abs(jnp.argmax(diff) - jnp.argmin(diff)) != 1
+
         assert jnp.allclose(lc1, lc2)
