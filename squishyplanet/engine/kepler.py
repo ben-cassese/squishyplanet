@@ -177,3 +177,72 @@ def skypos(a, e, f, Omega, i, omega, **kwargs):
             _z(a, e, f, Omega, i, omega),
         ]
     )
+
+
+def true_anomaly_at_transit_center(e, i, omega):
+    """
+    Computes the true anomaly at the instant of minimum star/planet separation.
+
+    Uses equations 4.12-4.18 of
+    `Kipping 2011 <https://ui.adsabs.harvard.edu/abs/2011PhDT.......294K/abstract>`_
+    to compute the true anomaly at the instant of minimum star/planet separation.
+
+    Args:
+        e (Array [Dimensionless]): Eccentricity of the orbit
+        i (Array [Radian]): Orbital inclination
+        omega (Array [Radian]): Argument of periapsis
+
+    Returns:
+        Array: True anomaly at the instant of minimum star/planet separation in radians.
+    """
+
+    hp = e * jnp.sin(omega)
+    kp = e * jnp.cos(omega)
+
+    eta_1 = (kp / (1 + hp)) * (jnp.cos(i) ** 2)
+    eta_2 = (kp / (1 + hp)) * (1 / (1 + hp)) * (jnp.cos(i) ** 2) ** 2
+    eta_3 = (
+        -(kp / (1 + hp))
+        * ((-6 * (1 + hp) + kp**2 * (-1 + 2 * hp)) / (6 * (1 + hp) ** 3))
+        * (jnp.cos(i) ** 2) ** 3
+    )
+    eta_4 = (
+        -(kp / (1 + hp))
+        * ((-2 * (1 + hp) + kp**2 * (-1 + 3 * hp)) / (2 * (1 + hp) ** 4))
+        * (jnp.cos(i) ** 2) ** 4
+    )
+    eta_5 = (
+        (kp / (1 + hp))
+        * (
+            (
+                40 * (1 + hp) ** 2
+                - 40 * kp**2 * (-1 + 3 * hp + 4 * hp**2)
+                + kp**4 * (3 - 19 * hp + 8 * hp**2)
+            )
+            / (40 * (1 + hp) ** 6)
+        )
+        * (jnp.cos(i) ** 2) ** 5
+    )
+    eta_6 = (
+        (kp / (1 + hp))
+        * (
+            (
+                24 * (1 + hp) ** 2
+                - 40 * kp**2 * (-1 + 4 * hp + 5 * hp**2)
+                + 9 * kp**4 * (1 - 8 * hp + 5 * hp**2)
+            )
+            / (24 * (1 + hp) ** 7)
+        )
+        * (jnp.cos(i) ** 2) ** 6
+    )
+
+    return jnp.pi / 2 - omega - eta_1 - eta_2 - eta_3 - eta_4 - eta_5 - eta_6
+
+
+def t0_to_t_peri(e, i, omega, period, t0, **kwargs):
+    f = true_anomaly_at_transit_center(e, i, omega)
+
+    eccentric_anomaly = jnp.arctan2(jnp.sqrt(1 - e**2) * jnp.sin(f), e + jnp.cos(f))
+    mean_anomaly = eccentric_anomaly - e * jnp.sin(eccentric_anomaly)
+
+    return t0 - period / (2 * jnp.pi) * mean_anomaly
