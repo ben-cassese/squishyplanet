@@ -12,7 +12,7 @@ from squishyplanet.engine.parametric_ellipse import (
     poly_to_parametric,
     cartesian_intersection_to_parametric_angle,
 )
-from squishyplanet.engine.kepler import kepler, skypos
+from squishyplanet.engine.kepler import kepler, skypos, t0_to_t_peri
 
 epsabs = epsrel = 1e-12
 
@@ -437,6 +437,9 @@ def lightcurve(state, parameterize_with_projected_ellipse):
 
     # array we'll modify if the planet is in transit
     fluxes = jnp.ones_like(state["times"])
+
+    if state["t0"] is not None:
+        state["t_peri"] = t0_to_t_peri(**state)
 
     time_deltas = state["times"] - state["t_peri"]
     mean_anomalies = 2 * jnp.pi * time_deltas / state["period"]

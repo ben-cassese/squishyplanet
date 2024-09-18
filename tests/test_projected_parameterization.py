@@ -13,9 +13,8 @@ def test_projected_parameterization():
     t_exp = 5 * u.min
     times = jnp.arange(-30, 30, t_exp.to(u.hour).value) * u.hour.to(u.day)
 
-    for i in range(1_000):
+    for i in range(2_000):
         key, *subkeys = jax.random.split(key, (5,))
-        # if i < 529: continue
 
         # the 3d planet
         injected_state = {
@@ -29,8 +28,8 @@ def test_projected_parameterization():
             "r": 0.1,
             "i": 89.9720 * jnp.pi / 180,
             "ld_u_coeffs": jnp.array([0.4, 0.26]),
-            "f1": jax.random.uniform(subkeys[0], (1,), minval=0.0, maxval=0.5),
-            "f2": jax.random.uniform(subkeys[1], (1,), minval=0.0, maxval=0.5),
+            "f1": jax.random.uniform(subkeys[0], (1,), minval=0.0, maxval=0.99),
+            "f2": jax.random.uniform(subkeys[1], (1,), minval=0.0, maxval=0.99),
             "obliq": jax.random.uniform(subkeys[2], (1,), minval=0.0, maxval=jnp.pi),
             "prec": jax.random.uniform(subkeys[3], (1,), minval=0.0, maxval=jnp.pi),
             "tidally_locked": False,
@@ -67,5 +66,11 @@ def test_projected_parameterization():
         r = planet1.state["projected_effective_r"][0]
         assert jnp.min(lc1 >= r**2)
         assert jnp.min(lc2 >= r**2)
+
+        # single point outliers
+        diff = jnp.diff(lc1)
+        assert jnp.abs(jnp.argmax(diff) - jnp.argmin(diff)) != 1
+        diff = jnp.diff(lc2)
+        assert jnp.abs(jnp.argmax(diff) - jnp.argmin(diff)) != 1
 
         assert jnp.allclose(lc1, lc2)
