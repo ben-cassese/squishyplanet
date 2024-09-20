@@ -135,8 +135,6 @@ def poly_to_parametric(rho_xx, rho_xy, rho_x0, rho_yy, rho_y0, rho_00):
     .. math::
         \\rho_{xx} x^2 + \\rho_{xy} xy + \\rho_{x0} x + \\rho_{yy} y^2 + \\rho_{y0} y + \\rho_{00} = 1
 
-
-
     Args:
         rho_xx (Array [Dimensionless]): Coefficient of x^2
         rho_xy (Array [Dimensionless]): Coefficient of xy
@@ -186,15 +184,21 @@ def cartesian_intersection_to_parametric_angle(
     Here, :math:`\\alpha` is the parameter in the parametric equations of the ellipse.
     See :func:`poly_to_parametric` for more details.
 
+    The c coefficients describe ellipse as a parametric curve for parameter :math:`\\alpha`:
+
+    .. math::
+        x = c_{x1} * \\cos(\\alpha) + c_{x2} * \\sin(\\alpha) + c_{x3}
+        y = c_{y1} * \\cos(\\alpha) + c_{y2} * \\sin(\\alpha) + c_{y3}
+
     Args:
         xs (Array [Rstar]): x-coordinates of the intersection points
         ys (Array [Rstar]): y-coordinates of the intersection points
-        c_x1 (Array [Dimensionless]): Coefficient of x^2
-        c_x2 (Array [Dimensionless]): Coefficient of xy
-        c_x3 (Array [Dimensionless]): Coefficient of x
-        c_y1 (Array [Dimensionless]): Coefficient of y^2
-        c_y2 (Array [Dimensionless]): Coefficient of y
-        c_y3 (Array [Dimensionless]): Constant term
+        c_x1 (Array [Dimensionless]): Coefficient in the parametric equation
+        c_x2 (Array [Dimensionless]): Coefficient in the parametric equation
+        c_x3 (Array [Dimensionless]): Coefficient in the parametric equation
+        c_y1 (Array [Dimensionless]): Coefficient in the parametric equation
+        c_y2 (Array [Dimensionless]): Coefficient in the parametric equation
+        c_y3 (Array [Dimensionless]): Coefficient in the parametric equation
 
     Returns:
         Array [Rstar]: The angle :math:`\\alpha` corresponding to each intersection point
