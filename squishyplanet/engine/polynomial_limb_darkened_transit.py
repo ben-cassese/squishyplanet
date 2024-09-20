@@ -93,7 +93,10 @@ def parameterize_2d_helper(projected_r, projected_f, projected_theta, xc, yc):
     :func:`planet_2d.planet_2d_coeffs`.
 
     Args:
-        projected_r (float): The projected "x" radius of the planet.
+        projected_r (float):
+            The projected "x" radius of the planet. Note: this is NOT the same as
+            projected_effective_r, which is the radius of a spherical planet with the
+            same projected area as the actual planet.
         projected_f (float): The flattening of the projected ellipse.
         projected_theta (float): The angle of the projected ellipse.
 
@@ -131,14 +134,6 @@ def parameterize_2d_helper(projected_r, projected_f, projected_theta, xc, yc):
         + (xc**2 * sin_t**2) / projected_r2**2,
     }
 
-    # para = {
-    #     "c_x1": jnp.ones_like(xc) * (projected_r * cos_t),
-    #     "c_x2": jnp.ones_like(xc) * (-projected_r2 * sin_t),
-    #     "c_x3": xc,
-    #     "c_y1": jnp.ones_like(xc) * (projected_r * sin_t),
-    #     "c_y2": jnp.ones_like(xc) * (projected_r2 * cos_t),
-    #     "c_y3": yc,
-    # }
     para = poly_to_parametric(**two)
 
     return two, para
@@ -487,13 +482,16 @@ def lightcurve(state, parameterize_with_projected_ellipse):
 
         largest_r = state["r"]
 
+    # initial mask for what values to look at for transits
     possibly_in_transit = (
         positions[0, :] ** 2 + positions[1, :] ** 2 <= (1.0 + largest_r * 1.1) ** 2
     ) * (positions[2, :] > 0)
 
+    # if you're not on the limb, you're either fully inside or outside the star
     def not_on_limb(X):
         para, _, _ = X
 
+        # do a full lap around the planet from 0->2Pi, you're fully inside the star
         def fully_transiting(para):
             solution_vectors = planet_solution_vec(
                 a=0.0, b=2 * jnp.pi, g_coeffs=g_coeffs, **para
@@ -504,6 +502,7 @@ def lightcurve(state, parameterize_with_projected_ellipse):
 
             return blocked_flux
 
+        # you're not transiting, there's no blocked flux
         def not_transiting(para):
             return 0.0
 
@@ -514,63 +513,80 @@ def lightcurve(state, parameterize_with_projected_ellipse):
             para,
         )
 
+    # here you're on the limb, so will need contributions from the planet solution
+    # vector and the star solution vector
     def partially_transiting(X):
         para, xs, ys = X
 
+        # get the angles of the intersection points
         alphas = cartesian_intersection_to_parametric_angle(xs, ys, **para)
         alphas = jnp.where(xs != 999, alphas, 2 * jnp.pi)
         alphas = jnp.where(alphas < 0, alphas + 2 * jnp.pi, alphas)
         alphas = jnp.where(alphas > 2 * jnp.pi, alphas - 2 * jnp.pi, alphas)
         alphas = jnp.sort(alphas)
 
-        test_ang = alphas[0] + (alphas[1] - alphas[0]) / 2
-        test_ang = jnp.where(test_ang > 2 * jnp.pi, test_ang - 2 * jnp.pi, test_ang)
+        # if there are only two intersection points
+        # (which will be the most common case for small, nearly circular planets)
+        def two_points(_):
+            # to figure out which direction to integrate along the planet,
+            # check a value halfway between the two intersection points
+            test_ang = alphas[0] + (alphas[1] - alphas[0]) / 2
+            test_ang = jnp.where(test_ang > 2 * jnp.pi, test_ang - 2 * jnp.pi, test_ang)
 
-        _x = (
-            para["c_x1"] * jnp.cos(test_ang)
-            + para["c_x2"] * jnp.sin(test_ang)
-            + para["c_x3"]
-        )
-        _y = (
-            para["c_y1"] * jnp.cos(test_ang)
-            + para["c_y2"] * jnp.sin(test_ang)
-            + para["c_y3"]
-        )
-        test_val = jnp.sqrt(_x**2 + _y**2)
+            _x = (
+                para["c_x1"] * jnp.cos(test_ang)
+                + para["c_x2"] * jnp.sin(test_ang)
+                + para["c_x3"]
+            )
+            _y = (
+                para["c_y1"] * jnp.cos(test_ang)
+                + para["c_y2"] * jnp.sin(test_ang)
+                + para["c_y3"]
+            )
+            test_val = jnp.sqrt(_x**2 + _y**2)
 
-        def testval_inside_star(_):
-            solution_vectors = planet_solution_vec(
+            def testval_inside_star(_):
+                solution_vectors = planet_solution_vec(
+                    alphas[0], alphas[1], g_coeffs, **para
+                )
+                planet_contribution = (
+                    jnp.matmul(solution_vectors, g_coeffs) * normalization_constant
+                )
+                return planet_contribution
+
+            def testval_outside_star(_):
+                leg1_solution_vec = planet_solution_vec(
+                    alphas[1], 2 * jnp.pi, g_coeffs, **para
+                )
+                leg1 = jnp.matmul(leg1_solution_vec, g_coeffs)
+                leg2_solution_vec = planet_solution_vec(
+                    0.0, alphas[0], g_coeffs, **para
+                )
+                leg2 = jnp.matmul(leg2_solution_vec, g_coeffs)
+                planet_contribution = (leg1 + leg2) * normalization_constant
+                return planet_contribution
+
+            planet_contribution = jax.lax.cond(
+                test_val > 1, testval_outside_star, testval_inside_star, ()
+            )
+
+            star_solution_vectors = star_solution_vec(
                 alphas[0], alphas[1], g_coeffs, **para
             )
-            planet_contribution = (
-                jnp.matmul(solution_vectors, g_coeffs) * normalization_constant
+            star_contribution = (
+                jnp.matmul(star_solution_vectors, g_coeffs) * normalization_constant
             )
-            return planet_contribution
 
-        def testval_outside_star(_):
-            leg1_solution_vec = planet_solution_vec(
-                alphas[1], 2 * jnp.pi, g_coeffs, **para
-            )
-            leg1 = jnp.matmul(leg1_solution_vec, g_coeffs)
-            leg2_solution_vec = planet_solution_vec(0.0, alphas[0], g_coeffs, **para)
-            leg2 = jnp.matmul(leg2_solution_vec, g_coeffs)
-            planet_contribution = (leg1 + leg2) * normalization_constant
-            return planet_contribution
+            total_blocked = planet_contribution + star_contribution
 
-        planet_contribution = jax.lax.cond(
-            test_val > 1, testval_outside_star, testval_inside_star, ()
-        )
+            return total_blocked
 
-        star_solution_vectors = star_solution_vec(
-            alphas[0], alphas[1], g_coeffs, **para
-        )
-        star_contribution = (
-            jnp.matmul(star_solution_vectors, g_coeffs) * normalization_constant
-        )
+        # if there are four intesection points, like when you "skewer" the star,
+        # need to do something more complicated
+        def four_points(_):
+            return jnp.nan
 
-        total_blocked = planet_contribution + star_contribution
-
-        return total_blocked
+        return jax.lax.cond(jnp.sum(xs == 999) == 2, two_points, four_points, ())
 
     def transiting(X):
         indv_para, indv_two = X
