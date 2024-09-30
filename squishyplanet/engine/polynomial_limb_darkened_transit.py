@@ -584,7 +584,63 @@ def lightcurve(state, parameterize_with_projected_ellipse):
         # if there are four intesection points, like when you "skewer" the star,
         # need to do something more complicated
         def four_points(_):
-            return jnp.nan
+            def determine_if_planet_chunk(a1, a2):
+                test_ang = a1 + (a2 - a1) / 2
+                test_ang = jnp.where(
+                    test_ang > 2 * jnp.pi, test_ang - 2 * jnp.pi, test_ang
+                )
+
+                _x = (
+                    para["c_x1"] * jnp.cos(test_ang)
+                    + para["c_x2"] * jnp.sin(test_ang)
+                    + para["c_x3"]
+                )
+                _y = (
+                    para["c_y1"] * jnp.cos(test_ang)
+                    + para["c_y2"] * jnp.sin(test_ang)
+                    + para["c_y3"]
+                )
+                test_val = jnp.sqrt(_x**2 + _y**2)
+                return test_val < 1
+
+            def is_planet_chunk(angs):
+                a1, a2 = angs
+
+                planet_solution_vectors = planet_solution_vec(a1, a2, g_coeffs, **para)
+                planet_chunk_contribution = (
+                    jnp.matmul(planet_solution_vectors, g_coeffs)
+                    * normalization_constant
+                )
+                star_chunk_contribution = 0.0
+
+                return planet_chunk_contribution, star_chunk_contribution
+
+            def is_star_chunk(angs):
+                a1, a2 = angs
+                planet_chunk_contribution = 0.0
+                star_solution_vectors = star_solution_vec(a1, a2, g_coeffs, **para)
+                star_chunk_contribution = (
+                    jnp.matmul(star_solution_vectors, g_coeffs) * normalization_constant
+                )
+                return jnp.abs(planet_chunk_contribution), star_chunk_contribution
+
+            def scan_func(carry, scan_over):
+                a1, a2 = scan_over
+                is_it_planet_chunk = determine_if_planet_chunk(a1, a2)
+                return None, jax.lax.cond(
+                    is_it_planet_chunk, is_planet_chunk, is_star_chunk, (a1, a2)
+                )
+
+            # alpha_pairs =
+            # all pairs of alphas including the last and first:
+            alpha_pairs = jnp.stack((alphas, jnp.roll(alphas, -1)), axis=1)
+            tmp = jax.lax.scan(scan_func, None, alpha_pairs)[1]
+            planet_contribution = jnp.sum(tmp[0])
+            star_contribution = jnp.sum(tmp[1])
+
+            total_blocked = planet_contribution + star_contribution
+
+            return total_blocked
 
         return jax.lax.cond(jnp.sum(xs == 999) == 2, two_points, four_points, ())
 
