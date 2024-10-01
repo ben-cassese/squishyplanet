@@ -555,15 +555,24 @@ def lightcurve(state, parameterize_with_projected_ellipse):
                 return planet_contribution
 
             def testval_outside_star(_):
-                leg1_solution_vec = planet_solution_vec(
-                    alphas[1], 2 * jnp.pi, g_coeffs, **para
+                # leg1_solution_vec = planet_solution_vec(
+                #     alphas[1], 2 * jnp.pi, g_coeffs, **para
+                # )
+                # leg1 = jnp.matmul(leg1_solution_vec, g_coeffs)
+                # leg2_solution_vec = planet_solution_vec(
+                #     0.0, alphas[0], g_coeffs, **para
+                # )
+                # leg2 = jnp.matmul(leg2_solution_vec, g_coeffs)
+                # planet_contribution = (leg1 + leg2) * normalization_constant
+
+                # unnecessary to compute leg1 and leg2 separately, can just wrap passed
+                # the 2pi boundary and use fewer points in the integral approx
+                planet_solution_vectors = planet_solution_vec(
+                    alphas[1], 2 * jnp.pi + alphas[0], g_coeffs, **para
                 )
-                leg1 = jnp.matmul(leg1_solution_vec, g_coeffs)
-                leg2_solution_vec = planet_solution_vec(
-                    0.0, alphas[0], g_coeffs, **para
-                )
-                leg2 = jnp.matmul(leg2_solution_vec, g_coeffs)
-                planet_contribution = (leg1 + leg2) * normalization_constant
+                planet_contribution = (
+                    jnp.matmul(planet_solution_vectors, g_coeffs)
+                ) * normalization_constant
                 return planet_contribution
 
             planet_contribution = jax.lax.cond(

@@ -1,6 +1,11 @@
 Changelog
 ++++++++++
 
+.. **0.2.3 (10/2024)**
+
+.. - Added ability to model planets large/distorted enough to intersect the stellar disk at four points. Previously we did not check for these cases and their corresponding light curves would have been incorrect. This would only have been a problem for either huge `effective_projected_r` (e.g. a white dwarf planet), or for extremely narrow ellipses (e.g. when hacking `OblateSystem` to mimic a ring system).
+.. - Fixed issue `#21 <https://github.com/ben-cassese/squishyplanet/issues/21>`_.
+
 **0.2.2 (09/2024)**
 
 - Added ability to parameterize the planet's orbit via t0, the time of transit center, instead of t_peri. This is useful for fitting systems with non-zero eccentricity.
