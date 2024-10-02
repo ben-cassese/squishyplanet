@@ -415,16 +415,16 @@ def _lightcurve_setup(state, parameterize_with_projected_ellipse):
         positions[0, :] ** 2 + positions[1, :] ** 2 <= (1.0 + largest_r * 1.1) ** 2
     ) * (positions[2, :] > 0)
 
-    return (
-        fluxes,
-        normalization_constant,
-        g_coeffs,
-        two,
-        para,
-        possibly_in_transit,
-        positions,
-        true_anomalies,
-    )
+    return {
+        "fluxes": fluxes,
+        "normalization_constant": normalization_constant,
+        "g_coeffs": g_coeffs,
+        "two": two,
+        "para": para,
+        "possibly_in_transit": possibly_in_transit,
+        "positions": positions,
+        "true_anomalies": true_anomalies,
+    }
 
 
 @partial(
@@ -481,27 +481,25 @@ def lightcurve(state, parameterize_with_projected_ellipse, precomputed=None):
     # set up everything you need for the lightcurve
     # if/else ok because the flow depends on only a static argument
     if precomputed is None:
-        (
-            fluxes,
-            normalization_constant,
-            g_coeffs,
-            two,
-            para,
-            possibly_in_transit,
-            positions,
-            true_anomalies,
-        ) = _lightcurve_setup(state, parameterize_with_projected_ellipse)
+        d = _lightcurve_setup(state, parameterize_with_projected_ellipse)
+        fluxes = d["fluxes"]
+        normalization_constant = d["normalization_constant"]
+        g_coeffs = d["g_coeffs"]
+        two = d["two"]
+        para = d["para"]
+        possibly_in_transit = d["possibly_in_transit"]
+        positions = d["positions"]
+        true_anomalies = d["true_anomalies"]
+
     else:
-        (
-            fluxes,
-            normalization_constant,
-            g_coeffs,
-            two,
-            para,
-            possibly_in_transit,
-            positions,
-            true_anomalies,
-        ) = precomputed
+        fluxes = precomputed["fluxes"]
+        normalization_constant = precomputed["normalization_constant"]
+        g_coeffs = precomputed["g_coeffs"]
+        two = precomputed["two"]
+        para = precomputed["para"]
+        possibly_in_transit = precomputed["possibly_in_transit"]
+        positions = precomputed["positions"]
+        true_anomalies = precomputed["true_anomalies"]
 
     # if you're not on the limb, you're either fully inside or outside the star
     def not_on_limb(X):

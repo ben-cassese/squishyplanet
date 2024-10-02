@@ -167,6 +167,34 @@ def poly_to_parametric(rho_xx, rho_xy, rho_x0, rho_yy, rho_y0, rho_00):
 
 
 @jax.jit
+def parametric_to_poly(c_x1, c_x2, c_x3, c_y1, c_y2, c_y3):
+
+    rho_xx = (c_y1**2 + c_y2**2) / (c_x2 * c_y1 - c_x1 * c_y2) ** 2
+    rho_xy = (-2 * (c_x1 * c_y1 + c_x2 * c_y2)) / (c_x2 * c_y1 - c_x1 * c_y2) ** 2
+    rho_x0 = (
+        -2 * c_x3 * (c_y1**2 + c_y2**2) + 2 * (c_x1 * c_y1 + c_x2 * c_y2) * c_y3
+    ) / (c_x2 * c_y1 - c_x1 * c_y2) ** 2
+    rho_yy = (c_x1**2 + c_x2**2) / (c_x2 * c_y1 - c_x1 * c_y2) ** 2
+    rho_y0 = (
+        2 * c_x3 * (c_x1 * c_y1 + c_x2 * c_y2) - 2 * (c_x1**2 + c_x2**2) * c_y3
+    ) / (c_x2 * c_y1 - c_x1 * c_y2) ** 2
+    rho_00 = (
+        c_x3**2 * (c_y1**2 + c_y2**2)
+        - 2 * c_x3 * (c_x1 * c_y1 + c_x2 * c_y2) * c_y3
+        + (c_x1**2 + c_x2**2) * c_y3**2
+    ) / (c_x2 * c_y1 - c_x1 * c_y2) ** 2
+
+    return {
+        "rho_xx": rho_xx,
+        "rho_xy": rho_xy,
+        "rho_x0": rho_x0,
+        "rho_yy": rho_yy,
+        "rho_y0": rho_y0,
+        "rho_00": rho_00,
+    }
+
+
+@jax.jit
 def cartesian_intersection_to_parametric_angle(
     xs,
     ys,

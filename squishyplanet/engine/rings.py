@@ -3,25 +3,31 @@ import jax
 jax.config.update("jax_enable_x64", True)
 import jax.numpy as jnp
 
+from squishyplanet.engine.planet_3d import planet_3d_coeffs
+from squishyplanet.engine.planet_2d import planet_2d_coeffs
 from squishyplanet.engine.parametric_ellipse import (
     poly_to_parametric,
+    parametric_to_poly,
     cartesian_intersection_to_parametric_angle,
 )
-from squishyplanet.engine.polynomial_limb_darkened_transit import _lightcurve_setup
+from squishyplanet.engine.polynomial_limb_darkened_transit import (
+    _lightcurve_setup,
+    lightcurve,
+)
 
 
 @jax.jit
-def ring_para_coeffs(a, e, f, Omega, i, omega, rRing, obliq, prec):
+def ring_para_coeffs(a, e, f, Omega, i, omega, rRing, ring_obliq, ring_prec, **kwargs):
     """
     Compute the coefficients describing the parametric form of a ring in the sky plane.
 
-    Remember that obliq and prec are defined *in the planet's orbital plane, at f=0*.
-    That implies that to get a face-on ring, you need obliq=prec=90 deg. Some other
+    Remember that ring_obliq and ring_prec are defined *in the planet's orbital plane, at f=0*.
+    That implies that to get a face-on ring, you need ring_obliq=ring_prec=90 deg. Some other
     examples all at inc=90 deg:
-    - obliq=0, prec=0: the ring is an edge-on horizontal line
-    - obliq=jnp.pi/4, prec=0: the ring is still a line, but now it's tilted 45 degrees in the sky frame. You've tipped the north pole away from the star.
-    - obliq=0, prec=anything: the ring is still a line
-    - obliq=90, prec=0: the ring is a face-on circle
+    - ring_obliq=0, ring_prec=0: the ring is an edge-on horizontal line
+    - ring_obliq=jnp.pi/4, ring_prec=0: the ring is still a line, but now it's tilted 45 degrees in the sky frame. You've tipped the north pole away from the star.
+    - ring_obliq=0, ring_prec=anything: the ring is still a line
+    - ring_obliq=90, ring_prec=0: the ring is a face-on circle
     Making inc != 90 deg will alter these: the angles are defined in the orbital plane,
     so if you tilt the orbit away from face-on, you'll also tilt the ring away from face-on.
 
@@ -33,8 +39,9 @@ def ring_para_coeffs(a, e, f, Omega, i, omega, rRing, obliq, prec):
         i (Array): The inclination of the planet.
         omega (Array): The argument of periapsis of the planet.
         rRing (Array): The radius of the ring.
-        obliq (Array): The obliquity of the ring.
-        prec (Array): The precession of the ring.
+        ring_obliq (Array): The ring_obliquity of the ring.
+        ring_prec (Array): The ring_precession of the ring.
+        kwargs (dict): Additional (unused) keyword arguments.
 
     Returns:
         dict:
@@ -42,15 +49,15 @@ def ring_para_coeffs(a, e, f, Omega, i, omega, rRing, obliq, prec):
             form of the ring.
     """
     cx1 = rRing * (
-        -(jnp.sin(i) * jnp.sin(obliq) * jnp.sin(Omega))
-        - jnp.cos(obliq)
-        * jnp.sin(prec)
+        -(jnp.sin(i) * jnp.sin(ring_obliq) * jnp.sin(Omega))
+        - jnp.cos(ring_obliq)
+        * jnp.sin(ring_prec)
         * (
             jnp.cos(Omega) * jnp.sin(omega)
             + jnp.cos(i) * jnp.cos(omega) * jnp.sin(Omega)
         )
-        + jnp.cos(prec)
-        * jnp.cos(obliq)
+        + jnp.cos(ring_prec)
+        * jnp.cos(ring_obliq)
         * (
             jnp.cos(omega) * jnp.cos(Omega)
             - jnp.cos(i) * jnp.sin(omega) * jnp.sin(Omega)
@@ -61,13 +68,13 @@ def ring_para_coeffs(a, e, f, Omega, i, omega, rRing, obliq, prec):
         * (
             jnp.cos(omega)
             * (
-                jnp.cos(Omega) * jnp.sin(prec)
-                + jnp.cos(i) * jnp.cos(prec) * jnp.sin(Omega)
+                jnp.cos(Omega) * jnp.sin(ring_prec)
+                + jnp.cos(i) * jnp.cos(ring_prec) * jnp.sin(Omega)
             )
             + jnp.sin(omega)
             * (
-                jnp.cos(prec) * jnp.cos(Omega)
-                - jnp.cos(i) * jnp.sin(prec) * jnp.sin(Omega)
+                jnp.cos(ring_prec) * jnp.cos(Omega)
+                - jnp.cos(i) * jnp.sin(ring_prec) * jnp.sin(Omega)
             )
         )
     )
@@ -91,14 +98,14 @@ def ring_para_coeffs(a, e, f, Omega, i, omega, rRing, obliq, prec):
     cy1 = rRing * (
         jnp.cos(Omega)
         * (
-            jnp.sin(i) * jnp.sin(obliq)
-            + jnp.cos(i) * jnp.cos(obliq) * jnp.sin(prec + omega)
+            jnp.sin(i) * jnp.sin(ring_obliq)
+            + jnp.cos(i) * jnp.cos(ring_obliq) * jnp.sin(ring_prec + omega)
         )
-        + jnp.cos(obliq) * jnp.cos(prec + omega) * jnp.sin(Omega)
+        + jnp.cos(ring_obliq) * jnp.cos(ring_prec + omega) * jnp.sin(Omega)
     )
     cy2 = rRing * (
-        jnp.cos(i) * jnp.cos(prec + omega) * jnp.cos(Omega)
-        - jnp.sin(prec + omega) * jnp.sin(Omega)
+        jnp.cos(i) * jnp.cos(ring_prec + omega) * jnp.cos(Omega)
+        - jnp.sin(ring_prec + omega) * jnp.sin(Omega)
     )
     cy3 = -(
         (
@@ -240,7 +247,7 @@ def ring_planet_intersection(
     return xs, ys
 
 
-def planet_ring_overlap(precomputed_lc_setup, ring_two):
+def planet_ring_overlap(precomputed_lc_setup, ring_para, planet_two):
     """
     Compute the flux blocked by a region that's doubly blocked by a planet and an
     ellipse representing the inner or outer edge of a ring.
@@ -257,8 +264,6 @@ def planet_ring_overlap(precomputed_lc_setup, ring_two):
         positions,
         true_anomalies,
     ) = precomputed_lc_setup
-
-    ring_para = poly_to_parametric(ring_two)
 
     # three possible cases:
     # 1) the overlapping portion is not transiting
@@ -281,15 +286,80 @@ def planet_ring_overlap(precomputed_lc_setup, ring_two):
         return 0.0
 
     def scan_func(carry, scan_over):
-        pass
+        indv_ring_para, indv_planet_two, mask = scan_over
+        return None, jax.lax.cond(
+            mask,
+            overlap_transiting,
+            overlap_not_transiting,
+            (indv_ring_para, indv_planet_two),
+        )
 
     double_counted_flux = jax.lax.scan()
 
 
-def ring_lightcurve():
-    planet_lc = 0.0
-    ring_inner_lc = 0.0
-    ring_outer_lc = 0.0
+@jax.jit
+def ring_lightcurve(state):
+
+    # compute things that can be shared across all three lc integrations
+    # switch the "r" to the outer ring radius, which is guaranteed to be largest,
+    # when making the mask if it's potentially in transit
+    _state = state.copy()
+    _state["r"] = state["ring_outer_r"]
+    _state["obliq"] = state["ring_obliq"]
+    _state["prec"] = state["ring_prec"]
+    setup = _lightcurve_setup(_state, parameterize_with_projected_ellipse=False)
+    normalization_constant = setup["normalization_constant"]
+    g_coeffs = setup["g_coeffs"]
+    possibly_in_transit = setup["possibly_in_transit"]
+    positions = setup["positions"]
+    true_anomalies = setup["true_anomalies"]
+
+    # these two are specific to the outer ring
+    two_ring_outer = setup["two"]
+    para_ring_outer = setup["para"]
+
+    # get the coeffs of the inner ring
+    para_ring_inner = ring_para_coeffs(**state, rRing=state["ring_inner_r"])
+    two_ring_inner = poly_to_parametric(**para_ring_inner)
+
+    # get the coeffs of the planet
+    three_planet = planet_3d_coeffs(**state)
+    two_planet = planet_2d_coeffs(**three_planet)
+
+    # compute the lightcurves of the three ellipses separately
+    ring_outer_lc = lightcurve(
+        state=state, parameterize_with_projected_ellipse=False, precomputed=setup
+    )
+
+    ring_inner_lc = lightcurve(
+        state=state,
+        parameterize_with_projected_ellipse=False,
+        precomputed={
+            "fluxes": fluxes,
+            "normalization_constant": normalization_constant,
+            "g_coeffs": g_coeffs,
+            "two": two_ring_inner,
+            "para": para_ring_inner,
+            "possibly_in_transit": possibly_in_transit,
+            "positions": positions,
+            "true_anomalies": true_anomalies,
+        },
+    )
+
+    planet_lc = lightcurve(
+        state=state,
+        parameterize_with_projected_ellipse=False,
+        precomputed={
+            "fluxes": fluxes,
+            "normalization_constant": normalization_constant,
+            "g_coeffs": g_coeffs,
+            "two": two_planet,
+            "para": three_planet,
+            "possibly_in_transit": possibly_in_transit,
+            "positions": positions,
+            "true_anomalies": true_anomalies,
+        },
+    )
 
     planet_ring_inner_overlap = 0.0
     planet_ring_outer_overlap = 0.0

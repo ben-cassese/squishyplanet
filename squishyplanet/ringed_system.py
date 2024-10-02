@@ -47,6 +47,15 @@ class RingedSystem(OblateSystem):
         assert (ring_obliq is None and ring_prec is None) or (
             ring_obliq is not None and ring_prec is not None
         ), "both ring_obliq and ring_prec must be provided, or neither"
+        assert (
+            ring_inner_edge < ring_outer_edge
+        ), "ring_inner_edge must be smaller than ring_outer_edge"
+        assert (
+            ring_inner_edge > state["r"]
+        ), "ring_inner_edge must be larger than the planet's radius"
+        assert (
+            ring_outer_edge > state["rstar"]
+        ), "ring_outer_edge must be larger than the star's radius"
 
         self._state["ring_inner_r"] = ring_inner_edge
         self._state["ring_outer_r"] = ring_outer_edge
