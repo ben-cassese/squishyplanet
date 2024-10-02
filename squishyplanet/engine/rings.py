@@ -3,140 +3,123 @@ import jax
 jax.config.update("jax_enable_x64", True)
 import jax.numpy as jnp
 
+from squishyplanet.engine.parametric_ellipse import (
+    poly_to_parametric,
+    cartesian_intersection_to_parametric_angle,
+)
+from squishyplanet.engine.polynomial_limb_darkened_transit import _lightcurve_setup
+
 
 @jax.jit
-def ring_poly_coeffs_2d(r, obliq, prec, xc, yc):
+def ring_para_coeffs(a, e, f, Omega, i, omega, rRing, obliq, prec):
     """
-    Compute the 2D implicit coefficients describing a circle after transformation into the sky plane.
+    Compute the coefficients describing the parametric form of a ring in the sky plane.
 
-    Originally from Tiger Lu, written for Lu et al. 2024,
-    "HIP-41378 f Likely has High Obliquity – Implications for Exorings"
+    Remember that obliq and prec are defined *in the planet's orbital plane, at f=0*.
+    That implies that to get a face-on ring, you need obliq=prec=90 deg. Some other
+    examples all at inc=90 deg:
+    - obliq=0, prec=0: the ring is an edge-on horizontal line
+    - obliq=jnp.pi/4, prec=0: the ring is still a line, but now it's tilted 45 degrees in the sky frame. You've tipped the north pole away from the star.
+    - obliq=0, prec=anything: the ring is still a line
+    - obliq=90, prec=0: the ring is a face-on circle
+    Making inc != 90 deg will alter these: the angles are defined in the orbital plane,
+    so if you tilt the orbit away from face-on, you'll also tilt the ring away from face-on.
 
     Args:
-        r (Array): The radius of the circle.
-        obliq (Array): The obliquity of the circle.
-        prec (Array): The precession of the circle.
-        xc (Array): The sky-projected x-coordinate of the circle's center.
-        yc (Array): The sky-projected y-coordinate of the circle's center.
+        a (Array): The semi-major axis of the planet.
+        e (Array): The eccentricity of the planet.
+        f (Array): The true anomaly of the planet.
+        Omega (Array): The longitude of the ascending node of the planet.
+        i (Array): The inclination of the planet.
+        omega (Array): The argument of periapsis of the planet.
+        rRing (Array): The radius of the ring.
+        obliq (Array): The obliquity of the ring.
+        prec (Array): The precession of the ring.
 
     Returns:
         dict:
-            A dictionary with keys representing different transformed coefficient
-            names ('rho__xx', 'rho__xy', 'rho__x0', 'rho__yy', 'rho__y0', 'rho__00') and
-            their corresponding values. These coefficients describe the outline of the
-            planet as an implicit curve that satisfies the equation:
-
-            .. math::
-                \\rho__{xx} x^2 + \\rho__{xy} xy + \\rho__{x0} x + \\rho__{yy} y^2 + \\rho__{y0} y + \\rho__{00} = 1
+            A dictionary with keys for each of the coefficients of the parametric
+            form of the ring.
     """
-
-    q_x1 = jnp.sin(obliq) ** 2
-    q_x2 = 2 * jnp.cos(obliq) * jnp.sin(obliq) * jnp.sin(prec)
-    q_x3 = -2 * xc * jnp.sin(obliq) ** 2 - 2 * yc * jnp.cos(obliq) * jnp.sin(
-        obliq
-    ) * jnp.sin(prec)
-    q_y1 = jnp.cos(prec) ** 2 + jnp.cos(obliq) ** 2 * jnp.sin(prec) ** 2
-    q_y2 = (
-        -2 * yc * jnp.cos(prec) ** 2
-        - 2 * xc * jnp.cos(obliq) * jnp.sin(obliq) * jnp.sin(prec)
-        - 2 * yc * jnp.cos(obliq) ** 2 * jnp.sin(prec) ** 2
+    cx1 = rRing * (
+        -(jnp.sin(i) * jnp.sin(obliq) * jnp.sin(Omega))
+        - jnp.cos(obliq)
+        * jnp.sin(prec)
+        * (
+            jnp.cos(Omega) * jnp.sin(omega)
+            + jnp.cos(i) * jnp.cos(omega) * jnp.sin(Omega)
+        )
+        + jnp.cos(prec)
+        * jnp.cos(obliq)
+        * (
+            jnp.cos(omega) * jnp.cos(Omega)
+            - jnp.cos(i) * jnp.sin(omega) * jnp.sin(Omega)
+        )
     )
-    q_y3 = 0
+    cx2 = -(
+        rRing
+        * (
+            jnp.cos(omega)
+            * (
+                jnp.cos(Omega) * jnp.sin(prec)
+                + jnp.cos(i) * jnp.cos(prec) * jnp.sin(Omega)
+            )
+            + jnp.sin(omega)
+            * (
+                jnp.cos(prec) * jnp.cos(Omega)
+                - jnp.cos(i) * jnp.sin(prec) * jnp.sin(Omega)
+            )
+        )
+    )
+    cx3 = (
+        a
+        * (-1 + e**2)
+        * (
+            jnp.sin(f)
+            * (
+                jnp.cos(Omega) * jnp.sin(omega)
+                + jnp.cos(i) * jnp.cos(omega) * jnp.sin(Omega)
+            )
+            + jnp.cos(f)
+            * (
+                -(jnp.cos(omega) * jnp.cos(Omega))
+                + jnp.cos(i) * jnp.sin(omega) * jnp.sin(Omega)
+            )
+        )
+    ) / (1 + e * jnp.cos(f))
 
-    norm = (
-        r**2 * jnp.sin(obliq) ** 2 * jnp.cos(prec) ** 2
-        - yc**2 * jnp.cos(prec) ** 2
-        - xc**2 * jnp.sin(obliq) ** 2
-        - 2 * xc * yc * jnp.cos(obliq) * jnp.sin(obliq) * jnp.sin(prec)
-        - yc**2 * jnp.cos(obliq) ** 2 * jnp.sin(prec) ** 2
+    cy1 = rRing * (
+        jnp.cos(Omega)
+        * (
+            jnp.sin(i) * jnp.sin(obliq)
+            + jnp.cos(i) * jnp.cos(obliq) * jnp.sin(prec + omega)
+        )
+        + jnp.cos(obliq) * jnp.cos(prec + omega) * jnp.sin(Omega)
+    )
+    cy2 = rRing * (
+        jnp.cos(i) * jnp.cos(prec + omega) * jnp.cos(Omega)
+        - jnp.sin(prec + omega) * jnp.sin(Omega)
+    )
+    cy3 = -(
+        (
+            a
+            * (-1 + e**2)
+            * (
+                jnp.cos(i) * jnp.cos(Omega) * jnp.sin(f + omega)
+                + jnp.cos(f + omega) * jnp.sin(Omega)
+            )
+        )
+        / (1 + e * jnp.cos(f))
     )
 
     return {
-        "rho_xx": q_x1 / norm,
-        "rho_xy": q_x2 / norm,
-        "rho_x0": q_x3 / norm,
-        "rho_yy": q_y1 / norm,
-        "rho_y0": q_y2 / norm,
-        "rho_00": q_y3 / norm,
+        "c_x1": cx1,
+        "c_x2": cx2,
+        "c_x3": cx3,
+        "c_y1": cy1,
+        "c_y2": cy2,
+        "c_y3": cy3,
     }
-
-
-def _t4(
-    c_x1, c_x2, c_x3, c_y1, c_y2, c_y3, rho_xx, rho_xy, rho_x0, rho_yy, rho_y0, rho_00
-):
-    return (
-        -1
-        + rho_00
-        + c_x1**2 * rho_xx
-        + c_x3**2 * rho_xx
-        + c_x3 * (rho_x0 + (-c_y1 + c_y3) * rho_xy)
-        - c_x1 * (rho_x0 + 2 * c_x3 * rho_xx + (-c_y1 + c_y3) * rho_xy)
-        - c_y1 * rho_y0
-        + c_y3 * rho_y0
-        + (c_y1 - c_y3) ** 2 * rho_yy
-    )
-
-
-def _t3(
-    c_x1, c_x2, c_x3, c_y1, c_y2, c_y3, rho_xx, rho_xy, rho_x0, rho_yy, rho_y0, rho_00
-):
-    return 2 * (
-        c_x2
-        * (
-            rho_x0
-            - 2 * c_x1 * rho_xx
-            + 2 * c_x3 * rho_xx
-            - c_y1 * rho_xy
-            + c_y3 * rho_xy
-        )
-        + c_y2
-        * (
-            -(c_x1 * rho_xy)
-            + c_x3 * rho_xy
-            + rho_y0
-            - 2 * c_y1 * rho_yy
-            + 2 * c_y3 * rho_yy
-        )
-    )
-
-
-def _t2(
-    c_x1, c_x2, c_x3, c_y1, c_y2, c_y3, rho_xx, rho_xy, rho_x0, rho_yy, rho_y0, rho_00
-):
-    return 2 * (
-        -1
-        + rho_00
-        - c_x1**2 * rho_xx
-        + c_x3**2 * rho_xx
-        - c_x1 * c_y1 * rho_xy
-        + 2 * c_x2 * (c_x2 * rho_xx + c_y2 * rho_xy)
-        + c_x3 * (rho_x0 + c_y3 * rho_xy)
-        + c_y3 * rho_y0
-        + (-(c_y1**2) + 2 * c_y2**2 + c_y3**2) * rho_yy
-    )
-
-
-def _t1(
-    c_x1, c_x2, c_x3, c_y1, c_y2, c_y3, rho_xx, rho_xy, rho_x0, rho_yy, rho_y0, rho_00
-):
-    return 2 * (
-        c_x2 * (rho_x0 + 2 * (c_x1 + c_x3) * rho_xx + (c_y1 + c_y3) * rho_xy)
-        + c_y2 * ((c_x1 + c_x3) * rho_xy + rho_y0 + 2 * (c_y1 + c_y3) * rho_yy)
-    )
-
-
-def _t0(
-    c_x1, c_x2, c_x3, c_y1, c_y2, c_y3, rho_xx, rho_xy, rho_x0, rho_yy, rho_y0, rho_00
-):
-    return (
-        -1
-        + rho_00
-        + c_x1**2 * rho_xx
-        + c_x3**2 * rho_xx
-        + c_x3 * (rho_x0 + (c_y1 + c_y3) * rho_xy)
-        + c_x1 * (rho_x0 + 2 * c_x3 * rho_xx + (c_y1 + c_y3) * rho_xy)
-        + (c_y1 + c_y3) * (rho_y0 + (c_y1 + c_y3) * rho_yy)
-    )
 
 
 @jax.jit
@@ -187,75 +170,62 @@ def ring_planet_intersection(
 
     """
 
-    t4 = _t4(
-        c_x1,
-        c_x2,
-        c_x3,
-        c_y1,
-        c_y2,
-        c_y3,
-        rho_xx,
-        rho_xy,
-        rho_x0,
-        rho_yy,
-        rho_y0,
-        rho_00,
+    t4 = (
+        -1
+        + rho_00
+        + c_x1**2 * rho_xx
+        + c_x3**2 * rho_xx
+        + c_x3 * (rho_x0 + (-c_y1 + c_y3) * rho_xy)
+        - c_x1 * (rho_x0 + 2 * c_x3 * rho_xx + (-c_y1 + c_y3) * rho_xy)
+        - c_y1 * rho_y0
+        + c_y3 * rho_y0
+        + (c_y1 - c_y3) ** 2 * rho_yy
     )
-    t3 = _t3(
-        c_x1,
-        c_x2,
-        c_x3,
-        c_y1,
-        c_y2,
-        c_y3,
-        rho_xx,
-        rho_xy,
-        rho_x0,
-        rho_yy,
-        rho_y0,
-        rho_00,
+
+    t3 = 2 * (
+        c_x2
+        * (
+            rho_x0
+            - 2 * c_x1 * rho_xx
+            + 2 * c_x3 * rho_xx
+            - c_y1 * rho_xy
+            + c_y3 * rho_xy
+        )
+        + c_y2
+        * (
+            -(c_x1 * rho_xy)
+            + c_x3 * rho_xy
+            + rho_y0
+            - 2 * c_y1 * rho_yy
+            + 2 * c_y3 * rho_yy
+        )
     )
-    t2 = _t2(
-        c_x1,
-        c_x2,
-        c_x3,
-        c_y1,
-        c_y2,
-        c_y3,
-        rho_xx,
-        rho_xy,
-        rho_x0,
-        rho_yy,
-        rho_y0,
-        rho_00,
+
+    t2 = 2 * (
+        -1
+        + rho_00
+        - c_x1**2 * rho_xx
+        + c_x3**2 * rho_xx
+        - c_x1 * c_y1 * rho_xy
+        + 2 * c_x2 * (c_x2 * rho_xx + c_y2 * rho_xy)
+        + c_x3 * (rho_x0 + c_y3 * rho_xy)
+        + c_y3 * rho_y0
+        + (-(c_y1**2) + 2 * c_y2**2 + c_y3**2) * rho_yy
     )
-    t1 = _t1(
-        c_x1,
-        c_x2,
-        c_x3,
-        c_y1,
-        c_y2,
-        c_y3,
-        rho_xx,
-        rho_xy,
-        rho_x0,
-        rho_yy,
-        rho_y0,
-        rho_00,
+
+    t1 = 2 * (
+        c_x2 * (rho_x0 + 2 * (c_x1 + c_x3) * rho_xx + (c_y1 + c_y3) * rho_xy)
+        + c_y2 * ((c_x1 + c_x3) * rho_xy + rho_y0 + 2 * (c_y1 + c_y3) * rho_yy)
     )
-    t0 = _t0(
-        c_x1,
-        c_x2,
-        c_x3,
-        c_y1,
-        c_y2,
-        c_y3,
-        rho_xx,
-        rho_xy,
-        rho_x0,
-        rho_yy,
-        rho_y0,
-        rho_00,
+
+    t0 = (
+        -1
+        + rho_00
+        + c_x1**2 * rho_xx
+        + c_x3**2 * rho_xx
+        + c_x3 * (rho_x0 + (c_y1 + c_y3) * rho_xy)
+        + c_x1 * (rho_x0 + 2 * c_x3 * rho_xx + (c_y1 + c_y3) * rho_xy)
+        + (c_y1 + c_y3) * (rho_y0 + (c_y1 + c_y3) * rho_yy)
     )
 
     polys = jnp.array([t4, t3, t2, t1, t0])
@@ -268,3 +238,64 @@ def ring_planet_intersection(
     ys = jnp.where(ts != 999, c_y1 * cos_t + c_y2 * sin_t + c_y3, ts)
 
     return xs, ys
+
+
+def planet_ring_overlap(precomputed_lc_setup, ring_two):
+    """
+    Compute the flux blocked by a region that's doubly blocked by a planet and an
+    ellipse representing the inner or outer edge of a ring.
+
+    This is *not* the full correction factor, just a tool used when computing it
+    """
+    (
+        fluxes,
+        normalization_constant,
+        g_coeffs,
+        two,
+        para,
+        possibly_in_transit,
+        positions,
+        true_anomalies,
+    ) = precomputed_lc_setup
+
+    ring_para = poly_to_parametric(ring_two)
+
+    # three possible cases:
+    # 1) the overlapping portion is not transiting
+    # 2) the overlaping portion is on the limb
+    # 3) the overlapping portion is on fully on the disk
+
+    def overlap_fully_transiting():
+        pass
+
+    def overlap_on_limb():
+        pass
+
+    def overlap_transiting(single_time_para, single_time_ring_two):
+        intersection_pts = ring_planet_intersection(
+            **single_time_para, **single_time_ring_two
+        )
+        pass
+
+    def overlap_not_transiting():
+        return 0.0
+
+    def scan_func(carry, scan_over):
+        pass
+
+    double_counted_flux = jax.lax.scan()
+
+
+def ring_lightcurve():
+    planet_lc = 0.0
+    ring_inner_lc = 0.0
+    ring_outer_lc = 0.0
+
+    planet_ring_inner_overlap = 0.0
+    planet_ring_outer_overlap = 0.0
+
+    ring_inner_blockage = ring_inner_lc - planet_ring_inner_overlap
+    ring_outer_blockage = ring_outer_lc - planet_ring_outer_overlap
+    ring_blockage = ring_outer_blockage - ring_inner_blockage
+
+    return planet_lc + ring_blockage

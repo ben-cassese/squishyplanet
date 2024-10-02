@@ -17,35 +17,16 @@ from squishyplanet.engine.kepler import kepler, skypos, t0_to_t_peri
 epsabs = epsrel = 1e-12
 
 
-def _t4(rho_xx, rho_xy, rho_x0, rho_yy, rho_y0, rho_00):
-    return -1 + rho_00 - rho_x0 + rho_xx
-
-
-def _t3(rho_xx, rho_xy, rho_x0, rho_yy, rho_y0, rho_00):
-    return -2 * rho_xy + 2 * rho_y0
-
-
-def _t2(rho_xx, rho_xy, rho_x0, rho_yy, rho_y0, rho_00):
-    return -2 + 2 * rho_00 - 2 * rho_xx + 4 * rho_yy
-
-
-def _t1(rho_xx, rho_xy, rho_x0, rho_yy, rho_y0, rho_00):
-    return 2 * rho_xy + 2 * rho_y0
-
-
-def _t0(rho_xx, rho_xy, rho_x0, rho_yy, rho_y0, rho_00):
-    return -1 + rho_00 + rho_x0 + rho_xx
-
-
 @jax.jit
 def _single_intersection_points(
     rho_xx, rho_xy, rho_x0, rho_yy, rho_y0, rho_00, **kwargs
 ):
-    t4 = _t4(rho_xx, rho_xy, rho_x0, rho_yy, rho_y0, rho_00)
-    t3 = _t3(rho_xx, rho_xy, rho_x0, rho_yy, rho_y0, rho_00)
-    t2 = _t2(rho_xx, rho_xy, rho_x0, rho_yy, rho_y0, rho_00)
-    t1 = _t1(rho_xx, rho_xy, rho_x0, rho_yy, rho_y0, rho_00)
-    t0 = _t0(rho_xx, rho_xy, rho_x0, rho_yy, rho_y0, rho_00)
+
+    t4 = -1 + rho_00 - rho_x0 + rho_xx
+    t3 = -2 * rho_xy + 2 * rho_y0
+    t2 = -2 + 2 * rho_00 - 2 * rho_xx + 4 * rho_yy
+    t1 = 2 * rho_xy + 2 * rho_y0
+    t0 = -1 + rho_00 + rho_x0 + rho_xx
 
     polys = jnp.array([t4, t3, t2, t1, t0])
     roots = jnp.roots(polys, strip_zeros=False)  # strip_zeros must be False to jit
@@ -54,24 +35,6 @@ def _single_intersection_points(
     xs = jnp.where(ts != 999, (1 - ts**2) / (1 + ts**2), ts)
     ys = jnp.where(ts != 999, 2 * ts / (1 + ts**2), ts)
     return xs, ys
-
-
-# @jax.jit
-# def multiple_intersection_points(rho_xx, rho_xy, rho_x0, rho_yy, rho_y0, rho_00, **kwargs):
-#     t4 = _t4(rho_xx, rho_xy, rho_x0, rho_yy, rho_y0, rho_00)
-#     t3 = _t3(rho_xx, rho_xy, rho_x0, rho_yy, rho_y0, rho_00)
-#     t2 = _t2(rho_xx, rho_xy, rho_x0, rho_yy, rho_y0, rho_00)
-#     t1 = _t1(rho_xx, rho_xy, rho_x0, rho_yy, rho_y0, rho_00)
-#     t0 = _t0(rho_xx, rho_xy, rho_x0, rho_yy, rho_y0, rho_00)
-
-#     polys = jnp.array([t4, t3, t2, t1, t0]).T
-
-#     roots = jax.vmap(lambda x: jnp.roots(x, strip_zeros=False))(polys)
-
-#     ts = jnp.where(jnp.imag(roots) == 0, jnp.real(roots), 999)
-#     xs = jnp.where(ts != 999, (1-ts**2)/(1+ts**2), ts)
-#     ys = jnp.where(ts != 999, 2*ts/(1+ts**2), ts)
-#     return xs, ys
 
 
 @jax.jit
@@ -389,45 +352,10 @@ def star_solution_vec(a, b, g_coeffs, c_x1, c_x2, c_x3, c_y1, c_y2, c_y3):
 
 
 @partial(jax.jit, static_argnames=("parameterize_with_projected_ellipse",))
-def lightcurve(state, parameterize_with_projected_ellipse):
+def _lightcurve_setup(state, parameterize_with_projected_ellipse):
     """
-    The main function for computing a transit light curve.
-
-    This function will return a 1-D array representing the flux recieved from the star,
-    where each entry corresponds to a time in the input `state` dictionary. It first
-    transforms the `state` into the implicit 3D surface of the planet, the implicit 2D
-    sky-projected outline of the planet, and a parametric form of that outline for each
-    time step. These are vectorized operations that are computed simulataneously across
-    all times. It then solves for the intersection points of the planet and star, and
-    if the planet is either partially or fully transiting, numerically solves the
-    required 1D integrals that leverage Green's Theorem to compute the blocked flux. The
-    flux-blocking calculations are done sequentially for each timestep using
-    ``jax.lax.scan``, which seemed to be more efficient than vectorizing again while
-    switching between braches with something like ``jax.lax.cond``. Keep these different
-    behaviors in mind when computing dense lightcurves with ~100s of thousands of time
-    steps: the first part will require enough memory to compute and store ~30 values for
-    each step, but then the actual 1D integrals will be computed sequentially.
-
-    Args:
-        state (dict):
-            A dictionary containing all of the keys that are included in an
-            :func:`OblateSystem` ``state`` attribute.
-        parameterize_with_projected_ellipse (bool):
-            If ``True``, the planet's outline will be parameterized by the projected
-            ellipse as seen by the observer. If ``False``, the planet's outline will be
-            set by the full 3D parameterization of the planet. When dealing with planets
-            that are not tidally locked and/or far from their host star and/or very
-            close to spherical, you won't be able to tell the difference between these
-            two parameterizations since the projected area won't be changing. In that
-            case, it's better to use the simpler 2D parameterization to avoid the
-            degeneracies and extra computation that can arise from the 3D
-            parameterization. This argument is static for the JIT-compiled function.
-
-    Returns:
-        Array:
-            The flux received from the star at each time step for the times included as
-            ``state["times"]``.
-
+    Previously part of the main lightcurve function, this function is now separated out
+    to avoid recomputing the same values for a RingedSystem. Used internally.
     """
 
     # array we'll modify if the planet is in transit
@@ -486,6 +414,94 @@ def lightcurve(state, parameterize_with_projected_ellipse):
     possibly_in_transit = (
         positions[0, :] ** 2 + positions[1, :] ** 2 <= (1.0 + largest_r * 1.1) ** 2
     ) * (positions[2, :] > 0)
+
+    return (
+        fluxes,
+        normalization_constant,
+        g_coeffs,
+        two,
+        para,
+        possibly_in_transit,
+        positions,
+        true_anomalies,
+    )
+
+
+@partial(
+    jax.jit,
+    static_argnames=(
+        "parameterize_with_projected_ellipse",
+        "precomputed",
+    ),
+)
+def lightcurve(state, parameterize_with_projected_ellipse, precomputed=None):
+    """
+    The main function for computing a transit light curve.
+
+    This function will return a 1-D array representing the flux recieved from the star,
+    where each entry corresponds to a time in the input `state` dictionary. It first
+    transforms the `state` into the implicit 3D surface of the planet, the implicit 2D
+    sky-projected outline of the planet, and a parametric form of that outline for each
+    time step. These are vectorized operations that are computed simulataneously across
+    all times. It then solves for the intersection points of the planet and star, and
+    if the planet is either partially or fully transiting, numerically solves the
+    required 1D integrals that leverage Green's Theorem to compute the blocked flux. The
+    flux-blocking calculations are done sequentially for each timestep using
+    ``jax.lax.scan``, which seemed to be more efficient than vectorizing again while
+    switching between braches with something like ``jax.lax.cond``. Keep these different
+    behaviors in mind when computing dense lightcurves with ~100s of thousands of time
+    steps: the first part will require enough memory to compute and store ~30 values for
+    each step, but then the actual 1D integrals will be computed sequentially.
+
+    Args:
+        state (dict):
+            A dictionary containing all of the keys that are included in an
+            :func:`OblateSystem` ``state`` attribute.
+        parameterize_with_projected_ellipse (bool):
+            If ``True``, the planet's outline will be parameterized by the projected
+            ellipse as seen by the observer. If ``False``, the planet's outline will be
+            set by the full 3D parameterization of the planet. When dealing with planets
+            that are not tidally locked and/or far from their host star and/or very
+            close to spherical, you won't be able to tell the difference between these
+            two parameterizations since the projected area won't be changing. In that
+            case, it's better to use the simpler 2D parameterization to avoid the
+            degeneracies and extra computation that can arise from the 3D
+            parameterization. This argument is static for the JIT-compiled function.
+        precomputed (tuple):
+            Either ``None`` or a tuple of precomputed values that are used to avoid
+            recomputing the same values for a RingedSystem. Used internally.
+
+    Returns:
+        Array:
+            The flux received from the star at each time step for the times included as
+            ``state["times"]``.
+
+    """
+
+    # set up everything you need for the lightcurve
+    # if/else ok because the flow depends on only a static argument
+    if precomputed is None:
+        (
+            fluxes,
+            normalization_constant,
+            g_coeffs,
+            two,
+            para,
+            possibly_in_transit,
+            positions,
+            true_anomalies,
+        ) = _lightcurve_setup(state, parameterize_with_projected_ellipse)
+    else:
+        (
+            fluxes,
+            normalization_constant,
+            g_coeffs,
+            two,
+            para,
+            possibly_in_transit,
+            positions,
+            true_anomalies,
+        ) = precomputed
 
     # if you're not on the limb, you're either fully inside or outside the star
     def not_on_limb(X):
