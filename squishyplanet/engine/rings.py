@@ -119,7 +119,7 @@ def ring_para_coeffs(a, e, f, Omega, i, omega, rRing, ring_obliq, ring_prec, **k
         / (1 + e * jnp.cos(f))
     )
 
-    return {
+    coeffs = {
         "c_x1": cx1,
         "c_x2": cx2,
         "c_x3": cx3,
@@ -127,6 +127,14 @@ def ring_para_coeffs(a, e, f, Omega, i, omega, rRing, ring_obliq, ring_prec, **k
         "c_y2": cy2,
         "c_y3": cy3,
     }
+
+    if coeffs["c_x1"].shape != coeffs["c_x3"].shape:
+        coeffs["c_x1"] = jnp.ones_like(coeffs["c_x3"]) * coeffs["c_x1"]
+        coeffs["c_x2"] = jnp.ones_like(coeffs["c_x3"]) * coeffs["c_x2"]
+        coeffs["c_y1"] = jnp.ones_like(coeffs["c_x3"]) * coeffs["c_y1"]
+        coeffs["c_y2"] = jnp.ones_like(coeffs["c_x3"]) * coeffs["c_y2"]
+
+    return coeffs
 
 
 @jax.jit
@@ -247,145 +255,93 @@ def ring_planet_intersection(
     return xs, ys
 
 
-def planet_ring_overlap(precomputed_lc_setup, ring_para, planet_two):
+def combo_lightcurve(
+    para_ring, two_ring, two_planet, these_times_have_intersections, pts
+):
+
+    # if the overlapping region is not transiting, we can just use the old lightcurve
+    # function for the ring and the planet individually. This usually means only one of
+    # the two are transiting, but you can construct a weird scenario where both are and
+    # you have two closed curves
+
+    pts_radial_dist = pts[:, 0] ** 2 + pts[:, 1] ** 2
+    # at_least_one_intersection_inside_star =
+
+    vanilla_lc_mask = possibly_in_transit | ~these_times_have_intersections
+    # curves_treated_individually
+
+    # curves_treated_individually = jax.lax.scan(
+    return jnp.ones_like(vanilla_lc_mask) * -999
+
+
+def ring_lightcurve(para_ring, two_ring, two_planet, precomputed):
     """
-    Compute the flux blocked by a region that's doubly blocked by a planet and an
-    ellipse representing the inner or outer edge of a ring.
+    Compute the light curve created by one of the ring boundaries and the planet.
 
-    This is *not* the full correction factor, just a tool used when computing it
-
-    # nope this doesn't work
-    # Logic flow. Honestly easier to read this function from bottom to top.
-    # For each timestep:
-    # - Is there a chance you're transiting?
-    #     - No:   dont_check_for_overlap, return 0.0
-    #     - Yes:  Do the planet and ring have any intersection points,
-    #             meaning there's potentially a double-counted region?
-    #             check_for_overlap
-    #             - No:   no_overlap, return 0.0
-    #             - Yes:  is any portion of that double-counted region in transit?
-    #                     overlap_potentially_transiting
-    #                     - No:   overlap_not_transiting, return 0.0
-    #                     - Yes:  how many points of intersection are inside the star?
-    #                             overlap_transiting
-    #                             - 3 or 4:  three_or_four_points_interior
-    #                                 - 3: three_points_interior, return integral
-    #                                 - 4: four_points_interior, return integral
-    #                             - 1 or 2:  one_or_two_points_interior
-    #                                 - 1: one_point_interior, return integral
-    #                                 - 2: two_points_interior, return integral
-
-
-
-
+    If the two ellipses don't intesect, since the ring is guaranteed to be larger that
+    the planet, the light curve is just that of the ring boundary and we can use the old
+    lightcurve function. If they do intersect though, we might need to trace the outline
+    of the combination of the two ellipses. That's done in combo_lightcurve.
     """
-    (
-        fluxes,
-        normalization_constant,
-        g_coeffs,
-        two,
-        para,
-        possibly_in_transit,
-        positions,
-        true_anomalies,
-    ) = precomputed_lc_setup
 
-    # def one_or_two_points_interior(args):
-    #     intersection_pts, indv_ring_para, indv_planet_two = args
-    #     pts_in_star = jnp.sum(intersection_pts[0] ** 2 + intersection_pts[1] ** 2 < 1.0)
+    def are_there_intersections(indv_para_ring, indv_two_planet):
+        pts = ring_planet_intersection(**indv_para_ring, **indv_two_planet)
+        return jnp.sum(pts[0] != 999) > 0, pts
 
-    #     def one_point_interior():
-    #         pass
+    # this will be all or none of the points in the time series, unless the projected
+    # shape of the planet+ring are evolving during the transit
+    these_times_have_intersections, pts = jax.vmap(are_there_intersections)(
+        para_ring, two_planet
+    )
+    return these_times_have_intersections, pts
 
-    #     def two_points_interior():
-    #         pass
+    # we're going to trick the old lightcurve function into only computing the fluxes
+    # for the times that don't have intersections (again, usually will be all or
+    # nothing) by modifying the possibly_in_transit mask to also block out times
+    # that have intersections
+    vanilla_lc_mask = precomputed[5] | ~these_times_have_intersections
+    # vanilla_lc_precomputed = (
+    #     "fluxes": precomputed[0],
+    #     "normalization_constant": precomputed[1],
+    #     "g_coeffs": precomputed[2],
+    #     "two": two_ring,
+    #     "para": para_ring,
+    #     "possibly_in_transit": vanilla_lc_mask,
+    #     "positions": precomputed[6],
+    #     "true_anomalies":precomputed[7],
+    # )
+    vanilla_lc_precomputed = (
+        precomputed[0],
+        precomputed[1],
+        precomputed[2],
+        two_ring,
+        para_ring,
+        vanilla_lc_mask,
+        precomputed[6],
+        precomputed[7],
+    )
+    no_interesction_lc = lightcurve(
+        {"_": 0.0},  # need to provide something, but it's not used
+        False,  # same
+        precomputed[0],
+        precomputed[1],
+        precomputed[2],
+        two_ring,
+        para_ring,
+        vanilla_lc_mask,
+        precomputed[6],
+        precomputed[7],
+    )
 
-    #     return jax.lax.cond(
-    #         pts_in_star == 1,
-    #         one_point_interior,
-    #         two_points_interior,
-    #         (intersection_pts, indv_ring_para, indv_planet_two),
-    #     )
+    intersections_lc = combo_lightcurve(
+        para_ring, two_ring, two_planet, these_times_have_intersections, pts
+    )
 
-    # def three_or_four_points_interior(args):
-    #     intersection_pts, indv_ring_para, indv_planet_two = args
-    #     pts_in_star = jnp.sum(intersection_pts[0] ** 2 + intersection_pts[1] ** 2 < 1.0)
-
-    #     def three_points_interior():
-    #         pass
-
-    #     def four_points_interior():
-    #         pass
-
-    #     return jax.lax.cond(
-    #         pts_in_star == 4,
-    #         four_points_interior,
-    #         three_points_interior,
-    #         (intersection_pts, indv_ring_para, indv_planet_two),
-    #     )
-
-    # def overlap_transiting(args):
-    #     intersection_pts, indv_ring_para, indv_planet_two = args
-    #     pts_in_star = jnp.sum(intersection_pts[0] ** 2 + intersection_pts[1] ** 2 < 1.0)
-    #     return jax.lax.cond(
-    #         pts_in_star >= 3,
-    #         three_or_four_points_interior,
-    #         one_or_two_points_interior,
-    #         (intersection_pts, indv_ring_para, indv_planet_two),
-    #     )
-
-    # def overlap_not_transiting(_):
-    #     return 0.0
-
-    # # here the overlap could be not transiting, on the limb, or fully in transit
-    # # this routes the timestep to the correct case
-    # def overlap_potentially_transiting(args):
-    #     indv_ring_para, indv_planet_two = args
-    #     intersection_pts = ring_planet_intersection(
-    #         **indv_ring_para, **sindv_planet_two
-    #     )
-    #     pts_in_star = jnp.sum(intersection_pts[0] ** 2 + intersection_pts[1] ** 2 < 1.0)
-    #     return jax.lax.cond(
-    #         pts_in_star > 0,
-    #         overlap_transiting,
-    #         overlap_not_transiting,
-    #         (intersection_pts, indv_ring_para, indv_planet_two),
-    #     )
-
-    # # I realize this is silly to have a repeat of the same function, but it's
-    # # easier to keep track in my head this way
-    # def no_overlap(_):
-    #     return 0.0
-
-    # def check_for_overlap(args):
-    #     indv_ring_para, indv_planet_two = args
-    #     intersection_pts = ring_planet_intersection(**indv_ring_para, **indv_planet_two)
-    #     there_is_overlap = jnp.sum(intersection_pts[0] == 999) < 4
-    #     return jax.lax.cond(
-    #         there_is_overlap,
-    #         overlap_potentially_transiting,
-    #         no_overlap,
-    #         (indv_ring_para, indv_planet_two),
-    #     )
-
-    # def dont_check_for_overlap(_):
-    #     return 0.0
-
-    # def scan_func(carry, scan_over):
-    #     indv_ring_para, indv_planet_two, mask = scan_over
-
-    #     return None, jax.lax.cond(
-    #         mask,
-    #         check_for_overlap,
-    #         dont_check_for_overlap,
-    #         (indv_ring_para, indv_planet_two),
-    #     )
-
-    # double_counted_flux = jax.lax.scan()
+    return no_interesction_lc + intersections_lc
 
 
 @jax.jit
-def ring_lightcurve(state):
+def ringed_system_lightcurve(state):
 
     # compute things that can be shared across all three lc integrations
     # switch the "r" to the outer ring radius, which is guaranteed to be largest,
@@ -413,26 +369,7 @@ def ring_lightcurve(state):
     three_planet = planet_3d_coeffs(**state)
     two_planet = planet_2d_coeffs(**three_planet)
 
-    # compute the lightcurves of the three ellipses separately
-    ring_outer_lc = lightcurve(
-        state=state, parameterize_with_projected_ellipse=False, precomputed=setup
-    )
-
-    ring_inner_lc = lightcurve(
-        state=state,
-        parameterize_with_projected_ellipse=False,
-        precomputed={
-            "fluxes": fluxes,
-            "normalization_constant": normalization_constant,
-            "g_coeffs": g_coeffs,
-            "two": two_ring_inner,
-            "para": para_ring_inner,
-            "possibly_in_transit": possibly_in_transit,
-            "positions": positions,
-            "true_anomalies": true_anomalies,
-        },
-    )
-
+    # get the flux blocked by the planet
     planet_lc = lightcurve(
         state=state,
         parameterize_with_projected_ellipse=False,
@@ -448,11 +385,8 @@ def ring_lightcurve(state):
         },
     )
 
-    planet_ring_inner_overlap = 0.0
-    planet_ring_outer_overlap = 0.0
+    outer_ring_lc = ring_lightcurve(para_ring_inner, two_ring_inner, two_planet, setup)
+    inner_ring_lc = combo_transit(para_ring_inner, two_ring_inner, two_planet, setup)
 
-    ring_inner_blockage = ring_inner_lc - planet_ring_inner_overlap
-    ring_outer_blockage = ring_outer_lc - planet_ring_outer_overlap
-    ring_blockage = ring_outer_blockage - ring_inner_blockage
-
-    return planet_lc + ring_blockage
+    ring_lc = outer_ring_lc - inner_ring_lc
+    return planet_lc + ring_lc

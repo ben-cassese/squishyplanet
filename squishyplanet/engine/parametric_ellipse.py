@@ -184,7 +184,7 @@ def parametric_to_poly(c_x1, c_x2, c_x3, c_y1, c_y2, c_y3):
         + (c_x1**2 + c_x2**2) * c_y3**2
     ) / (c_x2 * c_y1 - c_x1 * c_y2) ** 2
 
-    return {
+    coeffs = {
         "rho_xx": rho_xx,
         "rho_xy": rho_xy,
         "rho_x0": rho_x0,
@@ -192,6 +192,13 @@ def parametric_to_poly(c_x1, c_x2, c_x3, c_y1, c_y2, c_y3):
         "rho_y0": rho_y0,
         "rho_00": rho_00,
     }
+
+    if coeffs["rho_xx"].shape != c_x3.shape:
+        coeffs["rho_xx"] = jnp.ones_like(c_x3) * two["rho_xx"]
+        coeffs["rho_xy"] = jnp.ones_like(c_x3) * two["rho_xy"]
+        coeffs["rho_yy"] = jnp.ones_like(c_x3) * two["rho_yy"]
+
+    return coeffs
 
 
 @jax.jit

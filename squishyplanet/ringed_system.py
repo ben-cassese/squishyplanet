@@ -33,32 +33,34 @@ class RingedSystem(OblateSystem):
 
     def __init__(
         self,
-        ring_inner_edge=None,
-        ring_outer_edge=None,
+        ring_inner_r=None,
+        ring_outer_r=None,
         ring_obliq=None,
         ring_prec=None,
         **kwargs,
     ):
+        k = kwargs.copy()
+        k.pop("ring_inner_r", None)
+        k.pop("ring_outer_r", None)
+        k.pop("ring_obliq", None)
+        k.pop("ring_prec", None)
 
-        super().__init__(**kwargs)
+        super().__init__(**k)
 
-        assert ring_inner_edge is not None, "ring_inner_edge must be specified"
-        assert ring_outer_edge is not None, "ring_outer_edge must be specified"
+        assert ring_inner_r is not None, "ring_inner_r must be specified"
+        assert ring_outer_r is not None, "ring_outer_r must be specified"
         assert (ring_obliq is None and ring_prec is None) or (
             ring_obliq is not None and ring_prec is not None
         ), "both ring_obliq and ring_prec must be provided, or neither"
         assert (
-            ring_inner_edge < ring_outer_edge
-        ), "ring_inner_edge must be smaller than ring_outer_edge"
+            ring_inner_r < ring_outer_r
+        ), "ring_inner_r must be smaller than ring_outer_r"
         assert (
-            ring_inner_edge > state["r"]
-        ), "ring_inner_edge must be larger than the planet's radius"
-        assert (
-            ring_outer_edge > state["rstar"]
-        ), "ring_outer_edge must be larger than the star's radius"
+            ring_inner_r > self._state["r"]
+        ), "ring_inner_r must be larger than the planet's radius"
 
-        self._state["ring_inner_r"] = ring_inner_edge
-        self._state["ring_outer_r"] = ring_outer_edge
+        self._state["ring_inner_r"] = ring_inner_r
+        self._state["ring_outer_r"] = ring_outer_r
         if ring_obliq is None and ring_prec is None:
             ring_obliq = self._state["obliq"]
             ring_prec = self._state["prec"]

@@ -28,12 +28,12 @@ def is_within_ellipse(rho_coeffs, xs, ys):
 
 
 @jax.jit
-def measure_overlap_area(rho_coeffs1, rho_coeffs2, num_samples=10000):
-    """Measure the area of overlap between two ellipses within the unit disk."""
+def measure_blocked_area(rho_coeffs1, rho_coeffs2, num_samples=10000):
+    """Measure the area blocked by a pair of ellipses."""
     xs, ys = sample_points_in_unit_disk(num_samples)
     within_ellipse1 = is_within_ellipse(rho_coeffs1, xs, ys)
     within_ellipse2 = is_within_ellipse(rho_coeffs2, xs, ys)
-    overlap_count = jnp.sum(within_ellipse1 & within_ellipse2)
+    overlap_count = jnp.sum(within_ellipse1 | within_ellipse2)
     area_unit_disk = jnp.pi
     overlap_area = (overlap_count / num_samples) * area_unit_disk
     return overlap_area

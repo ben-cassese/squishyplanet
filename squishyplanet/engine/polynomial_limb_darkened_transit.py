@@ -415,26 +415,57 @@ def _lightcurve_setup(state, parameterize_with_projected_ellipse):
         positions[0, :] ** 2 + positions[1, :] ** 2 <= (1.0 + largest_r * 1.1) ** 2
     ) * (positions[2, :] > 0)
 
-    return {
-        "fluxes": fluxes,
-        "normalization_constant": normalization_constant,
-        "g_coeffs": g_coeffs,
-        "two": two,
-        "para": para,
-        "possibly_in_transit": possibly_in_transit,
-        "positions": positions,
-        "true_anomalies": true_anomalies,
-    }
+    # if prec isn't the same length as f, we've actually made
+    # it to this point with some of the three, two vectors being
+    # the same length as f, and the others are just scalars
+    # if prec isn't changing, the planet's orientation isn't either,
+    # so none of your quadratic terms vary
+    if state["prec"].shape != true_anomalies.shape:
+        two["rho_xx"] = jnp.ones_like(state["f"]) * two["rho_xx"]
+        two["rho_xy"] = jnp.ones_like(state["f"]) * two["rho_xy"]
+        two["rho_yy"] = jnp.ones_like(state["f"]) * two["rho_yy"]
+
+    # return {
+    #     "fluxes": fluxes,
+    #     "normalization_constant": normalization_constant,
+    #     "g_coeffs": g_coeffs,
+    #     "two": two,
+    #     "para": para,
+    #     "possibly_in_transit": possibly_in_transit,
+    #     "positions": positions,
+    #     "true_anomalies": true_anomalies,
+    # }
+    return (
+        fluxes,
+        normalization_constant,
+        g_coeffs,
+        two,
+        para,
+        possibly_in_transit,
+        positions,
+        true_anomalies,
+    )
 
 
 @partial(
     jax.jit,
     static_argnames=(
         "parameterize_with_projected_ellipse",
-        "precomputed",
+        # "precomputed",
     ),
 )
-def lightcurve(state, parameterize_with_projected_ellipse, precomputed=None):
+def lightcurve(
+    state,
+    parameterize_with_projected_ellipse,
+    fluxes=None,
+    normalization_constant=None,
+    g_coeffs=None,
+    two=None,
+    para=None,
+    possibly_in_transit=None,
+    positions=None,
+    true_anomalies=None,
+):
     """
     The main function for computing a transit light curve.
 
@@ -480,26 +511,28 @@ def lightcurve(state, parameterize_with_projected_ellipse, precomputed=None):
 
     # set up everything you need for the lightcurve
     # if/else ok because the flow depends on only a static argument
-    if precomputed is None:
+    if fluxes is None:
         d = _lightcurve_setup(state, parameterize_with_projected_ellipse)
-        fluxes = d["fluxes"]
-        normalization_constant = d["normalization_constant"]
-        g_coeffs = d["g_coeffs"]
-        two = d["two"]
-        para = d["para"]
-        possibly_in_transit = d["possibly_in_transit"]
-        positions = d["positions"]
-        true_anomalies = d["true_anomalies"]
+        # fluxes = d["fluxes"]
+        # normalization_constant = d["normalization_constant"]
+        # g_coeffs = d["g_coeffs"]
+        # two = d["two"]
+        # para = d["para"]
+        # possibly_in_transit = d["possibly_in_transit"]
+        # positions = d["positions"]
+        # true_anomalies = d["true_anomalies"]
+        fluxes, normalization_constant, g_coeffs, two, para, possibly_in_transit, positions, true_an
 
-    else:
-        fluxes = precomputed["fluxes"]
-        normalization_constant = precomputed["normalization_constant"]
-        g_coeffs = precomputed["g_coeffs"]
-        two = precomputed["two"]
-        para = precomputed["para"]
-        possibly_in_transit = precomputed["possibly_in_transit"]
-        positions = precomputed["positions"]
-        true_anomalies = precomputed["true_anomalies"]
+    # else:
+    #     # fluxes = precomputed["fluxes"]
+    #     # normalization_constant = precomputed["normalization_constant"]
+    #     # g_coeffs = precomputed["g_coeffs"]
+    #     # two = precomputed["two"]
+    #     # para = precomputed["para"]
+    #     # possibly_in_transit = precomputed["possibly_in_transit"]
+    #     # positions = precomputed["positions"]
+    #     # true_anomalies = precomputed["true_anomalies"]
+    #     fluxes, normalization_constant, g_coeffs, two, para, possibly_in_transit, positions, true_an
 
     # if you're not on the limb, you're either fully inside or outside the star
     def not_on_limb(X):
@@ -691,16 +724,6 @@ def lightcurve(state, parameterize_with_projected_ellipse, precomputed=None):
         return None, jax.lax.cond(
             mask, transiting, not_transiting, (indv_para, indv_two)
         )
-
-    # if prec isn't the same length as f, we've actually made
-    # it to this point with some of the three, two vectors being
-    # the same length as f, and the others are just scalars
-    # if prec isn't changing, the planet's orientation isn't either,
-    # so none of your quadratic terms vary
-    if state["prec"].shape != true_anomalies.shape:
-        two["rho_xx"] = jnp.ones_like(state["f"]) * two["rho_xx"]
-        two["rho_xy"] = jnp.ones_like(state["f"]) * two["rho_xy"]
-        two["rho_yy"] = jnp.ones_like(state["f"]) * two["rho_yy"]
 
     transit_fluxes = jax.lax.scan(
         scan_func, None, (para, two, possibly_in_transit), None
