@@ -253,6 +253,31 @@ def planet_ring_overlap(precomputed_lc_setup, ring_para, planet_two):
     ellipse representing the inner or outer edge of a ring.
 
     This is *not* the full correction factor, just a tool used when computing it
+
+    # nope this doesn't work
+    # Logic flow. Honestly easier to read this function from bottom to top.
+    # For each timestep:
+    # - Is there a chance you're transiting?
+    #     - No:   dont_check_for_overlap, return 0.0
+    #     - Yes:  Do the planet and ring have any intersection points,
+    #             meaning there's potentially a double-counted region?
+    #             check_for_overlap
+    #             - No:   no_overlap, return 0.0
+    #             - Yes:  is any portion of that double-counted region in transit?
+    #                     overlap_potentially_transiting
+    #                     - No:   overlap_not_transiting, return 0.0
+    #                     - Yes:  how many points of intersection are inside the star?
+    #                             overlap_transiting
+    #                             - 3 or 4:  three_or_four_points_interior
+    #                                 - 3: three_points_interior, return integral
+    #                                 - 4: four_points_interior, return integral
+    #                             - 1 or 2:  one_or_two_points_interior
+    #                                 - 1: one_point_interior, return integral
+    #                                 - 2: two_points_interior, return integral
+
+
+
+
     """
     (
         fluxes,
@@ -265,36 +290,98 @@ def planet_ring_overlap(precomputed_lc_setup, ring_para, planet_two):
         true_anomalies,
     ) = precomputed_lc_setup
 
-    # three possible cases:
-    # 1) the overlapping portion is not transiting
-    # 2) the overlaping portion is on the limb
-    # 3) the overlapping portion is on fully on the disk
+    # def one_or_two_points_interior(args):
+    #     intersection_pts, indv_ring_para, indv_planet_two = args
+    #     pts_in_star = jnp.sum(intersection_pts[0] ** 2 + intersection_pts[1] ** 2 < 1.0)
 
-    def overlap_fully_transiting():
-        pass
+    #     def one_point_interior():
+    #         pass
 
-    def overlap_on_limb():
-        pass
+    #     def two_points_interior():
+    #         pass
 
-    def overlap_transiting(single_time_para, single_time_ring_two):
-        intersection_pts = ring_planet_intersection(
-            **single_time_para, **single_time_ring_two
-        )
-        pass
+    #     return jax.lax.cond(
+    #         pts_in_star == 1,
+    #         one_point_interior,
+    #         two_points_interior,
+    #         (intersection_pts, indv_ring_para, indv_planet_two),
+    #     )
 
-    def overlap_not_transiting():
-        return 0.0
+    # def three_or_four_points_interior(args):
+    #     intersection_pts, indv_ring_para, indv_planet_two = args
+    #     pts_in_star = jnp.sum(intersection_pts[0] ** 2 + intersection_pts[1] ** 2 < 1.0)
 
-    def scan_func(carry, scan_over):
-        indv_ring_para, indv_planet_two, mask = scan_over
-        return None, jax.lax.cond(
-            mask,
-            overlap_transiting,
-            overlap_not_transiting,
-            (indv_ring_para, indv_planet_two),
-        )
+    #     def three_points_interior():
+    #         pass
 
-    double_counted_flux = jax.lax.scan()
+    #     def four_points_interior():
+    #         pass
+
+    #     return jax.lax.cond(
+    #         pts_in_star == 4,
+    #         four_points_interior,
+    #         three_points_interior,
+    #         (intersection_pts, indv_ring_para, indv_planet_two),
+    #     )
+
+    # def overlap_transiting(args):
+    #     intersection_pts, indv_ring_para, indv_planet_two = args
+    #     pts_in_star = jnp.sum(intersection_pts[0] ** 2 + intersection_pts[1] ** 2 < 1.0)
+    #     return jax.lax.cond(
+    #         pts_in_star >= 3,
+    #         three_or_four_points_interior,
+    #         one_or_two_points_interior,
+    #         (intersection_pts, indv_ring_para, indv_planet_two),
+    #     )
+
+    # def overlap_not_transiting(_):
+    #     return 0.0
+
+    # # here the overlap could be not transiting, on the limb, or fully in transit
+    # # this routes the timestep to the correct case
+    # def overlap_potentially_transiting(args):
+    #     indv_ring_para, indv_planet_two = args
+    #     intersection_pts = ring_planet_intersection(
+    #         **indv_ring_para, **sindv_planet_two
+    #     )
+    #     pts_in_star = jnp.sum(intersection_pts[0] ** 2 + intersection_pts[1] ** 2 < 1.0)
+    #     return jax.lax.cond(
+    #         pts_in_star > 0,
+    #         overlap_transiting,
+    #         overlap_not_transiting,
+    #         (intersection_pts, indv_ring_para, indv_planet_two),
+    #     )
+
+    # # I realize this is silly to have a repeat of the same function, but it's
+    # # easier to keep track in my head this way
+    # def no_overlap(_):
+    #     return 0.0
+
+    # def check_for_overlap(args):
+    #     indv_ring_para, indv_planet_two = args
+    #     intersection_pts = ring_planet_intersection(**indv_ring_para, **indv_planet_two)
+    #     there_is_overlap = jnp.sum(intersection_pts[0] == 999) < 4
+    #     return jax.lax.cond(
+    #         there_is_overlap,
+    #         overlap_potentially_transiting,
+    #         no_overlap,
+    #         (indv_ring_para, indv_planet_two),
+    #     )
+
+    # def dont_check_for_overlap(_):
+    #     return 0.0
+
+    # def scan_func(carry, scan_over):
+    #     indv_ring_para, indv_planet_two, mask = scan_over
+
+    #     return None, jax.lax.cond(
+    #         mask,
+    #         check_for_overlap,
+    #         dont_check_for_overlap,
+    #         (indv_ring_para, indv_planet_two),
+    #     )
+
+    # double_counted_flux = jax.lax.scan()
 
 
 @jax.jit
