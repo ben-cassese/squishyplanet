@@ -425,46 +425,36 @@ def _lightcurve_setup(state, parameterize_with_projected_ellipse):
         two["rho_xy"] = jnp.ones_like(state["f"]) * two["rho_xy"]
         two["rho_yy"] = jnp.ones_like(state["f"]) * two["rho_yy"]
 
-    # return {
-    #     "fluxes": fluxes,
-    #     "normalization_constant": normalization_constant,
-    #     "g_coeffs": g_coeffs,
-    #     "two": two,
-    #     "para": para,
-    #     "possibly_in_transit": possibly_in_transit,
-    #     "positions": positions,
-    #     "true_anomalies": true_anomalies,
-    # }
-    return (
-        fluxes,
-        normalization_constant,
-        g_coeffs,
-        two,
-        para,
-        possibly_in_transit,
-        positions,
-        true_anomalies,
-    )
+    # return (
+    #     fluxes,
+    #     normalization_constant,
+    #     g_coeffs,
+    #     two,
+    #     para,
+    #     possibly_in_transit,
+    #     positions,
+    #     true_anomalies,
+    # )
+    return {
+        "fluxes": fluxes,
+        "normalization_constant": normalization_constant,
+        "g_coeffs": g_coeffs,
+        "two": two,
+        "para": para,
+        "possibly_in_transit": possibly_in_transit,
+        "positions": positions,
+        "true_anomalies": true_anomalies,
+    }
 
 
 @partial(
     jax.jit,
-    static_argnames=(
-        "parameterize_with_projected_ellipse",
-        # "precomputed",
-    ),
+    static_argnames=("parameterize_with_projected_ellipse",),
 )
 def lightcurve(
     state,
     parameterize_with_projected_ellipse,
-    fluxes=None,
-    normalization_constant=None,
-    g_coeffs=None,
-    two=None,
-    para=None,
-    possibly_in_transit=None,
-    positions=None,
-    true_anomalies=None,
+    precomputed=None,
 ):
     """
     The main function for computing a transit light curve.
@@ -499,7 +489,7 @@ def lightcurve(
             degeneracies and extra computation that can arise from the 3D
             parameterization. This argument is static for the JIT-compiled function.
         precomputed (tuple):
-            Either ``None`` or a tuple of precomputed values that are used to avoid
+            Either ``None`` or a dict of precomputed values that are used to avoid
             recomputing the same values for a RingedSystem. Used internally.
 
     Returns:
@@ -511,28 +501,26 @@ def lightcurve(
 
     # set up everything you need for the lightcurve
     # if/else ok because the flow depends on only a static argument
-    if fluxes is None:
+    if precomputed is None:
         d = _lightcurve_setup(state, parameterize_with_projected_ellipse)
-        # fluxes = d["fluxes"]
-        # normalization_constant = d["normalization_constant"]
-        # g_coeffs = d["g_coeffs"]
-        # two = d["two"]
-        # para = d["para"]
-        # possibly_in_transit = d["possibly_in_transit"]
-        # positions = d["positions"]
-        # true_anomalies = d["true_anomalies"]
-        fluxes, normalization_constant, g_coeffs, two, para, possibly_in_transit, positions, true_an
+        fluxes = d["fluxes"]
+        normalization_constant = d["normalization_constant"]
+        g_coeffs = d["g_coeffs"]
+        two = d["two"]
+        para = d["para"]
+        possibly_in_transit = d["possibly_in_transit"]
+        positions = d["positions"]
+        true_anomalies = d["true_anomalies"]
 
-    # else:
-    #     # fluxes = precomputed["fluxes"]
-    #     # normalization_constant = precomputed["normalization_constant"]
-    #     # g_coeffs = precomputed["g_coeffs"]
-    #     # two = precomputed["two"]
-    #     # para = precomputed["para"]
-    #     # possibly_in_transit = precomputed["possibly_in_transit"]
-    #     # positions = precomputed["positions"]
-    #     # true_anomalies = precomputed["true_anomalies"]
-    #     fluxes, normalization_constant, g_coeffs, two, para, possibly_in_transit, positions, true_an
+    else:
+        fluxes = precomputed["fluxes"]
+        normalization_constant = precomputed["normalization_constant"]
+        g_coeffs = precomputed["g_coeffs"]
+        two = precomputed["two"]
+        para = precomputed["para"]
+        possibly_in_transit = precomputed["possibly_in_transit"]
+        positions = precomputed["positions"]
+        true_anomalies = precomputed["true_anomalies"]
 
     # if you're not on the limb, you're either fully inside or outside the star
     def not_on_limb(X):
