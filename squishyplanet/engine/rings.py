@@ -276,65 +276,76 @@ def combo_lightcurve(
     # you have two closed curves
     # jax.debug.print("pts radial dist: {x}", x=pts[0]**2 + pts[1]**2)
     # jax.debug.print("inside star? {x}", x=jnp.sum(pts[0]**2 + pts[1]**2 < 1, axis=1))
-    at_least_one_intersection_inside_star = (
-        jnp.sum(pts[0] ** 2 + pts[1] ** 2 < 1, axis=1) > 0
-    )
+    # at_least_one_intersection_inside_star = (
+    #     jnp.sum(pts[0] ** 2 + pts[1] ** 2 < 1, axis=1) > 0
+    # )
     # jax.debug.print("at_least_one_intersection_inside_star: {x}", x=at_least_one_intersection_inside_star)
 
     # first, figure out where the overlapping region is not transiting.
     # at these times, get the lcs individually. One will probably be zero.
-    mask = precomputed["possibly_in_transit"]
+    # mask = precomputed["possibly_in_transit"]
     # jax.debug.print("mask: {x}", x=mask)
-    mask *= these_times_have_intersections
+    # mask *= these_times_have_intersections
     # jax.debug.print("mask: {x}", x=mask)
-    mask *= ~at_least_one_intersection_inside_star
+    # mask *= ~at_least_one_intersection_inside_star
     # jax.debug.print("mask: {x}", x=mask)
 
     # jax.debug.print("possibly_in_transit: {x}", x=precomputed["possibly_in_transit"])
     # jax.debug.print("these_times_have_intersections: {x}", x=these_times_have_intersections)
     # jax.debug.print("at_least_one_intersection_inside_star: {x}", x=at_least_one_intersection_inside_star)
     # jax.debug.print("mask: {x}", x=mask)
-    jax.debug.print(
-        "mask of times when could be transiting, there are intersections, but not in the star, so indv lcs: {x}",
-        x=mask,
-    )
-    lone_planet_lc = (
-        lightcurve(
-            {"_": 0.0},  # need to provide something, but it's not used
-            False,  # same
-            {
-                "fluxes": precomputed["fluxes"],
-                "normalization_constant": precomputed["normalization_constant"],
-                "g_coeffs": precomputed["g_coeffs"],
-                "two": two_planet,
-                "para": para_planet,
-                "possibly_in_transit": mask,
-                "positions": precomputed["positions"],
-                "true_anomalies": precomputed["true_anomalies"],
-            },
-        )
-        - 1.0
-    )
-    lone_ring_lc = (
-        lightcurve(
-            {"_": 0.0},  # need to provide something, but it's not used
-            False,  # same
-            {
-                "fluxes": precomputed["fluxes"],
-                "normalization_constant": precomputed["normalization_constant"],
-                "g_coeffs": precomputed["g_coeffs"],
-                "two": two_ring,
-                "para": para_ring,
-                "possibly_in_transit": mask,
-                "positions": precomputed["positions"],
-                "true_anomalies": precomputed["true_anomalies"],
-            },
-        )
-        - 1.0
-    )
-    lone_curve_contributions = lone_planet_lc + lone_ring_lc
-    jax.debug.print("lone_curve_contributions: {x}", x=lone_curve_contributions)
 
+    ####### damn wait, this one is invalid. can still have overlap even if the intersections
+    ####### aren't inside the star.
+
+    # jax.debug.print(
+    #     "mask of times when could be transiting, there are intersections, but not in the star, so indv lcs: {x}",
+    #     x=mask,
+    # )
+    # lone_planet_lc = (
+    #     lightcurve(
+    #         {"_": 0.0},  # need to provide something, but it's not used
+    #         False,  # same
+    #         {
+    #             "fluxes": precomputed["fluxes"],
+    #             "normalization_constant": precomputed["normalization_constant"],
+    #             "g_coeffs": precomputed["g_coeffs"],
+    #             "two": two_planet,
+    #             "para": para_planet,
+    #             "possibly_in_transit": mask,
+    #             "positions": precomputed["positions"],
+    #             "true_anomalies": precomputed["true_anomalies"],
+    #         },
+    #     )
+    #     - 1.0
+    # )
+    # lone_ring_lc = (
+    #     lightcurve(
+    #         {"_": 0.0},  # need to provide something, but it's not used
+    #         False,  # same
+    #         {
+    #             "fluxes": precomputed["fluxes"],
+    #             "normalization_constant": precomputed["normalization_constant"],
+    #             "g_coeffs": precomputed["g_coeffs"],
+    #             "two": two_ring,
+    #             "para": para_ring,
+    #             "possibly_in_transit": mask,
+    #             "positions": precomputed["positions"],
+    #             "true_anomalies": precomputed["true_anomalies"],
+    #         },
+    #     )
+    #     - 1.0
+    # )
+    # lone_curve_contributions = lone_planet_lc + lone_ring_lc
+    # jax.debug.print("lone_curve_contributions: {x}", x=lone_curve_contributions)
+
+    # mask = precomputed["possibly_in_transit"]
+    # mask *= these_times_have_intersections
+    # mask *= at_least_one_intersection_inside_star
+    # jax.debug.print(
+    #     "mask of times when could be transiting, there are intersections, and in the star, so combo lc: {x}",
+    #     x=mask,
+    # )
     # simultaneous_transit_contributions = ouch()
 
 
