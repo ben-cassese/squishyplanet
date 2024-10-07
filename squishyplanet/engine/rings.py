@@ -14,6 +14,9 @@ from squishyplanet.engine.polynomial_limb_darkened_transit import (
     _lightcurve_setup,
     lightcurve,
 )
+from squishyplanet.engine.polynomial_limb_darkened_transit import (
+    _single_intersection_points as star_intersection_points,
+)
 
 
 @jax.jit
@@ -255,218 +258,303 @@ def ring_planet_intersection(
     return xs, ys
 
 
-def transit_of_region_with_overlap():
-    pass
-
-
-def combo_lightcurve(
-    para_ring,
-    two_ring,
-    para_planet,
-    two_planet,
-    these_times_have_intersections,
-    pts,
-    precomputed,
+def break_into_component_curves(
+    ring_inner_para, ring_outer_para, planet_two, planet_para
 ):
-    jax.debug.print("beginning combo_lightcurve")
 
-    # if the overlapping region is not transiting, we can just use the old lightcurve
-    # function for the ring and the planet individually. This usually means only one of
-    # the two are transiting, but you can construct a weird scenario where both are and
-    # you have two closed curves
-    # jax.debug.print("pts radial dist: {x}", x=pts[0]**2 + pts[1]**2)
-    # jax.debug.print("inside star? {x}", x=jnp.sum(pts[0]**2 + pts[1]**2 < 1, axis=1))
-    # at_least_one_intersection_inside_star = (
-    #     jnp.sum(pts[0] ** 2 + pts[1] ** 2 < 1, axis=1) > 0
-    # )
-    # jax.debug.print("at_least_one_intersection_inside_star: {x}", x=at_least_one_intersection_inside_star)
-
-    # first, figure out where the overlapping region is not transiting.
-    # at these times, get the lcs individually. One will probably be zero.
-    # mask = precomputed["possibly_in_transit"]
-    # jax.debug.print("mask: {x}", x=mask)
-    # mask *= these_times_have_intersections
-    # jax.debug.print("mask: {x}", x=mask)
-    # mask *= ~at_least_one_intersection_inside_star
-    # jax.debug.print("mask: {x}", x=mask)
-
-    # jax.debug.print("possibly_in_transit: {x}", x=precomputed["possibly_in_transit"])
-    # jax.debug.print("these_times_have_intersections: {x}", x=these_times_have_intersections)
-    # jax.debug.print("at_least_one_intersection_inside_star: {x}", x=at_least_one_intersection_inside_star)
-    # jax.debug.print("mask: {x}", x=mask)
-
-    ####### damn wait, this one is invalid. can still have overlap even if the intersections
-    ####### aren't inside the star.
-
-    # jax.debug.print(
-    #     "mask of times when could be transiting, there are intersections, but not in the star, so indv lcs: {x}",
-    #     x=mask,
-    # )
-    # lone_planet_lc = (
-    #     lightcurve(
-    #         {"_": 0.0},  # need to provide something, but it's not used
-    #         False,  # same
-    #         {
-    #             "fluxes": precomputed["fluxes"],
-    #             "normalization_constant": precomputed["normalization_constant"],
-    #             "g_coeffs": precomputed["g_coeffs"],
-    #             "two": two_planet,
-    #             "para": para_planet,
-    #             "possibly_in_transit": mask,
-    #             "positions": precomputed["positions"],
-    #             "true_anomalies": precomputed["true_anomalies"],
-    #         },
-    #     )
-    #     - 1.0
-    # )
-    # lone_ring_lc = (
-    #     lightcurve(
-    #         {"_": 0.0},  # need to provide something, but it's not used
-    #         False,  # same
-    #         {
-    #             "fluxes": precomputed["fluxes"],
-    #             "normalization_constant": precomputed["normalization_constant"],
-    #             "g_coeffs": precomputed["g_coeffs"],
-    #             "two": two_ring,
-    #             "para": para_ring,
-    #             "possibly_in_transit": mask,
-    #             "positions": precomputed["positions"],
-    #             "true_anomalies": precomputed["true_anomalies"],
-    #         },
-    #     )
-    #     - 1.0
-    # )
-    # lone_curve_contributions = lone_planet_lc + lone_ring_lc
-    # jax.debug.print("lone_curve_contributions: {x}", x=lone_curve_contributions)
-
-    # mask = precomputed["possibly_in_transit"]
-    # mask *= these_times_have_intersections
-    # mask *= at_least_one_intersection_inside_star
-    # jax.debug.print(
-    #     "mask of times when could be transiting, there are intersections, and in the star, so combo lc: {x}",
-    #     x=mask,
-    # )
-    # simultaneous_transit_contributions = ouch()
-
-
-def ring_lightcurve(para_ring, two_ring, para_planet, two_planet, precomputed):
-    """
-    Compute the light curve created by one of the ring boundaries and the planet.
-
-    If the two ellipses don't intesect, since the ring is guaranteed to be larger that
-    the planet, the light curve is just that of the ring boundary and we can use the old
-    lightcurve function. If they do intersect though, we might need to trace the outline
-    of the combination of the two ellipses. That's done in combo_lightcurve.
-    """
-
-    def are_there_intersections(indv_para_ring, indv_two_planet):
-        pts = ring_planet_intersection(**indv_para_ring, **indv_two_planet)
-        return jnp.sum(pts[0] != 999) > 0, pts
-
-    # this will be all or none of the points in the time series, unless the projected
-    # shape of the planet+ring are evolving during the transit
-    these_times_have_intersections, pts = jax.vmap(are_there_intersections)(
-        para_ring, two_planet
-    )
-    # return these_times_have_intersections, pts
-
-    # we're going to trick the old lightcurve function into only computing the fluxes
-    # for the times that don't have intersections (again, usually will be all or
-    # nothing) by modifying the possibly_in_transit mask to also block out times
-    # that have intersections
-    vanilla_lc_mask = ~these_times_have_intersections
-    vanillia_lc_mask = vanilla_lc_mask * precomputed["possibly_in_transit"]
-    jax.debug.print(
-        "mask of times when could be transiting, but no intersections, so indv ring-only lc: {x}",
-        x=vanilla_lc_mask,
-    )
-    vanilla_lc_precomputed = {
-        "fluxes": precomputed["fluxes"],
-        "normalization_constant": precomputed["normalization_constant"],
-        "g_coeffs": precomputed["g_coeffs"],
-        "two": two_ring,
-        "para": para_ring,
-        "possibly_in_transit": vanilla_lc_mask,
-        "positions": precomputed["positions"],
-        "true_anomalies": precomputed["true_anomalies"],
+    # define a circular star just to reuse the intersection function here
+    star_two = {
+        "rho_xx": 1.0,
+        "rho_xy": 0.0,
+        "rho_x0": 0.0,
+        "rho_yy": 1.0,
+        "rho_y0": 0.0,
+        "rho_00": 0.0,
+    }
+    star_para = {
+        "c_x1": 1.0,
+        "c_x2": 0.0,
+        "c_x3": 0.0,
+        "c_y1": 0.0,
+        "c_y2": 1.0,
+        "c_y3": 0.0,
     }
 
-    # temporarily commenting out to speed testing of combo_lightcurve
-    no_interesction_lc = (
-        lightcurve(
-            {"_": 0.0},  # need to provide something, but it's not used
-            False,  # same
-            vanilla_lc_precomputed,
-        )
-        - 1.0
+    ###
+    # first, get the x,y coords of all the intersection points
+    ###
+
+    # the inner ring could intersect the star and/or the planet
+    ring_inner_planet_intersections = ring_planet_intersection(
+        **ring_inner_para, **planet_two
     )
-    jax.debug.print("no_interesctions_lc: {x}", x=no_interesction_lc)
-
-    intersections_lc = combo_lightcurve(
-        para_ring,
-        two_ring,
-        para_planet,
-        two_planet,
-        these_times_have_intersections,
-        pts,
-        precomputed,
-    )
-    jax.debug.print("intersections_lc: {x}", x=intersections_lc)
-
-    return no_interesction_lc + intersections_lc
-
-
-@jax.jit
-def ringed_system_lightcurve(state):
-
-    # compute things that can be shared across all three lc integrations
-    # switch the "r" to the outer ring radius, which is guaranteed to be largest,
-    # when making the mask if it's potentially in transit
-    _state = state.copy()
-    _state["r"] = state["ring_outer_r"]
-    _state["obliq"] = state["ring_obliq"]
-    _state["prec"] = state["ring_prec"]
-    setup = _lightcurve_setup(_state, parameterize_with_projected_ellipse=False)
-    normalization_constant = setup["normalization_constant"]
-    g_coeffs = setup["g_coeffs"]
-    possibly_in_transit = setup["possibly_in_transit"]
-    positions = setup["positions"]
-    true_anomalies = setup["true_anomalies"]
-
-    # these two are specific to the outer ring
-    two_ring_outer = setup["two"]
-    para_ring_outer = setup["para"]
-
-    # get the coeffs of the inner ring
-    para_ring_inner = ring_para_coeffs(**state, rRing=state["ring_inner_r"])
-    two_ring_inner = poly_to_parametric(**para_ring_inner)
-
-    # get the coeffs of the planet
-    three_planet = planet_3d_coeffs(**state)
-    two_planet = planet_2d_coeffs(**three_planet)
-
-    # get the flux blocked by the planet
-    planet_lc = lightcurve(
-        state=state,
-        parameterize_with_projected_ellipse=False,
-        precomputed={
-            "fluxes": fluxes,
-            "normalization_constant": normalization_constant,
-            "g_coeffs": g_coeffs,
-            "two": two_planet,
-            "para": three_planet,
-            "possibly_in_transit": possibly_in_transit,
-            "positions": positions,
-            "true_anomalies": true_anomalies,
-        },
+    ring_inner_star_intersections = ring_planet_intersection(
+        **ring_inner_para, **star_two
     )
 
-    outer_ring_lc = ring_lightcurve(
-        para_ring_inner, two_ring_inner, para_planet, two_planet, setup
+    # the outer ring could intersect the star and/or the planet
+    ring_outer_planet_intersections = ring_planet_intersection(
+        **ring_outer_para, **planet_two
     )
-    inner_ring_lc = combo_transit(
-        para_ring_inner, two_ring_inner, para_planet, two_planet, setup
+    ring_outer_star_intersections = ring_planet_intersection(
+        **ring_outer_para, **star_two
     )
 
-    ring_lc = outer_ring_lc - inner_ring_lc
-    return planet_lc + ring_lc
+    # the planet could separately overlap with the star
+    planet_star_intersections = ring_planet_intersection(**planet_para, **star_two)
+
+    # return (
+    #     ring_inner_planet_intersections,
+    #     ring_inner_star_intersections,
+    #     ring_outer_planet_intersections,
+    #     ring_outer_star_intersections,
+    #     planet_star_intersections,
+    # )
+
+    ###
+    # now convert those x,y coords to parametric angles
+    ###
+    def process_alphas(alphas, xs):
+        alphas = jnp.where(xs != 999, alphas, 2 * jnp.pi)
+        alphas = jnp.where(alphas < 0, alphas + 2 * jnp.pi, alphas)
+        alphas = jnp.where(alphas > 2 * jnp.pi, alphas - 2 * jnp.pi, alphas)
+        return alphas
+
+    ring_inner_planet_alphas = cartesian_intersection_to_parametric_angle(
+        *ring_inner_planet_intersections, **ring_inner_para
+    )
+    ring_inner_star_alphas = cartesian_intersection_to_parametric_angle(
+        *ring_inner_star_intersections, **ring_inner_para
+    )
+
+    ring_outer_planet_alphas = cartesian_intersection_to_parametric_angle(
+        *ring_outer_planet_intersections, **ring_outer_para
+    )
+    ring_outer_star_alphas = cartesian_intersection_to_parametric_angle(
+        *ring_outer_star_intersections, **ring_outer_para
+    )
+
+    planet_ring_inner_alphas = cartesian_intersection_to_parametric_angle(
+        *ring_inner_planet_intersections, **planet_para
+    )
+    planet_ring_outer_alphas = cartesian_intersection_to_parametric_angle(
+        *ring_outer_planet_intersections, **planet_para
+    )
+    planet_star_alphas = cartesian_intersection_to_parametric_angle(
+        *planet_star_intersections, **planet_para
+    )
+
+    star_ring_inner_alphas = cartesian_intersection_to_parametric_angle(
+        *ring_inner_star_intersections, **star_para
+    )
+    star_ring_outer_alphas = cartesian_intersection_to_parametric_angle(
+        *ring_outer_star_intersections, **star_para
+    )
+    star_planet_alphas = cartesian_intersection_to_parametric_angle(
+        *planet_star_intersections, **star_para
+    )
+
+    ###
+    # group the intersections along each curve together
+    ###
+    ring_inner_alphas = jnp.concatenate(
+        [ring_inner_planet_alphas, ring_inner_star_alphas]
+    )
+    ring_outer_alphas = jnp.concatenate(
+        [ring_outer_planet_alphas, ring_outer_star_alphas]
+    )
+    planet_alphas = jnp.concatenate(
+        [planet_ring_inner_alphas, planet_ring_outer_alphas, planet_star_alphas]
+    )
+    star_alphas = jnp.concatenate(
+        [star_ring_inner_alphas, star_ring_outer_alphas, star_planet_alphas]
+    )
+
+    ###
+    # post-process the alphas
+    ###
+    ring_inner_alphas = process_alphas(
+        ring_inner_alphas,
+        jnp.concatenate(
+            [ring_inner_planet_intersections[0], ring_inner_star_intersections[0]]
+        ),
+    )
+    ring_outer_alphas = process_alphas(
+        ring_outer_alphas,
+        jnp.concatenate(
+            [ring_outer_planet_intersections[0], ring_outer_star_intersections[0]]
+        ),
+    )
+
+    planet_alphas = process_alphas(
+        planet_alphas,
+        jnp.concatenate(
+            [
+                ring_inner_planet_intersections[0],
+                ring_outer_planet_intersections[0],
+                planet_star_intersections[0],
+            ],
+        ),
+    )
+
+    star_alphas = process_alphas(
+        star_alphas,
+        jnp.concatenate(
+            [
+                ring_inner_star_intersections[0],
+                ring_outer_star_intersections[0],
+                planet_star_intersections[0],
+            ],
+        ),
+    )
+
+    return ring_inner_alphas, ring_outer_alphas, planet_alphas, star_alphas
+
+
+# def combo_lightcurve(
+#     para_ring,
+#     two_ring,
+#     para_planet,
+#     two_planet,
+#     these_times_have_intersections,
+#     pts,
+#     precomputed,
+# ):
+#     jax.debug.print("beginning combo_lightcurve")
+
+#     # ok so the whole see-if-intersections-are-inside-the-star thing doesn't work
+#     # need to think of another way to check for the two ellipses transiting but not
+#     # overlapping, ie two closed curves
+
+#     star_planet_intersections = jax.vmap(star_intersection_points)(**two_planet)
+#     jax.debug.print("star_planet_intersections: {x}", x=star_planet_intersections)
+#     star_ring_intersections = jax.vmap(star_intersection_points)(**two_ring)
+#     jax.debug.print("star_ring_intersections: {x}", x=star_ring_intersections)
+#     ring_planet_intersections = jax.vmap(ring_planet_intersection)(**para_ring, **two_planet)
+#     jax.debug.print("ring_planet_intersections: {x}", x=ring_planet_intersections)
+
+
+#     return 0.0
+
+
+# def ring_lightcurve(para_ring, two_ring, para_planet, two_planet, precomputed):
+#     """
+#     Compute the light curve created by one of the ring boundaries and the planet.
+
+#     If the two ellipses don't intesect, since the ring is guaranteed to be larger that
+#     the planet, the light curve is just that of the ring boundary and we can use the old
+#     lightcurve function. If they do intersect though, we might need to trace the outline
+#     of the combination of the two ellipses. That's done in combo_lightcurve.
+#     """
+
+#     def are_there_intersections(indv_para_ring, indv_two_planet):
+#         pts = ring_planet_intersection(**indv_para_ring, **indv_two_planet)
+#         return jnp.sum(pts[0] != 999) > 0, pts
+
+#     # this will be all or none of the points in the time series, unless the projected
+#     # shape of the planet+ring are evolving during the transit
+#     these_times_have_intersections, pts = jax.vmap(are_there_intersections)(
+#         para_ring, two_planet
+#     )
+#     # return these_times_have_intersections, pts
+
+#     # we're going to trick the old lightcurve function into only computing the fluxes
+#     # for the times that don't have intersections (again, usually will be all or
+#     # nothing) by modifying the possibly_in_transit mask to also block out times
+#     # that have intersections
+#     vanilla_lc_mask = ~these_times_have_intersections
+#     vanillia_lc_mask = vanilla_lc_mask * precomputed["possibly_in_transit"]
+#     jax.debug.print(
+#         "mask of times when could be transiting, but no intersections, so indv ring-only lc: {x}",
+#         x=vanilla_lc_mask,
+#     )
+#     vanilla_lc_precomputed = {
+#         "fluxes": precomputed["fluxes"],
+#         "normalization_constant": precomputed["normalization_constant"],
+#         "g_coeffs": precomputed["g_coeffs"],
+#         "two": two_ring,
+#         "para": para_ring,
+#         "possibly_in_transit": vanilla_lc_mask,
+#         "positions": precomputed["positions"],
+#         "true_anomalies": precomputed["true_anomalies"],
+#     }
+
+#     # temporarily commenting out to speed testing of combo_lightcurve
+#     no_interesction_lc = (
+#         lightcurve(
+#             {"_": 0.0},  # need to provide something, but it's not used
+#             False,  # same
+#             vanilla_lc_precomputed,
+#         )
+#         - 1.0
+#     )
+#     jax.debug.print("no_interesctions_lc: {x}", x=no_interesction_lc)
+
+#     intersections_lc = combo_lightcurve(
+#         para_ring,
+#         two_ring,
+#         para_planet,
+#         two_planet,
+#         these_times_have_intersections,
+#         pts,
+#         precomputed,
+#     )
+#     jax.debug.print("intersections_lc: {x}", x=intersections_lc)
+
+#     return no_interesction_lc + intersections_lc
+
+
+# @jax.jit
+# def ringed_system_lightcurve(state):
+
+#     # compute things that can be shared across all three lc integrations
+#     # switch the "r" to the outer ring radius, which is guaranteed to be largest,
+#     # when making the mask if it's potentially in transit
+#     _state = state.copy()
+#     _state["r"] = state["ring_outer_r"]
+#     _state["obliq"] = state["ring_obliq"]
+#     _state["prec"] = state["ring_prec"]
+#     setup = _lightcurve_setup(_state, parameterize_with_projected_ellipse=False)
+#     normalization_constant = setup["normalization_constant"]
+#     g_coeffs = setup["g_coeffs"]
+#     possibly_in_transit = setup["possibly_in_transit"]
+#     positions = setup["positions"]
+#     true_anomalies = setup["true_anomalies"]
+
+#     # these two are specific to the outer ring
+#     two_ring_outer = setup["two"]
+#     para_ring_outer = setup["para"]
+
+#     # get the coeffs of the inner ring
+#     para_ring_inner = ring_para_coeffs(**state, rRing=state["ring_inner_r"])
+#     two_ring_inner = poly_to_parametric(**para_ring_inner)
+
+#     # get the coeffs of the planet
+#     three_planet = planet_3d_coeffs(**state)
+#     two_planet = planet_2d_coeffs(**three_planet)
+
+#     # get the flux blocked by the planet
+#     planet_lc = lightcurve(
+#         state=state,
+#         parameterize_with_projected_ellipse=False,
+#         precomputed={
+#             "fluxes": fluxes,
+#             "normalization_constant": normalization_constant,
+#             "g_coeffs": g_coeffs,
+#             "two": two_planet,
+#             "para": three_planet,
+#             "possibly_in_transit": possibly_in_transit,
+#             "positions": positions,
+#             "true_anomalies": true_anomalies,
+#         },
+#     )
+
+#     outer_ring_lc = ring_lightcurve(
+#         para_ring_inner, two_ring_inner, para_planet, two_planet, setup
+#     )
+#     inner_ring_lc = combo_transit(
+#         para_ring_inner, two_ring_inner, para_planet, two_planet, setup
+#     )
+
+#     ring_lc = outer_ring_lc - inner_ring_lc
+#     return planet_lc + ring_lc
