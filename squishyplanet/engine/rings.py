@@ -20,6 +20,30 @@ from squishyplanet.engine.polynomial_limb_darkened_transit import (
 
 
 @jax.jit
+def poly_eval(x, y, coeffs):
+    return (
+        coeffs["rho_xx"] * x**2
+        + coeffs["rho_yy"] * y**2
+        + coeffs["rho_xy"] * x * y
+        + coeffs["rho_x0"] * x
+        + coeffs["rho_y0"] * y
+        + coeffs["rho_00"]
+    )
+
+
+@jax.jit
+def para_eval(alpha, coeffs):
+    return (
+        coeffs["c_x1"] * jnp.cos(alpha)
+        + coeffs["c_x2"] * jnp.sin(alpha)
+        + coeffs["c_x3"],
+        coeffs["c_y1"] * jnp.cos(alpha)
+        + coeffs["c_y2"] * jnp.sin(alpha)
+        + coeffs["c_y3"],
+    )
+
+
+@jax.jit
 def ring_para_coeffs(a, e, f, Omega, i, omega, rRing, ring_obliq, ring_prec, **kwargs):
     """
     Compute the coefficients describing the parametric form of a ring in the sky plane.
@@ -141,7 +165,7 @@ def ring_para_coeffs(a, e, f, Omega, i, omega, rRing, ring_obliq, ring_prec, **k
 
 
 @jax.jit
-def ring_planet_intersection(
+def cocentered_ellipse_intersections(
     c_x1, c_x2, c_x3, c_y1, c_y2, c_y3, rho_xx, rho_xy, rho_x0, rho_yy, rho_y0, rho_00
 ):
     """
@@ -258,8 +282,76 @@ def ring_planet_intersection(
     return xs, ys
 
 
-def break_into_component_curves(
-    ring_inner_para, ring_outer_para, planet_two, planet_para
+@jax.jit
+def _process_alphas(alphas, xs):
+    alphas = jnp.where(xs != 999, alphas, 2 * jnp.pi)
+    alphas = jnp.where(alphas < 0, alphas + 2 * jnp.pi, alphas)
+    alphas = jnp.where(alphas > 2 * jnp.pi, alphas - 2 * jnp.pi, alphas)
+    return alphas
+
+
+@jax.jit
+def define_central_region(ring_para, ring_two, planet_two, planet_para):
+    # create a directed, parametric description of the overlap between the
+    # ring and the planet
+
+    # get the intersection points in cartesian coordinates
+    ring_planet_intersections = cocentered_ellipse_intersections(
+        **ring_para, **planet_two
+    )
+
+    # now convert those x,y coords to parametric angles
+    ring_planet_alphas = cartesian_intersection_to_parametric_angle(
+        *ring_planet_intersections, **ring_para
+    )
+    planet_ring_alphas = cartesian_intersection_to_parametric_angle(
+        *ring_planet_intersections, **planet_para
+    )
+
+    # post-process the alphas
+    ring_planet_alphas = _process_alphas(
+        ring_planet_alphas, ring_planet_intersections[0]
+    )
+    planet_ring_alphas = process_alphas(
+        planet_ring_alphas, ring_planet_intersections[0]
+    )
+
+    # make sure we're traversing the planet w/o skipping any points
+    order = jnp.argsort(planet_ring_alphas)
+    planet_ring_alphas = planet_ring_alphas[order]
+    ring_planet_alphas = ring_planet_alphas[order]
+    ring_planet_intersections = (
+        ring_planet_intersections[0][order],
+        ring_planet_intersections[1][order],
+    )
+
+    # set up most of the final structure
+    d = (
+        jnp.ones((5, 5)) * 999
+    )  # (vertex, info: (x, y, planet_alpha, ring_alpha, curve_ind))
+    d = d.at[:, 0] = ring_planet_intersections[0]
+    d = d.at[:, 1] = ring_planet_intersections[1]
+    d = d.at[:, 2] = planet_ring_alphas
+    d = d.at[:, 3] = ring_planet_alphas
+
+    # add the curve indecies
+    def determine_curve(planet_alpha0, planet_alpha1):
+        test_point = (planet_alpha0 + planet_alpha1) / 2
+        test_point = para_eval(test_point, planet_para)
+        inside_ring = poly_eval(test_point[0], test_point[1], ring_two) < 1
+        return jnp.where(inside_ring, 0, 1)
+
+    d = d.at[0, 4] = determine_curve(d[0, 2], d[1, 2])
+    d = d.at[1, 4] = determine_curve(d[1, 2], d[2, 2])
+    d = d.at[2, 4] = determine_curve(d[2, 2], d[3, 2])
+    d = d.at[3, 4] = determine_curve(d[3, 2], d[4, 2])
+    d = d.at[4, 4] = 999  # the fifth vertex is just the first wrapped again
+
+    return d
+
+
+def check_star_overlap_with_central_region(
+    ring_para, ring_two, planet_two, planet_para, central_region
 ):
 
     # define a circular star just to reuse the intersection function here
@@ -280,135 +372,95 @@ def break_into_component_curves(
         "c_y3": 0.0,
     }
 
-    ###
-    # first, get the x,y coords of all the intersection points
-    ###
-
-    # the inner ring could intersect the star and/or the planet
-    ring_inner_planet_intersections = ring_planet_intersection(
-        **ring_inner_para, **planet_two
-    )
-    ring_inner_star_intersections = ring_planet_intersection(
-        **ring_inner_para, **star_two
+    # get the intersection points in cartesian coordinates
+    ring_star_intersections = cocentered_ellipse_intersections(**ring_para, **star_two)
+    planet_star_intersections = cocentered_ellipse_intersections(
+        **planet_para, **star_two
     )
 
-    # the outer ring could intersect the star and/or the planet
-    ring_outer_planet_intersections = ring_planet_intersection(
-        **ring_outer_para, **planet_two
-    )
-    ring_outer_star_intersections = ring_planet_intersection(
-        **ring_outer_para, **star_two
-    )
+    # check if there were any intersections
+    ring_intersections_present = jnp.sum(ring_star_intersections[0] != 999) > 0
+    planet_intersections_present = jnp.sum(planet_star_intersections[0] != 999) > 0
 
-    # the planet could separately overlap with the star
-    planet_star_intersections = ring_planet_intersection(**planet_para, **star_two)
+    # if the there are no intersections with the star, we're either fully outside the
+    # star (so no integration needed) or fully inside the star (so we can just use the
+    # unmodified central region)
+    def no_intersections_with_star(_):
+        def fully_inside_star(_):
+            final_shape = jnp.ones((8, 3)) * 999
+            final_shape = final_shape.at[:5, :].set(central_region)
+            return final_shape
 
-    # return (
-    #     ring_inner_planet_intersections,
-    #     ring_inner_star_intersections,
-    #     ring_outer_planet_intersections,
-    #     ring_outer_star_intersections,
-    #     planet_star_intersections,
-    # )
+        def fully_outside_star(_):
+            final_shape = jnp.ones((8, 3)) * 999
+            return final_shape
 
-    ###
-    # now convert those x,y coords to parametric angles
-    ###
-    def process_alphas(alphas, xs):
-        alphas = jnp.where(xs != 999, alphas, 2 * jnp.pi)
-        alphas = jnp.where(alphas < 0, alphas + 2 * jnp.pi, alphas)
-        alphas = jnp.where(alphas > 2 * jnp.pi, alphas - 2 * jnp.pi, alphas)
-        return alphas
+        return jax.lax.cond(
+            central_region[0, 0] ** 2 + central_region[0, 1] ** 2 < 1,
+            fully_inside_star,
+            fully_outside_star,
+            0,
+        )
 
-    ring_inner_planet_alphas = cartesian_intersection_to_parametric_angle(
-        *ring_inner_planet_intersections, **ring_inner_para
-    )
-    ring_inner_star_alphas = cartesian_intersection_to_parametric_angle(
-        *ring_inner_star_intersections, **ring_inner_para
-    )
+    def some_intersections_with_star(args):
 
-    ring_outer_planet_alphas = cartesian_intersection_to_parametric_angle(
-        *ring_outer_planet_intersections, **ring_outer_para
-    )
-    ring_outer_star_alphas = cartesian_intersection_to_parametric_angle(
-        *ring_outer_star_intersections, **ring_outer_para
-    )
+        # if there were any intersections, convert the cartesian coords to parametric angles
+        def no_need(_):
+            return jnp.ones(4) * 2 * jnp.pi
 
-    planet_ring_inner_alphas = cartesian_intersection_to_parametric_angle(
-        *ring_inner_planet_intersections, **planet_para
-    )
-    planet_ring_outer_alphas = cartesian_intersection_to_parametric_angle(
-        *ring_outer_planet_intersections, **planet_para
-    )
-    planet_star_alphas = cartesian_intersection_to_parametric_angle(
-        *planet_star_intersections, **planet_para
-    )
+        def get_angles(args):
+            intersections, para = args
+            return cartesian_intersection_to_parametric_angle(*intersections, **para)
 
-    star_ring_inner_alphas = cartesian_intersection_to_parametric_angle(
-        *ring_inner_star_intersections, **star_para
-    )
-    star_ring_outer_alphas = cartesian_intersection_to_parametric_angle(
-        *ring_outer_star_intersections, **star_para
-    )
-    star_planet_alphas = cartesian_intersection_to_parametric_angle(
-        *planet_star_intersections, **star_para
-    )
+        ring_star_alphas = jax.lax.cond(
+            ring_intersections_present,
+            get_angles,
+            no_need,
+            (ring_star_intersections, ring_para),
+        )
+        planet_star_alphas = jax.lax.cond(
+            planet_intersections_present,
+            get_angles,
+            no_need,
+            (planet_star_intersections, planet_para),
+        )
+        star_ring_alphas = jax.lax.cond(
+            ring_intersections_present,
+            get_angles,
+            no_need,
+            (ring_star_intersections, star_para),
+        )
+        star_planet_alphas = jax.lax.cond(
+            planet_intersections_present,
+            get_angles,
+            no_need,
+            (planet_star_intersections, star_para),
+        )
 
-    ###
-    # group the intersections along each curve together
-    ###
-    ring_inner_alphas = jnp.concatenate(
-        [ring_inner_planet_alphas, ring_inner_star_alphas]
-    )
-    ring_outer_alphas = jnp.concatenate(
-        [ring_outer_planet_alphas, ring_outer_star_alphas]
-    )
-    planet_alphas = jnp.concatenate(
-        [planet_ring_inner_alphas, planet_ring_outer_alphas, planet_star_alphas]
-    )
-    star_alphas = jnp.concatenate(
-        [star_ring_inner_alphas, star_ring_outer_alphas, star_planet_alphas]
-    )
+        # boost everyone up to arrays with 8 elements so we can move along the star
+        star_alphas = jnp.concatenate(star_ring_alphas, star_planet_alphas)
+        star_labels = jnp.concatenate(
+            jnp.ones_like(star_ring_alphas), jnp.zeros_like(star_planet_alphas)
+        )
+        order = jnp.argsort(star_alphas)
+        star_alphas = star_alphas[order]
+        star_labels = star_labels[order]
+        ring_star_alphas = jnp.where(star_labels == 1, star_alphas, 2 * jnp.pi)
+        planet_star_alphas = jnp.where(star_labels == 0, star_alphas, 2 * jnp.pi)
 
-    ###
-    # post-process the alphas
-    ###
-    ring_inner_alphas = process_alphas(
-        ring_inner_alphas,
-        jnp.concatenate(
-            [ring_inner_planet_intersections[0], ring_inner_star_intersections[0]]
-        ),
-    )
-    ring_outer_alphas = process_alphas(
-        ring_outer_alphas,
-        jnp.concatenate(
-            [ring_outer_planet_intersections[0], ring_outer_star_intersections[0]]
-        ),
-    )
+    # assemble the final shape to integrate over
+    # could be composed of up to 8 segments if the star manages 4 intersections with
+    # both the ring and planet components
+    final_shape = (
+        jnp.ones((8, 3)) * 999
+    )  # (segment, info: (alpha_0, alpha_1, curve_ind))
 
-    planet_alphas = process_alphas(
-        planet_alphas,
-        jnp.concatenate(
-            [
-                ring_inner_planet_intersections[0],
-                ring_outer_planet_intersections[0],
-                planet_star_intersections[0],
-            ],
-        ),
+    jax.lax.cond(
+        (ring_intersections_present or planet_intersections_present),
+        some_intersections_with_star,
+        no_intersections_with_star,
+        (ring_star_alphas, planet_star_alphas),
     )
-
-    star_alphas = process_alphas(
-        star_alphas,
-        jnp.concatenate(
-            [
-                ring_inner_star_intersections[0],
-                ring_outer_star_intersections[0],
-                planet_star_intersections[0],
-            ],
-        ),
-    )
-
-    return ring_inner_alphas, ring_outer_alphas, planet_alphas, star_alphas
 
 
 # def combo_lightcurve(
@@ -430,7 +482,7 @@ def break_into_component_curves(
 #     jax.debug.print("star_planet_intersections: {x}", x=star_planet_intersections)
 #     star_ring_intersections = jax.vmap(star_intersection_points)(**two_ring)
 #     jax.debug.print("star_ring_intersections: {x}", x=star_ring_intersections)
-#     ring_planet_intersections = jax.vmap(ring_planet_intersection)(**para_ring, **two_planet)
+#     ring_planet_intersections = jax.vmap(cocentered_ellipse_intersections)(**para_ring, **two_planet)
 #     jax.debug.print("ring_planet_intersections: {x}", x=ring_planet_intersections)
 
 
@@ -448,7 +500,7 @@ def break_into_component_curves(
 #     """
 
 #     def are_there_intersections(indv_para_ring, indv_two_planet):
-#         pts = ring_planet_intersection(**indv_para_ring, **indv_two_planet)
+#         pts = cocentered_ellipse_intersections(**indv_para_ring, **indv_two_planet)
 #         return jnp.sum(pts[0] != 999) > 0, pts
 
 #     # this will be all or none of the points in the time series, unless the projected
