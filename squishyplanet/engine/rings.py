@@ -312,7 +312,7 @@ def define_central_region(ring_para, ring_two, planet_two, planet_para):
     ring_planet_alphas = _process_alphas(
         ring_planet_alphas, ring_planet_intersections[0]
     )
-    planet_ring_alphas = process_alphas(
+    planet_ring_alphas = _process_alphas(
         planet_ring_alphas, ring_planet_intersections[0]
     )
 
@@ -327,12 +327,21 @@ def define_central_region(ring_para, ring_two, planet_two, planet_para):
 
     # set up most of the final structure
     d = (
-        jnp.ones((5, 5)) * 999
-    )  # (vertex, info: (x, y, planet_alpha, ring_alpha, curve_ind))
-    d = d.at[:, 0] = ring_planet_intersections[0]
-    d = d.at[:, 1] = ring_planet_intersections[1]
-    d = d.at[:, 2] = planet_ring_alphas
-    d = d.at[:, 3] = ring_planet_alphas
+        jnp.ones((5, 6)) * 999
+    )  # (vertex, info: (x, y, planet_alpha, ring_alpha, star_alpha, curve_ind))
+    d = d.at[:4, 0].set(ring_planet_intersections[0])
+    d = d.at[:4, 1].set(ring_planet_intersections[1])
+    d = d.at[:4, 2].set(planet_ring_alphas)
+    d = d.at[:4, 3].set(ring_planet_alphas)
+
+    d = d.at[4, 2].set(
+        planet_ring_alphas[0] + 2 * jnp.pi
+    )  # the fifth vertex is just the first wrapped again
+    d = d.at[4, 3].set(
+        ring_planet_alphas[0] + 2 * jnp.pi
+    )  # the fifth vertex is just the first wrapped again
+
+    # d = d.at[:, 4].set(999)  # placeholder for the star alpha
 
     # add the curve indecies
     def determine_curve(planet_alpha0, planet_alpha1):
@@ -341,13 +350,23 @@ def define_central_region(ring_para, ring_two, planet_two, planet_para):
         inside_ring = poly_eval(test_point[0], test_point[1], ring_two) < 1
         return jnp.where(inside_ring, 0, 1)
 
-    d = d.at[0, 4] = determine_curve(d[0, 2], d[1, 2])
-    d = d.at[1, 4] = determine_curve(d[1, 2], d[2, 2])
-    d = d.at[2, 4] = determine_curve(d[2, 2], d[3, 2])
-    d = d.at[3, 4] = determine_curve(d[3, 2], d[4, 2])
-    d = d.at[4, 4] = 999  # the fifth vertex is just the first wrapped again
+    d = d.at[0, 5].set(determine_curve(d[0, 2], d[1, 2]))
+    d = d.at[1, 5].set(determine_curve(d[1, 2], d[2, 2]))
+    d = d.at[2, 5].set(determine_curve(d[2, 2], d[3, 2]))
+    d = d.at[3, 5].set(determine_curve(d[3, 2], d[4, 2]))
+    d = d.at[4, 5].set(999)  # the fifth vertex is just the first wrapped again
 
-    return d
+    # final represenation will be (segment: (xstart, ystart, alpha0, alpha1, curve_ind))
+    final = jnp.ones((5, 5))  # will trim down to 4 at the end
+    final = final.at[:, :2].set(d[:, :2])
+    alpha_0 = jnp.where(d[:, 5] == 0, d[:, 2], d[:, 3])
+    alpha_1 = jnp.where(d[:, 5] == 0, jnp.roll(d[:, 2], -1), jnp.roll(d[:, 3], -1))
+    final = final.at[:, 2].set(alpha_0)
+    final = final.at[:, 3].set(alpha_1)
+    final = final.at[:, 4].set(d[:, 5])
+    final = final[:-1]
+
+    return final
 
 
 def check_star_overlap_with_central_region(
@@ -385,15 +404,17 @@ def check_star_overlap_with_central_region(
     # if the there are no intersections with the star, we're either fully outside the
     # star (so no integration needed) or fully inside the star (so we can just use the
     # unmodified central region)
-    def no_intersections_with_star(_):
+    def no_intersections_with_star():
         def fully_inside_star(_):
-            final_shape = jnp.ones((8, 3)) * 999
-            final_shape = final_shape.at[:5, :].set(central_region)
+            final_shape = jnp.ones((8, 5)) * 999
+            final_shape = final_shape.at[:4, :].set(central_region)
             return final_shape
 
         def fully_outside_star(_):
-            final_shape = jnp.ones((8, 3)) * 999
+            final_shape = jnp.ones((8, 5)) * 999
             return final_shape
+
+        # only need to check one pt, all others will match
 
         return jax.lax.cond(
             central_region[0, 0] ** 2 + central_region[0, 1] ** 2 < 1,
@@ -402,7 +423,11 @@ def check_star_overlap_with_central_region(
             0,
         )
 
-    def some_intersections_with_star(args):
+    # if either the planet or the ring has intersections with the star,
+    # the central region *might* as well. need to compute the parametric angles
+    # of each star intersection, then check if they're inside the alpha range that
+    # defines each segment of the central region
+    def some_intersections_with_star():
 
         # if there were any intersections, convert the cartesian coords to parametric angles
         def no_need(_):
@@ -410,7 +435,10 @@ def check_star_overlap_with_central_region(
 
         def get_angles(args):
             intersections, para = args
-            return cartesian_intersection_to_parametric_angle(*intersections, **para)
+            angles = cartesian_intersection_to_parametric_angle(*intersections, **para)
+            angles = _process_alphas(angles, intersections[0])
+            angles = jnp.where(angles == 2 * jnp.pi, 999, angles)
+            return angles
 
         ring_star_alphas = jax.lax.cond(
             ring_intersections_present,
@@ -437,30 +465,53 @@ def check_star_overlap_with_central_region(
             (planet_star_intersections, star_para),
         )
 
-        # boost everyone up to arrays with 8 elements so we can move along the star
-        star_alphas = jnp.concatenate(star_ring_alphas, star_planet_alphas)
-        star_labels = jnp.concatenate(
-            jnp.ones_like(star_ring_alphas), jnp.zeros_like(star_planet_alphas)
+        # check each segment for a star intersection
+        def check_segment(segment):
+            alpha0 = segment[2]
+            alpha1 = segment[3]
+            relenvant_segment_alphas = jnp.where(
+                segment[4] == 0,
+                planet_star_alphas,
+                ring_star_alphas,
+            )
+            return (relenvant_segment_alphas > alpha0) & (
+                relenvant_segment_alphas < alpha1
+            )
+
+        jax.debug.print("planet_star_alphas: {x}", x=planet_star_alphas)
+        jax.debug.print("ring_star_alphas: {x}", x=ring_star_alphas)
+        revelant_star_intersections = jax.vmap(check_segment)(central_region)
+        jax.debug.print(
+            "revelant_star_intersections: {x}", x=revelant_star_intersections
         )
-        order = jnp.argsort(star_alphas)
-        star_alphas = star_alphas[order]
-        star_labels = star_labels[order]
-        ring_star_alphas = jnp.where(star_labels == 1, star_alphas, 2 * jnp.pi)
-        planet_star_alphas = jnp.where(star_labels == 0, star_alphas, 2 * jnp.pi)
 
-    # assemble the final shape to integrate over
-    # could be composed of up to 8 segments if the star manages 4 intersections with
-    # both the ring and planet components
-    final_shape = (
-        jnp.ones((8, 3)) * 999
-    )  # (segment, info: (alpha_0, alpha_1, curve_ind))
+        # it's still possible that the ring/planet have stellar intersections,
+        # but the central region is either fully inside or outside the star.
+        # so, reuse the same function we invoked when there were no intersections
+        # of any kind
+        central_region_has_star_intersections = jnp.sum(revelant_star_intersections) > 0
 
-    jax.lax.cond(
+        def star_intersection_with_central_region_present():
+            # placeholder
+            return jnp.ones((8, 5)) * 777
+
+        q = jax.lax.cond(
+            central_region_has_star_intersections,
+            star_intersection_with_central_region_present,
+            no_intersections_with_star,
+        )
+
+        return q
+
+    jax.debug.print("ring_intersections_present: {x}", x=ring_intersections_present)
+    jax.debug.print("planet_intersections_present: {x}", x=planet_intersections_present)
+    jax.debug.print("central_region: {x}", x=central_region)
+    a = jax.lax.cond(
         (ring_intersections_present or planet_intersections_present),
         some_intersections_with_star,
         no_intersections_with_star,
-        (ring_star_alphas, planet_star_alphas),
     )
+    return a
 
 
 # def combo_lightcurve(
