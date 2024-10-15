@@ -797,8 +797,16 @@ class OblateSystem:
             assert (
                 reflected == False
             ), "Can't illustrate both reflected and emitted flux"
+            assert self._state["parameterize_with_projected_ellipse"] == False, (
+                "Can't illustrate emitted flux when only describing the 2D outline of"
+                "the planet"
+            )
         if reflected:
             assert emitted == False, "Can't illustrate both reflected and emitted flux"
+            assert self._state["parameterize_with_projected_ellipse"] == False, (
+                "Can't illustrate reflected flux when only describing the 2D outline of"
+                "the planet"
+            )
 
         fig, ax = plt.subplots(1, 1, figsize=(8, 8))
 
