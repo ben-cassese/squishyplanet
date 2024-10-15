@@ -32,15 +32,21 @@ See the [installation instructions](https://squishyplanet.readthedocs.io/en/late
 
 ```
 @article{squishyplanet,
-   author = {{Cassese}, Ben and {Vega}, Justin and {Lu}, Tiger and {Rice}, Malena and {Poddar}, Avishi and {Kipping}, David},
-   doi = {10.21105/joss.06972},
-   journal = {Journal of Open Source Software},
-   month = aug,
-   number = {100},
-   pages = {6972},
-   title = {{squishyplanet: modeling transits of non-spherical exoplanets in JAX}},
-   url = {https://joss.theoj.org/papers/10.21105/joss.06972},
-   volume = {9},
-   year = {2024}
+       author = {{Cassese}, Ben and {Vega}, Justin and {Lu}, Tiger and {Rice}, Malena and {Poddar}, Avishi and {Kipping}, David},
+        title = "{squishyplanet: modeling transits of non-spherical exoplanets in JAX}",
+      journal = {The Journal of Open Source Software},
+     keywords = {astronomy, exoplanets, exoplanet transits, Python, Jupyter Notebook, Astrophysics - Instrumentation and Methods for Astrophysics, Astrophysics - Earth and Planetary Astrophysics},
+         year = 2024,
+        month = aug,
+       volume = {9},
+       number = {100},
+          eid = {6972},
+        pages = {6972},
+          doi = {10.21105/joss.06972},
+archivePrefix = {arXiv},
+       eprint = {2409.00167},
+ primaryClass = {astro-ph.IM},
+       adsurl = {https://ui.adsabs.harvard.edu/abs/2024JOSS....9.6972C},
+      adsnote = {Provided by the SAO/NASA Astrophysics Data System}
 }
 ```
