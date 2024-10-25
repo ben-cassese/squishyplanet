@@ -21,9 +21,10 @@ from squishyplanet.engine.parametric_ellipse import (
 from squishyplanet.engine.greens_basis_transform import generate_change_of_basis_matrix
 from squishyplanet.engine.kepler import kepler, skypos, t0_to_t_peri
 from squishyplanet.engine.polynomial_limb_darkened_transit import (
-    lightcurve,
-    parameterize_2d_helper,
+    lightcurve as poly_lightcurve,
 )
+from squishyplanet.engine.polynomial_limb_darkened_transit import parameterize_2d_helper
+
 from squishyplanet.engine.phase_curve_utils import (
     pre_squish_transform,
     generate_sample_radii_thetas,
@@ -278,7 +279,7 @@ class OblateSystem:
         phase_curve_nsamples=50_000,
         random_seed=0,
         data=jnp.array([1.0]),
-        uncertainties=jnp.array([0.01]),
+        uncertainties=jnp.array([jnp.inf]),
         exposure_time=0.0,
         oversample=1,
         oversample_correction_order=2,
@@ -1134,7 +1135,7 @@ def _lightcurve(
     # always compute the primary transit and trend
     for key in params.keys():
         state[key] = params[key]
-    transit = lightcurve(state, parameterize_with_projected_ellipse)
+    transit = poly_lightcurve(state, parameterize_with_projected_ellipse)
     trend = jnp.polyval(state["systematic_trend_coeffs"], state["times"])
 
     # if you don't want any phase curve stuff, you're done
