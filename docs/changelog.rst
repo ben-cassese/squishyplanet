@@ -1,15 +1,17 @@
 Changelog
 ++++++++++
 
+**0.3.0 (10/2024)**
+
+- Added ``limb_darkening_laws`` module, which contains convenience functions for transforming limb darkening coefficients of commonly used limb darkening laws into coefficients of high-order polynomials that ``squishyplanet`` can use to model the intensity profile of the star.
+
 **0.2.2 (09/2024)**
 
 - Added ability to parameterize the planet's orbit via t0, the time of transit center, instead of t_peri. This is useful for fitting systems with non-zero eccentricity.
 
 **0.2.1 (09/2024)**
 
-- Fixes issues `#16
-<https://github.com/ben-cassese/squishyplanet/issues/16>`_ and `#17
-<https://github.com/ben-cassese/squishyplanet/issues/17>`_.
+- Fixes issues `#16 <https://github.com/ben-cassese/squishyplanet/issues/16>`_ and `#17 <https://github.com/ben-cassese/squishyplanet/issues/17>`_.
 
 **0.2.0 (08/2024)**
 
