@@ -3,4 +3,5 @@
    :caption: API Documentation
 
    oblate_system
+   limb_darkening
    engine
