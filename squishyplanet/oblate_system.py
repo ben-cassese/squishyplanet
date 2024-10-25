@@ -419,6 +419,100 @@ class OblateSystem:
                 yc=self._state["y_c"],
             )
 
+        self._lightcurve_fwd_grad_enforced = self._setup_lightcurve_func()
+        self._loglike_fwd_grad_enforced = self._setup_loglike_func()
+
+    def _setup_lightcurve_func(self):
+
+        constants = {
+            "tidally_locked": self._state["tidally_locked"],
+            "compute_reflected_phase_curve": self._state[
+                "compute_reflected_phase_curve"
+            ],
+            "compute_emitted_phase_curve": self._state["compute_emitted_phase_curve"],
+            "compute_stellar_ellipsoidal_variations": self._state[
+                "compute_stellar_ellipsoidal_variations"
+            ],
+            "compute_stellar_doppler_variations": self._state[
+                "compute_stellar_doppler_variations"
+            ],
+            "parameterize_with_projected_ellipse": self._state[
+                "parameterize_with_projected_ellipse"
+            ],
+            "oversample": self._state["oversample"],
+            "random_seed": self._state["random_seed"],
+            "phase_curve_nsamples": self._state["phase_curve_nsamples"],
+            "extended_illumination_npts": self._state["extended_illumination_npts"],
+            "state": self._state,
+        }
+
+        frozen = jax.tree_util.Partial(_lightcurve, **constants)
+
+        @jax.custom_vjp
+        def lightcurve(params):
+            return frozen(params)
+
+        def lightcurve_fwd(params):
+            output = frozen(params)
+            jac = jax.jacfwd(frozen)(params)
+            return output, (jac,)
+
+        def lightcurve_bwd(res, g):
+            jac = res
+            val = jax.tree.map(lambda x: x.T @ g, jac)
+            return val
+
+        lightcurve.defvjp(lightcurve_fwd, lightcurve_bwd)
+
+        lightcurve = jax.jit(lightcurve)
+
+        return lightcurve
+
+    def _setup_loglike_func(self):
+
+        constants = {
+            "tidally_locked": self._state["tidally_locked"],
+            "compute_reflected_phase_curve": self._state[
+                "compute_reflected_phase_curve"
+            ],
+            "compute_emitted_phase_curve": self._state["compute_emitted_phase_curve"],
+            "compute_stellar_ellipsoidal_variations": self._state[
+                "compute_stellar_ellipsoidal_variations"
+            ],
+            "compute_stellar_doppler_variations": self._state[
+                "compute_stellar_doppler_variations"
+            ],
+            "parameterize_with_projected_ellipse": self._state[
+                "parameterize_with_projected_ellipse"
+            ],
+            "oversample": self._state["oversample"],
+            "random_seed": self._state["random_seed"],
+            "phase_curve_nsamples": self._state["phase_curve_nsamples"],
+            "extended_illumination_npts": self._state["extended_illumination_npts"],
+            "state": self._state,
+        }
+
+        frozen = jax.tree_util.Partial(_loglike, **constants)
+
+        @jax.custom_vjp
+        def loglike(params):
+            return frozen(params)
+
+        def loglike_fwd(params):
+            output = frozen(params)
+            jac = jax.jacfwd(frozen)(params)
+            return output, jac
+
+        def loglike_bwd(res, g):
+            val = jax.tree.map(lambda x: x.T * g, res)
+            return (val,)
+
+        loglike.defvjp(loglike_fwd, loglike_bwd)
+
+        loglike = jax.jit(loglike)
+
+        return loglike
+
     def __repr__(self):
         s = pprint.pformat(self.state)
         return f"OblateSystem(\n{s}\n)"
@@ -1038,27 +1132,7 @@ class OblateSystem:
             >>> system.lightcurve()
 
         """
-
-        return _lightcurve_fwd_grad_enforced(
-            tidally_locked=self._state["tidally_locked"],
-            compute_reflected_phase_curve=self._state["compute_reflected_phase_curve"],
-            compute_emitted_phase_curve=self._state["compute_emitted_phase_curve"],
-            compute_stellar_ellipsoidal_variations=self._state[
-                "compute_stellar_ellipsoidal_variations"
-            ],
-            compute_stellar_doppler_variations=self._state[
-                "compute_stellar_doppler_variations"
-            ],
-            parameterize_with_projected_ellipse=self._state[
-                "parameterize_with_projected_ellipse"
-            ],
-            oversample=self._state["oversample"],
-            random_seed=self._state["random_seed"],
-            phase_curve_nsamples=self._state["phase_curve_nsamples"],
-            extended_illumination_npts=self._state["extended_illumination_npts"],
-            state=self._state,
-            params=params,
-        )
+        return self._lightcurve_fwd_grad_enforced(params)
 
     def loglike(self, params={}):
         """
@@ -1081,43 +1155,12 @@ class OblateSystem:
             provided parameters.
 
         """
-        return _loglike_fwd_grad_enforced(
-            tidally_locked=self._state["tidally_locked"],
-            compute_reflected_phase_curve=self._state["compute_reflected_phase_curve"],
-            compute_emitted_phase_curve=self._state["compute_emitted_phase_curve"],
-            compute_stellar_ellipsoidal_variations=self._state[
-                "compute_stellar_ellipsoidal_variations"
-            ],
-            compute_stellar_doppler_variations=self._state[
-                "compute_stellar_doppler_variations"
-            ],
-            parameterize_with_projected_ellipse=self._state[
-                "parameterize_with_projected_ellipse"
-            ],
-            oversample=self._state["oversample"],
-            random_seed=self._state["random_seed"],
-            phase_curve_nsamples=self._state["phase_curve_nsamples"],
-            extended_illumination_npts=self._state["extended_illumination_npts"],
-            state=self._state,
-            params=params,
-        )
-
-
-# Ok. Down here we have jitted function so that we don't have to register the whole
-# OblateSystem class as a pytree. Previously, we had two functions down here named
-# _lightcurve and _loglike. But, when evaluating gradients, reverse mode a) took a long
-# time and b) often returned NaNs. But, forward mode seems to work fine.
-
-# Since packages like BlackJax call jax..grad (which is reverse mode), I wanted to force
-# it to use forward mode when it thinks it's doing reverse mode. That's done through
-# a custom vjp. I'm not super confident what follows is the best (or even a good) way to
-# do this, but it seems to work for now.
+        return self._loglike_fwd_grad_enforced(params)
 
 
 @partial(
     jax.jit,
     static_argnums=(
-        0,
         1,
         2,
         3,
@@ -1127,9 +1170,11 @@ class OblateSystem:
         7,
         8,
         9,
+        10,
     ),
 )
 def _lightcurve(
+    params,
     tidally_locked,
     compute_reflected_phase_curve,
     compute_emitted_phase_curve,
@@ -1141,7 +1186,6 @@ def _lightcurve(
     phase_curve_nsamples,
     extended_illumination_npts,
     state,
-    params,
 ):
     # always compute the primary transit and trend
     for key in params.keys():
@@ -1274,120 +1318,9 @@ def _lightcurve(
     return c
 
 
-@jax.custom_vjp
-def _lightcurve_fwd_grad_enforced(
-    tidally_locked,
-    compute_reflected_phase_curve,
-    compute_emitted_phase_curve,
-    compute_stellar_ellipsoidal_variations,
-    compute_stellar_doppler_variations,
-    parameterize_with_projected_ellipse,
-    oversample,
-    random_seed,
-    phase_curve_nsamples,
-    extended_illumination_npts,
-    state,
-    params,
-):
-
-    return _lightcurve(
-        tidally_locked,
-        compute_reflected_phase_curve,
-        compute_emitted_phase_curve,
-        compute_stellar_ellipsoidal_variations,
-        compute_stellar_doppler_variations,
-        parameterize_with_projected_ellipse,
-        oversample,
-        random_seed,
-        phase_curve_nsamples,
-        extended_illumination_npts,
-        state,
-        params,
-    )
-
-
-@jax.jit
-def _lightcurve_fwd_grad_enforced_fwd(
-    tidally_locked,
-    compute_reflected_phase_curve,
-    compute_emitted_phase_curve,
-    compute_stellar_ellipsoidal_variations,
-    compute_stellar_doppler_variations,
-    parameterize_with_projected_ellipse,
-    oversample,
-    random_seed,
-    phase_curve_nsamples,
-    extended_illumination_npts,
-    state,
-    params,
-):
-
-    output = _lightcurve(
-        tidally_locked,
-        compute_reflected_phase_curve,
-        compute_emitted_phase_curve,
-        compute_stellar_ellipsoidal_variations,
-        compute_stellar_doppler_variations,
-        parameterize_with_projected_ellipse,
-        oversample,
-        random_seed,
-        phase_curve_nsamples,
-        extended_illumination_npts,
-        state,
-        params,
-    )
-
-    jac = jax.jacfwd(
-        lambda p: _lightcurve(
-            tidally_locked,
-            compute_reflected_phase_curve,
-            compute_emitted_phase_curve,
-            compute_stellar_ellipsoidal_variations,
-            compute_stellar_doppler_variations,
-            parameterize_with_projected_ellipse,
-            oversample,
-            random_seed,
-            phase_curve_nsamples,
-            extended_illumination_npts,
-            state,
-            p,
-        )
-    )(params)
-
-    return output, (*[None] * 11, jac)
-
-
-@jax.jit
-def _lightcurve_fwd_grad_enforced_bwd(res, g):
-    jac = res[-1]
-    val = jax.tree.map(lambda x: x.T @ g, jac)
-    return (*[None] * 11, val)
-
-
-_lightcurve_fwd_grad_enforced.defvjp(
-    _lightcurve_fwd_grad_enforced_fwd, _lightcurve_fwd_grad_enforced_bwd
-)
-# _lightcurve_fwd_grad_enforced = jax.jit(
-#     _lightcurve_fwd_grad_enforced,
-#     static_argnames=(
-#         "tidally_locked",
-#         "compute_reflected_phase_curve",
-#         "compute_emitted_phase_curve",
-#         "compute_stellar_ellipsoidal_variations",
-#         "compute_stellar_doppler_variations",
-#         "parameterize_with_projected_ellipse",
-#         "oversample",
-#         "random_seed",
-#         "phase_curve_nsamples",
-#         "extended_illumination_npts",
-#     ),
-# )
-
-
 @partial(
     jax.jit,
     static_argnums=(
-        0,
         1,
         2,
         3,
@@ -1397,9 +1330,11 @@ _lightcurve_fwd_grad_enforced.defvjp(
         7,
         8,
         9,
+        10,
     ),
 )
 def _loglike(
+    params,
     tidally_locked,
     compute_reflected_phase_curve,
     compute_emitted_phase_curve,
@@ -1411,9 +1346,9 @@ def _loglike(
     phase_curve_nsamples,
     extended_illumination_npts,
     state,
-    params,
 ):
     lc = _lightcurve(
+        params,
         tidally_locked,
         compute_reflected_phase_curve,
         compute_emitted_phase_curve,
@@ -1425,7 +1360,6 @@ def _loglike(
         phase_curve_nsamples,
         extended_illumination_npts,
         state,
-        params,
     )
 
     for key in params.keys():
@@ -1435,115 +1369,6 @@ def _loglike(
     var = jnp.exp(state["log_jitter"]) ** 2 + state["uncertainties"] ** 2
 
     return jnp.sum(-0.5 * (resids**2 / var + jnp.log(2 * jnp.pi * var)))
-
-
-@jax.custom_vjp
-def _loglike_fwd_grad_enforced(
-    tidally_locked,
-    compute_reflected_phase_curve,
-    compute_emitted_phase_curve,
-    compute_stellar_ellipsoidal_variations,
-    compute_stellar_doppler_variations,
-    parameterize_with_projected_ellipse,
-    oversample,
-    random_seed,
-    phase_curve_nsamples,
-    extended_illumination_npts,
-    state,
-    params,
-):
-    return _loglike(
-        tidally_locked,
-        compute_reflected_phase_curve,
-        compute_emitted_phase_curve,
-        compute_stellar_ellipsoidal_variations,
-        compute_stellar_doppler_variations,
-        parameterize_with_projected_ellipse,
-        oversample,
-        random_seed,
-        phase_curve_nsamples,
-        extended_illumination_npts,
-        state,
-        params,
-    )
-
-
-@jax.jit
-def _loglike_fwd_grad_enforced_fwd(
-    tidally_locked,
-    compute_reflected_phase_curve,
-    compute_emitted_phase_curve,
-    compute_stellar_ellipsoidal_variations,
-    compute_stellar_doppler_variations,
-    parameterize_with_projected_ellipse,
-    oversample,
-    random_seed,
-    phase_curve_nsamples,
-    extended_illumination_npts,
-    state,
-    params,
-):
-
-    output = _loglike(
-        tidally_locked,
-        compute_reflected_phase_curve,
-        compute_emitted_phase_curve,
-        compute_stellar_ellipsoidal_variations,
-        compute_stellar_doppler_variations,
-        parameterize_with_projected_ellipse,
-        oversample,
-        random_seed,
-        phase_curve_nsamples,
-        extended_illumination_npts,
-        state,
-        params,
-    )
-
-    jac = jax.jacfwd(
-        lambda p: _loglike(
-            tidally_locked,
-            compute_reflected_phase_curve,
-            compute_emitted_phase_curve,
-            compute_stellar_ellipsoidal_variations,
-            compute_stellar_doppler_variations,
-            parameterize_with_projected_ellipse,
-            oversample,
-            random_seed,
-            phase_curve_nsamples,
-            extended_illumination_npts,
-            state,
-            p,
-        )
-    )(params)
-
-    return output, (*[None] * 11, jac)
-
-
-@jax.jit
-def _loglike_fwd_grad_enforced_bwd(res, g):
-    jac = res[-1]
-    val = jax.tree.map(lambda x: x.T * g, jac)
-    return (*[None] * 11, val)  # `None` for non-diff args and param
-
-
-_loglike_fwd_grad_enforced.defvjp(
-    _loglike_fwd_grad_enforced_fwd, _loglike_fwd_grad_enforced_bwd
-)
-# _loglike_fwd_grad_enforced = jax.jit(
-#     _loglike_fwd_grad_enforced,
-#     static_argnames=(
-#         "tidally_locked",
-#         "compute_reflected_phase_curve",
-#         "compute_emitted_phase_curve",
-#         "compute_stellar_ellipsoidal_variations",
-#         "compute_stellar_doppler_variations",
-#         "parameterize_with_projected_ellipse",
-#         "oversample",
-#         "random_seed",
-#         "phase_curve_nsamples",
-#         "extended_illumination_npts",
-#     ),
-# )
 
 
 @partial(jax.jit, static_argnums=(1,))
