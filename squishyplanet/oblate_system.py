@@ -422,97 +422,6 @@ class OblateSystem:
         self._lightcurve_fwd_grad_enforced = self._setup_lightcurve_func()
         self._loglike_fwd_grad_enforced = self._setup_loglike_func()
 
-    def _setup_lightcurve_func(self):
-
-        constants = {
-            "tidally_locked": self._state["tidally_locked"],
-            "compute_reflected_phase_curve": self._state[
-                "compute_reflected_phase_curve"
-            ],
-            "compute_emitted_phase_curve": self._state["compute_emitted_phase_curve"],
-            "compute_stellar_ellipsoidal_variations": self._state[
-                "compute_stellar_ellipsoidal_variations"
-            ],
-            "compute_stellar_doppler_variations": self._state[
-                "compute_stellar_doppler_variations"
-            ],
-            "parameterize_with_projected_ellipse": self._state[
-                "parameterize_with_projected_ellipse"
-            ],
-            "oversample": self._state["oversample"],
-            "random_seed": self._state["random_seed"],
-            "phase_curve_nsamples": self._state["phase_curve_nsamples"],
-            "extended_illumination_npts": self._state["extended_illumination_npts"],
-            "state": self._state,
-        }
-
-        frozen = jax.tree_util.Partial(_lightcurve, **constants)
-
-        @jax.custom_vjp
-        def lightcurve(params):
-            return frozen(params)
-
-        def lightcurve_fwd(params):
-            output = frozen(params)
-            jac = jax.jacfwd(frozen)(params)
-            return output, (jac,)
-
-        def lightcurve_bwd(res, g):
-            jac = res
-            val = jax.tree.map(lambda x: x.T @ g, jac)
-            return val
-
-        lightcurve.defvjp(lightcurve_fwd, lightcurve_bwd)
-
-        lightcurve = jax.jit(lightcurve)
-
-        return lightcurve
-
-    def _setup_loglike_func(self):
-
-        constants = {
-            "tidally_locked": self._state["tidally_locked"],
-            "compute_reflected_phase_curve": self._state[
-                "compute_reflected_phase_curve"
-            ],
-            "compute_emitted_phase_curve": self._state["compute_emitted_phase_curve"],
-            "compute_stellar_ellipsoidal_variations": self._state[
-                "compute_stellar_ellipsoidal_variations"
-            ],
-            "compute_stellar_doppler_variations": self._state[
-                "compute_stellar_doppler_variations"
-            ],
-            "parameterize_with_projected_ellipse": self._state[
-                "parameterize_with_projected_ellipse"
-            ],
-            "oversample": self._state["oversample"],
-            "random_seed": self._state["random_seed"],
-            "phase_curve_nsamples": self._state["phase_curve_nsamples"],
-            "extended_illumination_npts": self._state["extended_illumination_npts"],
-            "state": self._state,
-        }
-
-        frozen = jax.tree_util.Partial(_loglike, **constants)
-
-        @jax.custom_vjp
-        def loglike(params):
-            return frozen(params)
-
-        def loglike_fwd(params):
-            output = frozen(params)
-            jac = jax.jacfwd(frozen)(params)
-            return output, jac
-
-        def loglike_bwd(res, g):
-            val = jax.tree.map(lambda x: x.T * g, res)
-            return (val,)
-
-        loglike.defvjp(loglike_fwd, loglike_bwd)
-
-        loglike = jax.jit(loglike)
-
-        return loglike
-
     def __repr__(self):
         s = pprint.pformat(self.state)
         return f"OblateSystem(\n{s}\n)"
@@ -652,6 +561,95 @@ class OblateSystem:
             assert (
                 self._state["e"] == 0.0
             ), "Stellar doppler variations are only valid for circular orbits"
+
+    def _setup_lightcurve_func(self):
+
+        constants = {
+            "tidally_locked": self._state["tidally_locked"],
+            "compute_reflected_phase_curve": self._state[
+                "compute_reflected_phase_curve"
+            ],
+            "compute_emitted_phase_curve": self._state["compute_emitted_phase_curve"],
+            "compute_stellar_ellipsoidal_variations": self._state[
+                "compute_stellar_ellipsoidal_variations"
+            ],
+            "compute_stellar_doppler_variations": self._state[
+                "compute_stellar_doppler_variations"
+            ],
+            "parameterize_with_projected_ellipse": self._state[
+                "parameterize_with_projected_ellipse"
+            ],
+            "oversample": self._state["oversample"],
+            "random_seed": self._state["random_seed"],
+            "phase_curve_nsamples": self._state["phase_curve_nsamples"],
+            "extended_illumination_npts": self._state["extended_illumination_npts"],
+            "state": self._state,
+        }
+
+        frozen = jax.tree_util.Partial(_lightcurve, **constants)
+
+        @jax.custom_vjp
+        def lightcurve(params):
+            return frozen(params)
+
+        def lightcurve_fwd(params):
+            output = frozen(params)
+            jac = jax.jacfwd(frozen)(params)
+            return output, (jac,)
+
+        def lightcurve_bwd(res, g):
+            jac = res
+            val = jax.tree.map(lambda x: x.T @ g, jac)
+            return val
+
+        lightcurve.defvjp(lightcurve_fwd, lightcurve_bwd)
+        lightcurve = jax.jit(lightcurve)
+
+        return lightcurve
+
+    def _setup_loglike_func(self):
+
+        constants = {
+            "tidally_locked": self._state["tidally_locked"],
+            "compute_reflected_phase_curve": self._state[
+                "compute_reflected_phase_curve"
+            ],
+            "compute_emitted_phase_curve": self._state["compute_emitted_phase_curve"],
+            "compute_stellar_ellipsoidal_variations": self._state[
+                "compute_stellar_ellipsoidal_variations"
+            ],
+            "compute_stellar_doppler_variations": self._state[
+                "compute_stellar_doppler_variations"
+            ],
+            "parameterize_with_projected_ellipse": self._state[
+                "parameterize_with_projected_ellipse"
+            ],
+            "oversample": self._state["oversample"],
+            "random_seed": self._state["random_seed"],
+            "phase_curve_nsamples": self._state["phase_curve_nsamples"],
+            "extended_illumination_npts": self._state["extended_illumination_npts"],
+            "state": self._state,
+        }
+
+        frozen = jax.tree_util.Partial(_loglike, **constants)
+
+        @jax.custom_vjp
+        def loglike(params):
+            return frozen(params)
+
+        def loglike_fwd(params):
+            output = frozen(params)
+            jac = jax.jacfwd(frozen)(params)
+            return output, jac
+
+        def loglike_bwd(res, g):
+            val = jax.tree.map(lambda x: x.T * g, res)
+            return (val,)
+
+        loglike.defvjp(loglike_fwd, loglike_bwd)
+        loglike = jax.jit(loglike)
+
+        return loglike
 
     def _illustrate_helper(self, times=None, true_anomalies=None, nsamples=50_000):
 
