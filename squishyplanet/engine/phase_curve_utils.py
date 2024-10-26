@@ -1271,11 +1271,11 @@ def emission_at_timestep(
         hotspot_latitude (Array):
             The "latitude" of the hotspot on the planet. Defined the physics way for
             :math:`\\theta` though, not the geography way: 0 is the north pole,
-            :math:`\pi/2` is the equator, and :math:`\pi` is the south pole.
+            :math:`\\pi/2` is the equator, and :math:`\\pi` is the south pole.
         hotspot_longitude (Array):
             The longitude of the hotspot on the planet.
         hotspot_concentration (Array):
-            The concentration of the hotspot on the planet. :math:`\kappa` in the
+            The concentration of the hotspot on the planet. :math:`\\kappa` in the
             von Mises-Fisher distribution.
 
     Returns:
@@ -1471,14 +1471,14 @@ def stellar_ellipsoidal_variations(true_anomalies, stellar_ellipsoidal_alpha, pe
 
     A simple sinusoid model with minima at primary and secondary eclipse, meant to
     capture gravitational  Works only for a circular orbit and assumes
-    that :math:`\Omega=\pi`. Uses the model in
+    that :math:`\\Omega=\\pi`. Uses the model in
     `Shporer et al. 2014 <https://ui.adsabs.harvard.edu/abs/2014ApJ...788...92S/abstract>`_.
 
     Technically the amplitude in `Morris, Heng, and Kitzmann 2024 <https://ui.adsabs.harvard.edu/abs/2024arXiv240113635M/abstract>`_ is given by
 
     .. math::
 
-        A_{ellip} = \\frac{\\alpha}{0.077} \\frac{M_p}{M_J} \\left(\\frac{R_s}{R_\odot}\\right)^3 \\left(\\frac{P}{1 \\text{day}}\\right)^{-2}
+        A_{ellip} = \\frac{\\alpha}{0.077} \\frac{M_p}{M_J} \\left(\\frac{R_s}{R_\\odot}\\right)^3 \\left(\\frac{P}{1 \\text{day}}\\right)^{-2}
 
     But we instead roll everything into the alpha parameter.
 

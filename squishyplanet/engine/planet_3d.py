@@ -534,7 +534,7 @@ def planet_3d_coeffs(a, e, f, Omega, i, omega, r, obliq, prec, f1, f2, **kwargs)
         prec (Array [Radian]):
             Precession angle, or equivalently the longitude of ascending node of the
             planet's equatorial plane. This is defined at periapsis with an Omega of
-             zero as a rotation about the sky-frame z-axis.
+            zero as a rotation about the sky-frame z-axis.
         f1 (Array [Dimensionless]):
             The flattening coefficient of the planet that describes the compression
             along the planet's polar axis. A value of 0.0 indicates no flattening.
@@ -712,7 +712,7 @@ def planet_3d_coeffs_extended_illumination(
         prec (Array [Radian]):
             Precession angle, or equivalently the longitude of ascending node of the
             planet's equatorial plane. This is defined at periapsis with an Omega of
-             zero as a rotation about the sky-frame z-axis.
+            zero as a rotation about the sky-frame z-axis.
         f1 (Array [Dimensionless]):
             The flattening coefficient of the planet that describes the compression
             along the planet's polar axis. A value of 0.0 indicates no flattening.

@@ -1,6 +1,10 @@
 Changelog
 ++++++++++
 
+**0.3.1 (10/2024)**
+
+- Enforced forward-mode differentiation under the hood in ``OblateSystem`` to speed up gradient evaluation for ``OblateSystem.loglike`` or any functions that use ``OblateSystem.lightcurve``.
+
 **0.3.0 (10/2024)**
 
 - Added ``limb_darkening_laws`` module, which contains convenience functions for transforming limb darkening coefficients of commonly used limb darkening laws into coefficients of high-order polynomials that ``squishyplanet`` can use to model the intensity profile of the star.

@@ -4,12 +4,12 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "squishyplanet"
-version = "0.3.0"
+version = "0.3.1"
 requires-python = ">=3.9"
 dependencies = [
     "requests",
-    "jax<0.4.29", # avoiding https://github.com/google/jax/issues/21824 for now
-    "jaxlib<0.4.29",
+    "jax",
+    "jaxlib",
     "quadax",
     "tqdm",
     "black",

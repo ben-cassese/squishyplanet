@@ -102,7 +102,7 @@ class OblateSystem:
         obliq (float, [Radian], default=0.0):
             The obliquity of the planet. This is the angle between the planet's rotation
             axis and the normal to the orbital plane. It is defined such that a planet
-            on a circular orbit with :math:`\Omega = 0` and :math:`\\nu = 0` (i.e., when
+            on a circular orbit with :math:`\\Omega = 0` and :math:`\\nu = 0` (i.e., when
             it's along the positive :math:`x` axis) will have its north pole tipped
             *away* from the star.
         prec (float, [Radian], default=0.0):
@@ -129,7 +129,7 @@ class OblateSystem:
 
             .. math::
 
-                \\frac{I(\mu)}{I_0} = - \Sigma_{i=0}^N u_i (1 - \mu)^i
+                \\frac{I(\\mu)}{I_0} = - \\Sigma_{i=0}^N u_i (1 - \\mu)^i
 
             for some order polynomial :math:`N`. See
             `Agol, Luger, and Foreman-Mackey 2020
@@ -137,12 +137,12 @@ class OblateSystem:
         hotspot_latitude (float, [Radian], default=0.0):
             The latitude of a potential hotspot on the planet. This is defined according
             to the "physics" convention of spherical coordinates, not in the geography
-            sense: 0 is the north pole, :math:`\pi/2` is the equator, and :math:`\pi` is
+            sense: 0 is the north pole, :math:`\\pi/2` is the equator, and :math:`\\pi` is
             the south pole.
         hotspot_longitude (float, [Radian], default=0.0):
             The longitude of a potential hotspot on the planet.
         hotspot_concentration (float, default=0.2):
-            The "concentration" of the hotspot. This is the :math:`\kappa` parameter in
+            The "concentration" of the hotspot. This is the :math:`\\kappa` parameter in
             the von Mises-Fisher distribution that describes the hotspot.
         albedo (float, default=1.0):
             The (spatialy uniform) albedo of the planet. This is the fraction of light

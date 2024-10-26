@@ -1,4 +1,5 @@
 .. _limb_darkening:
+
 Limb Darkening
 ==============
 
@@ -8,4 +9,3 @@ These are convenience functions designed to transform limb darkening coefficient
     :members:
     :undoc-members:
     :show-inheritance:
-    
