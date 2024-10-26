@@ -167,7 +167,7 @@ def planet_solution_vec(a, b, g_coeffs, c_x1, c_x2, c_x3, c_y1, c_y2, c_y3):
 
     .. math::
 
-        G_1 = \\left\\{0, \\frac{1}{2} \left(x \sqrt{-x^2-y^2+1}-\left(y^2-1\\right) \\tan ^{-1}\left(\\frac{x}{\sqrt{-x^2-y^2+1}}\\right)\\right)+\\frac{\pi }{12} \\right\\}
+        G_1 = \\left\\{0, \\frac{1}{2} \\left(x \\sqrt{-x^2-y^2+1}-\\left(y^2-1\\right) \\tan ^{-1}\\left(\\frac{x}{\\sqrt{-x^2-y^2+1}}\\right)\\right)+\\frac{\\pi }{12} \\right\\}
 
     These expressions were derived by solving the required PDE in Eq. 14 with the
     boundary conditions from Eq. 27. Finally, the C coefficients here describe the
@@ -175,11 +175,11 @@ def planet_solution_vec(a, b, g_coeffs, c_x1, c_x2, c_x3, c_y1, c_y2, c_y3):
 
     .. math::
 
-        x = c_{x1} \cos(\\alpha) + c_{x2} \sin(\\alpha) + c_{x3}
+        x = c_{x1} \\cos(\\alpha) + c_{x2} \\sin(\\alpha) + c_{x3}
 
-        y = c_{y1} \cos(\\alpha) + c_{y2} \sin(\\alpha) + c_{y3}
+        y = c_{y1} \\cos(\\alpha) + c_{y2} \\sin(\\alpha) + c_{y3}
 
-    for some angle :math:`\\alpha \\in [0, 2\pi)`.
+    for some angle :math:`\\alpha \\in [0, 2\\pi)`.
 
     Args:
         a (float):

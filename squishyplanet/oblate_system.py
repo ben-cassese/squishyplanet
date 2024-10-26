@@ -21,9 +21,10 @@ from squishyplanet.engine.parametric_ellipse import (
 from squishyplanet.engine.greens_basis_transform import generate_change_of_basis_matrix
 from squishyplanet.engine.kepler import kepler, skypos, t0_to_t_peri
 from squishyplanet.engine.polynomial_limb_darkened_transit import (
-    lightcurve,
-    parameterize_2d_helper,
+    lightcurve as poly_lightcurve,
 )
+from squishyplanet.engine.polynomial_limb_darkened_transit import parameterize_2d_helper
+
 from squishyplanet.engine.phase_curve_utils import (
     pre_squish_transform,
     generate_sample_radii_thetas,
@@ -101,7 +102,7 @@ class OblateSystem:
         obliq (float, [Radian], default=0.0):
             The obliquity of the planet. This is the angle between the planet's rotation
             axis and the normal to the orbital plane. It is defined such that a planet
-            on a circular orbit with :math:`\Omega = 0` and :math:`\\nu = 0` (i.e., when
+            on a circular orbit with :math:`\\Omega = 0` and :math:`\\nu = 0` (i.e., when
             it's along the positive :math:`x` axis) will have its north pole tipped
             *away* from the star.
         prec (float, [Radian], default=0.0):
@@ -128,7 +129,7 @@ class OblateSystem:
 
             .. math::
 
-                \\frac{I(\mu)}{I_0} = - \Sigma_{i=0}^N u_i (1 - \mu)^i
+                \\frac{I(\\mu)}{I_0} = - \\Sigma_{i=0}^N u_i (1 - \\mu)^i
 
             for some order polynomial :math:`N`. See
             `Agol, Luger, and Foreman-Mackey 2020
@@ -136,12 +137,12 @@ class OblateSystem:
         hotspot_latitude (float, [Radian], default=0.0):
             The latitude of a potential hotspot on the planet. This is defined according
             to the "physics" convention of spherical coordinates, not in the geography
-            sense: 0 is the north pole, :math:`\pi/2` is the equator, and :math:`\pi` is
+            sense: 0 is the north pole, :math:`\\pi/2` is the equator, and :math:`\\pi` is
             the south pole.
         hotspot_longitude (float, [Radian], default=0.0):
             The longitude of a potential hotspot on the planet.
         hotspot_concentration (float, default=0.2):
-            The "concentration" of the hotspot. This is the :math:`\kappa` parameter in
+            The "concentration" of the hotspot. This is the :math:`\\kappa` parameter in
             the von Mises-Fisher distribution that describes the hotspot.
         albedo (float, default=1.0):
             The (spatialy uniform) albedo of the planet. This is the fraction of light
@@ -278,7 +279,7 @@ class OblateSystem:
         phase_curve_nsamples=50_000,
         random_seed=0,
         data=jnp.array([1.0]),
-        uncertainties=jnp.array([0.01]),
+        uncertainties=jnp.array([jnp.inf]),
         exposure_time=0.0,
         oversample=1,
         oversample_correction_order=2,
@@ -417,6 +418,9 @@ class OblateSystem:
                 xc=self._state["x_c"],
                 yc=self._state["y_c"],
             )
+
+        self._lightcurve_fwd_grad_enforced = self._setup_lightcurve_func()
+        self._loglike_fwd_grad_enforced = self._setup_loglike_func()
 
     def __repr__(self):
         s = pprint.pformat(self.state)
@@ -557,6 +561,95 @@ class OblateSystem:
             assert (
                 self._state["e"] == 0.0
             ), "Stellar doppler variations are only valid for circular orbits"
+
+    def _setup_lightcurve_func(self):
+
+        constants = {
+            "tidally_locked": self._state["tidally_locked"],
+            "compute_reflected_phase_curve": self._state[
+                "compute_reflected_phase_curve"
+            ],
+            "compute_emitted_phase_curve": self._state["compute_emitted_phase_curve"],
+            "compute_stellar_ellipsoidal_variations": self._state[
+                "compute_stellar_ellipsoidal_variations"
+            ],
+            "compute_stellar_doppler_variations": self._state[
+                "compute_stellar_doppler_variations"
+            ],
+            "parameterize_with_projected_ellipse": self._state[
+                "parameterize_with_projected_ellipse"
+            ],
+            "oversample": self._state["oversample"],
+            "random_seed": self._state["random_seed"],
+            "phase_curve_nsamples": self._state["phase_curve_nsamples"],
+            "extended_illumination_npts": self._state["extended_illumination_npts"],
+            "state": self._state,
+        }
+
+        frozen = jax.tree_util.Partial(_lightcurve, **constants)
+
+        @jax.custom_vjp
+        def lightcurve(params):
+            return frozen(params)
+
+        def lightcurve_fwd(params):
+            output = frozen(params)
+            jac = jax.jacfwd(frozen)(params)
+            return output, (jac,)
+
+        def lightcurve_bwd(res, g):
+            jac = res
+            val = jax.tree.map(lambda x: x.T @ g, jac)
+            return val
+
+        lightcurve.defvjp(lightcurve_fwd, lightcurve_bwd)
+        lightcurve = jax.jit(lightcurve)
+
+        return lightcurve
+
+    def _setup_loglike_func(self):
+
+        constants = {
+            "tidally_locked": self._state["tidally_locked"],
+            "compute_reflected_phase_curve": self._state[
+                "compute_reflected_phase_curve"
+            ],
+            "compute_emitted_phase_curve": self._state["compute_emitted_phase_curve"],
+            "compute_stellar_ellipsoidal_variations": self._state[
+                "compute_stellar_ellipsoidal_variations"
+            ],
+            "compute_stellar_doppler_variations": self._state[
+                "compute_stellar_doppler_variations"
+            ],
+            "parameterize_with_projected_ellipse": self._state[
+                "parameterize_with_projected_ellipse"
+            ],
+            "oversample": self._state["oversample"],
+            "random_seed": self._state["random_seed"],
+            "phase_curve_nsamples": self._state["phase_curve_nsamples"],
+            "extended_illumination_npts": self._state["extended_illumination_npts"],
+            "state": self._state,
+        }
+
+        frozen = jax.tree_util.Partial(_loglike, **constants)
+
+        @jax.custom_vjp
+        def loglike(params):
+            return frozen(params)
+
+        def loglike_fwd(params):
+            output = frozen(params)
+            jac = jax.jacfwd(frozen)(params)
+            return output, jac
+
+        def loglike_bwd(res, g):
+            val = jax.tree.map(lambda x: x.T * g, res)
+            return (val,)
+
+        loglike.defvjp(loglike_fwd, loglike_bwd)
+        loglike = jax.jit(loglike)
+
+        return loglike
 
     def _illustrate_helper(self, times=None, true_anomalies=None, nsamples=50_000):
 
@@ -1037,27 +1130,7 @@ class OblateSystem:
             >>> system.lightcurve()
 
         """
-
-        return _lightcurve(
-            tidally_locked=self._state["tidally_locked"],
-            compute_reflected_phase_curve=self._state["compute_reflected_phase_curve"],
-            compute_emitted_phase_curve=self._state["compute_emitted_phase_curve"],
-            compute_stellar_ellipsoidal_variations=self._state[
-                "compute_stellar_ellipsoidal_variations"
-            ],
-            compute_stellar_doppler_variations=self._state[
-                "compute_stellar_doppler_variations"
-            ],
-            parameterize_with_projected_ellipse=self._state[
-                "parameterize_with_projected_ellipse"
-            ],
-            oversample=self._state["oversample"],
-            random_seed=self._state["random_seed"],
-            phase_curve_nsamples=self._state["phase_curve_nsamples"],
-            extended_illumination_npts=self._state["extended_illumination_npts"],
-            state=self._state,
-            params=params,
-        )
+        return self._lightcurve_fwd_grad_enforced(params)
 
     def loglike(self, params={}):
         """
@@ -1080,32 +1153,12 @@ class OblateSystem:
             provided parameters.
 
         """
-        return _loglike(
-            tidally_locked=self._state["tidally_locked"],
-            compute_reflected_phase_curve=self._state["compute_reflected_phase_curve"],
-            compute_emitted_phase_curve=self._state["compute_emitted_phase_curve"],
-            compute_stellar_ellipsoidal_variations=self._state[
-                "compute_stellar_ellipsoidal_variations"
-            ],
-            compute_stellar_doppler_variations=self._state[
-                "compute_stellar_doppler_variations"
-            ],
-            parameterize_with_projected_ellipse=self._state[
-                "parameterize_with_projected_ellipse"
-            ],
-            oversample=self._state["oversample"],
-            random_seed=self._state["random_seed"],
-            phase_curve_nsamples=self._state["phase_curve_nsamples"],
-            extended_illumination_npts=self._state["extended_illumination_npts"],
-            state=self._state,
-            params=params,
-        )
+        return self._loglike_fwd_grad_enforced(params)
 
 
 @partial(
     jax.jit,
     static_argnums=(
-        0,
         1,
         2,
         3,
@@ -1115,9 +1168,11 @@ class OblateSystem:
         7,
         8,
         9,
+        10,
     ),
 )
 def _lightcurve(
+    params,
     tidally_locked,
     compute_reflected_phase_curve,
     compute_emitted_phase_curve,
@@ -1129,12 +1184,11 @@ def _lightcurve(
     phase_curve_nsamples,
     extended_illumination_npts,
     state,
-    params,
 ):
     # always compute the primary transit and trend
     for key in params.keys():
         state[key] = params[key]
-    transit = lightcurve(state, parameterize_with_projected_ellipse)
+    transit = poly_lightcurve(state, parameterize_with_projected_ellipse)
     trend = jnp.polyval(state["systematic_trend_coeffs"], state["times"])
 
     # if you don't want any phase curve stuff, you're done
@@ -1265,7 +1319,6 @@ def _lightcurve(
 @partial(
     jax.jit,
     static_argnums=(
-        0,
         1,
         2,
         3,
@@ -1275,9 +1328,11 @@ def _lightcurve(
         7,
         8,
         9,
+        10,
     ),
 )
 def _loglike(
+    params,
     tidally_locked,
     compute_reflected_phase_curve,
     compute_emitted_phase_curve,
@@ -1289,9 +1344,9 @@ def _loglike(
     phase_curve_nsamples,
     extended_illumination_npts,
     state,
-    params,
 ):
     lc = _lightcurve(
+        params,
         tidally_locked,
         compute_reflected_phase_curve,
         compute_emitted_phase_curve,
@@ -1303,7 +1358,6 @@ def _loglike(
         phase_curve_nsamples,
         extended_illumination_npts,
         state,
-        params,
     )
 
     for key in params.keys():

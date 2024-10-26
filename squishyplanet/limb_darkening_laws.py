@@ -109,21 +109,26 @@ def kipping_ld_law(q1, q2, return_profile=False):
     where
 
     .. math::
-        u_1 &= 2 \\sqrt{q_1} q_2
+        u_1 = 2 \\sqrt{q_1} q_2
 
-        u_2 &= \\sqrt{q_1} (1 - 2 q_2)
+    .. math::
+        u_2 = \\sqrt{q_1} (1 - 2 q_2)
 
     Args:
-        q1 (float): Kipping limb-darkening coefficient
-        q2 (float): Kipping limb-darkening coefficient
+        q1 (float):
+            Kipping limb-darkening coefficient
+        q2 (float):
+            Kipping limb-darkening coefficient
         return_profile (bool, default=False):
             Whether to return a dictionary describing the intensity profile
 
     Returns:
-        Array:
-            u coefficients used by squishyplanet to compute the intensity profile
-        dict (if return_profile=True):
-            Dictionary describing the intensity profile
+        Array or dict:
+            If `return_profile` is False, returns an array of `u` coefficients used by
+            squishyplanet to compute the intensity profile.
+
+            If `return_profile` is True, returns a dictionary describing the intensity
+            profile.
     """
     u1 = 2.0 * q1**0.5 * q2
     u2 = q1**0.5 * (1 - 2.0 * q2)
