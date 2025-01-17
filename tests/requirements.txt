@@ -1,7 +1,7 @@
 pint<0.24
 jaxoplanet>0.0.1
-jax
-numpy<2
+jax<0.4.38 # jpu issues
+numpy<2 # jpu issues
 scipy
 tqdm
 pytest
