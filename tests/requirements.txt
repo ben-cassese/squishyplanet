@@ -1,6 +1,7 @@
 pint<0.24
 jaxoplanet>0.0.1
-jax<0.4.34 # temporary restriction for jaxoplanet issue #229
+jax
+numpy<2
 scipy
 tqdm
 pytest
