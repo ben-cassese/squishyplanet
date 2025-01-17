@@ -609,7 +609,7 @@ def lambertian_reflection(surface_star_cos_angle, x, y, z):
 
 @jax.jit
 def _henyey_greenstein(g, theta):
-    return 0.5 * (1 - g1**2) / (1 + g1**2 - 2 * g * jnp.cos(theta)) ** (1.5)
+    return 0.5 * (1 - g**2) / (1 + g**2 - 2 * g * jnp.cos(theta)) ** (1.5)
 
 
 @jax.jit

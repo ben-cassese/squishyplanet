@@ -342,12 +342,15 @@ def star_solution_vec(a, b, g_coeffs, c_x1, c_x2, c_x3, c_y1, c_y2, c_y3):
     delta = jnp.abs(jnp.arctan2(jnp.sin(theta1 - theta2), jnp.cos(theta1 - theta2)))
     delta = theta2 - theta1
 
-    s0_integrand = lambda t: jnp.cos(t) ** 2
-    s1_integrand = lambda t: jnp.where(
-        (t < jnp.pi / 2) | (t > 3 * jnp.pi / 2),
-        (jnp.pi * jnp.cos(t) * (5 + 3 * jnp.cos(2 * t))) / 24.0,
-        -(jnp.pi * jnp.cos(t) * (1 + 3 * jnp.cos(2 * t))) / 24.0,
-    )
+    def s0_integrand(t):
+        return jnp.cos(t) ** 2
+
+    def s1_integrand(t):
+        return jnp.where(
+            (t < jnp.pi / 2) | (t > 3 * jnp.pi / 2),
+            (jnp.pi * jnp.cos(t) * (5 + 3 * jnp.cos(2 * t))) / 24.0,
+            -(jnp.pi * jnp.cos(t) * (1 + 3 * jnp.cos(2 * t))) / 24.0,
+        )
 
     def no_wrap(delta):
         s0, _ = quadgk(

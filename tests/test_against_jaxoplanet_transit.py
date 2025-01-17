@@ -4,16 +4,13 @@ from jax import config
 config.update("jax_enable_x64", True)
 import jax.numpy as jnp
 
-from jaxoplanet.orbits.keplerian import Central, Body, System
+from jaxoplanet.orbits.keplerian import Central, System
 from jaxoplanet.units import unit_registry as ureg
-from jaxoplanet import units
 from jaxoplanet.light_curves import limb_dark_light_curve
 
-import matplotlib.pyplot as plt
 from tqdm import tqdm
 
 from squishyplanet.engine.polynomial_limb_darkened_transit import lightcurve
-from squishyplanet.engine.kepler import kepler
 from squishyplanet import OblateSystem
 
 N_JAXOPLANT_COMPARISONS = 1000

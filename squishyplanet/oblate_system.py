@@ -455,7 +455,7 @@ class OblateSystem:
 
     def _validate_inputs(self):
         for key, val in self._state.items():
-            if type(val) == type(None):
+            if val is None:
                 if key == "r":
                     if self._state["parameterize_with_projected_ellipse"]:
                         self._state["r"] = 0.0
@@ -474,10 +474,12 @@ class OblateSystem:
         assert (
             self._state["ld_u_coeffs"].shape[0] >= 2
         ), "ld_u_coeffs must have at least 2 (even if higher-order terms are 0)"
-        assert (
-            type(self._state["phase_curve_nsamples"]) == int
+        assert isinstance(
+            self._state["phase_curve_nsamples"], int
         ), "phase_curve_nsamples must be an integer"
-        assert type(self._state["random_seed"]) == int, "random_seed must be an integer"
+        assert isinstance(
+            self._state["random_seed"], int
+        ), "random_seed must be an integer"
 
         if self._state["e"] == 0:
             assert self._state["omega"] == 0, "omega must be 0 for a circular orbit"
@@ -498,10 +500,10 @@ class OblateSystem:
                 | (key == "extended_illumination_npts")
             ):
                 continue
-            elif type(self._state[key]) == bool:
+            elif isinstance(self._state[key], bool):
                 continue
 
-            if (type(self._state[key]) == float) | (type(self._state[key]) == int):
+            if isinstance(self._state[key], (float, int)):
                 self._state[key] = jnp.array([self._state[key]])
                 shapes.append(1)
             else:
@@ -536,13 +538,13 @@ class OblateSystem:
                 "curve calculations"
             )
 
-            assert self._state["tidally_locked"] == False, (
+            assert not self._state["tidally_locked"], (
                 "parameterize_with_projected_ellipse is incompatible with "
                 "tidally_locked=True"
             )
 
         assert (self._state["oversample_correction_order"] in [0, 1, 2]) & (
-            type(self._state["oversample_correction_order"]) == int
+            isinstance(self._state["oversample_correction_order"], int)
         ), "oversample_correction_order must be 0, 1, or 2"
 
         assert self._state["oversample"] > 0, "oversample must be greater than 0"
@@ -665,7 +667,7 @@ class OblateSystem:
         else:
             true_anomalies = jnp.array([jnp.pi / 2])
 
-        if (type(true_anomalies) == float) | (type(true_anomalies) == int):
+        if isinstance(true_anomalies, (float, int)):
             true_anomalies = jnp.array([true_anomalies])
 
         # the trace of the orbit
@@ -721,7 +723,6 @@ class OblateSystem:
                 self._coeffs_3d = {}
                 area = jnp.pi * self._state["projected_effective_r"] ** 2
                 r1 = jnp.sqrt(area / ((1 - self._state["projected_f"]) * jnp.pi))
-                r2 = r1 * (1 - self._state["projected_f"])
                 self._coeffs_2d, self._para_coeffs_2d = parameterize_2d_helper(
                     projected_r=r1,
                     projected_f=self._state["projected_f"],
@@ -887,16 +888,14 @@ class OblateSystem:
         """
 
         if emitted:
-            assert (
-                reflected == False
-            ), "Can't illustrate both reflected and emitted flux"
-            assert self._state["parameterize_with_projected_ellipse"] == False, (
+            assert not reflected, "Can't illustrate both reflected and emitted flux"
+            assert not self._state["parameterize_with_projected_ellipse"], (
                 "Can't illustrate emitted flux when only describing the 2D outline of"
                 "the planet"
             )
         if reflected:
-            assert emitted == False, "Can't illustrate both reflected and emitted flux"
-            assert self._state["parameterize_with_projected_ellipse"] == False, (
+            assert not emitted, "Can't illustrate both reflected and emitted flux"
+            assert not self._state["parameterize_with_projected_ellipse"], (
                 "Can't illustrate reflected flux when only describing the 2D outline of"
                 "the planet"
             )
@@ -1061,11 +1060,7 @@ class OblateSystem:
         """
         assert (mu is None) != (r is None), "Only one of `mu` or `r` should be provided"
 
-        if ld_u_coeffs is None:
-            ld_u_coeffs = self._state["ld_u_coeffs"]
-            greens_transform = self._state["greens_basis_transform"]
-        else:
-            greens_transform = generate_change_of_basis_matrix(len(ld_u_coeffs))
+        greens_transform = generate_change_of_basis_matrix(len(ld_u_coeffs))
 
         if r is None:
             r = jnp.sqrt(1 - mu**2)
@@ -1085,7 +1080,7 @@ class OblateSystem:
             powers = jnp.arange(len(us))
             return -jnp.sum(us * (1 - mu) ** powers) * normalization_constant
 
-        if (type(r) == float) | (type(r) == int):
+        if isinstance(r, (float, int)):
             return inner(r)
         else:
             return jax.vmap(inner)(r)

@@ -639,19 +639,30 @@ def extended_illumination_offsets(
     thetas = jnp.arccos(x[-1])
     phis = jnp.arctan2(x[0], x[1])
 
-    rot_x = lambda theta: jnp.array(
-        [
-            [1, 0, 0],
-            [0, jnp.cos(theta), -jnp.sin(theta)],
-            [0, jnp.sin(theta), jnp.cos(theta)],
-        ]
-    )
-    rot_z = lambda phi: jnp.array(
-        [[jnp.cos(phi), -jnp.sin(phi), 0], [jnp.sin(phi), jnp.cos(phi), 0], [0, 0, 1]]
-    )
+    def rot_x(theta):
+        return jnp.array(
+            [
+                [1, 0, 0],
+                [0, jnp.cos(theta), -jnp.sin(theta)],
+                [0, jnp.sin(theta), jnp.cos(theta)],
+            ]
+        )
 
-    rotate_pt = lambda theta, phi, pt: jnp.dot(rot_z(phi), jnp.dot(rot_x(theta), pt))
-    func = lambda pt: jax.vmap(rotate_pt, in_axes=(0, 0, None))(thetas, phis, pt)
+    def rot_z(phi):
+        return jnp.array(
+            [
+                [jnp.cos(phi), -jnp.sin(phi), 0],
+                [jnp.sin(phi), jnp.cos(phi), 0],
+                [0, 0, 1],
+            ]
+        )
+
+    def rotate_pt(theta, phi, pt):
+        return jnp.dot(rot_z(phi), jnp.dot(rot_x(theta), pt))
+
+    def func(pt):
+        return jax.vmap(rotate_pt, in_axes=(0, 0, None))(thetas, phis, pt)
+
     pts = jax.vmap(func)(extended_illumination_points)
     return pts
 

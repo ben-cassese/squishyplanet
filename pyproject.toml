@@ -17,6 +17,7 @@ dependencies = [
     "matplotlib",
     "sympy",
     "ipykernel",
+    "ruff",
 ]
 authors = [
   {name = "Ben Cassese", email = "b.c.cassese@columbia.edu"},
@@ -45,10 +46,10 @@ include = ["squishyplanet", "squishyplanet.*"]
 [tool.black]
 line-length = 88
 
-[tool.coverage.run]
-omit = [
-    "tests/*",
+[tool.ruff]
+exclude = [
+  "*/animations.ipynb"
 ]
-exclude_lines = [
-    '.*@_defjvp*'
-]
+
+[tool.ruff.lint]
+ignore = ["E402"]

@@ -26,7 +26,7 @@ def test_limb_darkening_profile_helper():
         # this though
         try:
             val = jnp.trapezoid(z, jnp.linspace(0, 1, n)) * 2 * jnp.pi
-        except:
+        except Exception:
             val = jnp.trapz(z, jnp.linspace(0, 1, n)) * 2 * jnp.pi
 
         assert jnp.allclose(val, 1.0)

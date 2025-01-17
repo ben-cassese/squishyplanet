@@ -1,7 +1,6 @@
 import jax
 
 jax.config.update("jax_enable_x64", True)
-import jax.numpy as jnp
 
 
 def _rho_xx(p_xx, p_xy, p_xz, p_x0, p_yy, p_yz, p_y0, p_zz, p_z0, p_00):
