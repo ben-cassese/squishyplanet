@@ -5,6 +5,7 @@ numpy<2 # jpu issues
 scipy
 tqdm
 pytest
+pytest-cov
 coverage
 matplotlib
 astropy
