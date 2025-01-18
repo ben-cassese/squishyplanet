@@ -53,3 +53,7 @@ exclude = [
 
 [tool.ruff.lint]
 ignore = ["E402"]
+
+[tool.coverage.run]
+source = ["squishyplanet"]
+omit = ["tests/*"]
