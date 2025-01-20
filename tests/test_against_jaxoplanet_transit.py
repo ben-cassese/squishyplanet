@@ -3,15 +3,13 @@ from jax import config
 
 config.update("jax_enable_x64", True)
 import jax.numpy as jnp
-
+from jaxoplanet.light_curves import limb_dark_light_curve
 from jaxoplanet.orbits.keplerian import Central, System
 from jaxoplanet.units import unit_registry as ureg
-from jaxoplanet.light_curves import limb_dark_light_curve
-
 from tqdm import tqdm
 
-from squishyplanet.engine.polynomial_limb_darkened_transit import lightcurve
 from squishyplanet import OblateSystem
+from squishyplanet.engine.polynomial_limb_darkened_transit import lightcurve
 
 N_JAXOPLANT_COMPARISONS = 1000
 TIMES = jnp.linspace(-1, 1, 1728) * ureg.day  # 100s cadence for 48 hours

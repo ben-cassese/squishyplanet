@@ -31,8 +31,7 @@ def _rho_00(p_xx, p_xy, p_xz, p_x0, p_yy, p_yz, p_y0, p_zz, p_z0, p_00):
 def planet_2d_coeffs(
     p_xx, p_xy, p_xz, p_x0, p_yy, p_yz, p_y0, p_zz, p_z0, p_00, **kwargs
 ):
-    """
-    Compute the coefficients that describe the planet as an implicit 2D surface from the
+    """Compute the coefficients that describe the planet as an implicit 2D surface from the
     observer's perspective.
 
     This function transforms the coefficients that describe the planet's 3D shape into
@@ -66,6 +65,7 @@ def planet_2d_coeffs(
 
             .. math::
                 \\rho_{xx} x^2 + \\rho_{xy} xy + \\rho_{x0} x + \\rho_{yy} y^2 + \\rho_{y0} y + \\rho_{00} = 1
+
     """
     return {
         "rho_xx": _rho_xx(p_xx, p_xy, p_xz, p_x0, p_yy, p_yz, p_y0, p_zz, p_z0, p_00),

@@ -20,6 +20,7 @@ def kepler(M, ecc):
 
     Returns:
         Array: True anomaly in radians
+
     """
     sinf, cosf = _kepler(M, ecc)
     # this is the only bit that's different from jaxoplanet-
@@ -34,7 +35,7 @@ def _kepler(M, ecc):
     M = M % (2 * jnp.pi)
 
     # We can restrict to the range [0, pi)
-    high = M > jnp.pi
+    high = jnp.pi < M
     M = jnp.where(high, 2 * jnp.pi - M, M)
 
     # Solve
@@ -150,8 +151,7 @@ def _z(a, e, f, Omega, i, omega):
 
 @jax.jit
 def skypos(a, e, f, Omega, i, omega, **kwargs):
-    """
-    Compute the cartesian coordinates of the center of the planet in the sky frame
+    """Compute the cartesian coordinates of the center of the planet in the sky frame
     given its orbital elements.
 
     Args:
@@ -169,6 +169,7 @@ def skypos(a, e, f, Omega, i, omega, **kwargs):
 
     Returns:
         Array: The cartesian coordinates of the planet in the sky frame. Shape [3, N].
+
     """
     return jnp.array(
         [
@@ -180,8 +181,7 @@ def skypos(a, e, f, Omega, i, omega, **kwargs):
 
 
 def true_anomaly_at_transit_center(e, i, omega):
-    """
-    Computes the true anomaly at the instant of minimum star/planet separation.
+    """Computes the true anomaly at the instant of minimum star/planet separation.
 
     Uses equations 4.12-4.18 of
     `Kipping 2011 <https://ui.adsabs.harvard.edu/abs/2011PhDT.......294K/abstract>`_
@@ -194,8 +194,8 @@ def true_anomaly_at_transit_center(e, i, omega):
 
     Returns:
         Array: True anomaly at the instant of minimum star/planet separation in radians.
-    """
 
+    """
     hp = e * jnp.sin(omega)
     kp = e * jnp.cos(omega)
 

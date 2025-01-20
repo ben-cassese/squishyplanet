@@ -41,7 +41,7 @@ where $a$ is the semi-major axis, $e$ is the eccentricity, and $f$ is the true a
 not *rotations*, so the planet's obliquity-precession orientation does not change as a
 function of phase unless we force it to by continuously updating ``prec``. ``squishyplanet`` does this automatically whenever ``tidally_locked`` is set to ``True`` when creating an :ref:`OblateSystem` object.
 
-Finally, we rotate this orbital frame to account for our viewing geometry. We re-define the coordinate system such that we watch the scene unfold from $z = \\infty$ and $x$ is to the right. 
+Finally, we rotate this orbital frame to account for our viewing geometry. We re-define the coordinate system such that we watch the scene unfold from $z = \\infty$ and $x$ is to the right.
 
 .. video:: _static/media/videos/_static/480p15/sections/SquishyPlanet_0003.mp4
    :loop:
@@ -99,7 +99,7 @@ We can now fully describe the boundary of the flux-blocking area as a 1D paramet
 Green's Basis
 ^^^^^^^^^^^^^
 
-We happily leave a detailed explanation of this process to Agol et al., who provide an excellent description of the algorithm in the paper above (which includes links to code examples and complete derivations). However, when adapting the algorithm for this more general case we have made two additions that are worth documenting. 
+We happily leave a detailed explanation of this process to Agol et al., who provide an excellent description of the algorithm in the paper above (which includes links to code examples and complete derivations). However, when adapting the algorithm for this more general case we have made two additions that are worth documenting.
 
 We assume the star's intensity profile is described as:
 
@@ -151,7 +151,7 @@ At each timestep, the workflow is then the following:
 2. Compute the $p$ coefficients from the orbital elements.
 3. Compute the $\\rho$ coefficients from the $p$ coefficients.
 4. Solve for intersections between the planet and the star. This involves finding the roots of a quartic polynomial, which we do numerically.
-5. If there are real intersections, or if the planet is completely inside the star, compute the $c$ coefficients of the parametric ellipse. 
+5. If there are real intersections, or if the planet is completely inside the star, compute the $c$ coefficients of the parametric ellipse.
 6. If there are real intersections
 
     a. For each intersection point, compute the corresponding $\\alpha$ value.

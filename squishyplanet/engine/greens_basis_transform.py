@@ -6,9 +6,7 @@ import jax
 
 jax.config.update("jax_enable_x64", True)
 import jax.numpy as jnp
-
 from sympy import binomial, symbols, zeros
-
 
 # Define our symbols
 z, n = symbols("z n")
@@ -71,8 +69,7 @@ def _A(N):
 
 
 def generate_change_of_basis_matrix(N):
-    """
-    Generate the change of basis matrix to convert limb darking u coefficients to
+    """Generate the change of basis matrix to convert limb darking u coefficients to
     Green's basis coefficients.
 
     This function is only run once per system, though the resulting matrix is used

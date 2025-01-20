@@ -4,12 +4,12 @@ jax.config.update("jax_enable_x64", True)
 import jax.numpy as jnp
 
 from squishyplanet.limb_darkening_laws import (
-    linear_ld_law,
-    quadratic_ld_law,
     kipping_ld_law,
-    squareroot_ld_law,
+    linear_ld_law,
     nonlinear_3param_ld_law,
     nonlinear_4param_ld_law,
+    quadratic_ld_law,
+    squareroot_ld_law,
 )
 
 

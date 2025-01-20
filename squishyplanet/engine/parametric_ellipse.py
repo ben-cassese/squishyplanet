@@ -6,8 +6,7 @@ import jax.numpy as jnp
 
 @jax.jit
 def poly_to_parametric_helper(rho_xx, rho_xy, rho_x0, rho_yy, rho_y0, rho_00):
-    """
-    A helper function for :func:`poly_to_parametric`.
+    """A helper function for :func:`poly_to_parametric`.
 
     Args:
         rho_xx (Array [Dimensionless]): Coefficient of x^2
@@ -25,6 +24,7 @@ def poly_to_parametric_helper(rho_xx, rho_xy, rho_x0, rho_yy, rho_y0, rho_00):
             - yc (Array [Rstar]): y-coordinate of the center of the ellipse
             - cosa (Array [Dimensionless]): Cosine of the rotation angle
             - sina (Array [Dimensionless]): Sine of the rotation angle
+
     """
     # (* base eq *)
     # pxx  x^2 + pxy  x  y + px0 x + pyy y^2 + py0 y + p00 == 1
@@ -126,8 +126,7 @@ def poly_to_parametric_helper(rho_xx, rho_xy, rho_x0, rho_yy, rho_y0, rho_00):
 
 @jax.jit
 def poly_to_parametric(rho_xx, rho_xy, rho_x0, rho_yy, rho_y0, rho_00):
-    """
-    Convert between the coefficients that describe an implicit to those
+    """Convert between the coefficients that describe an implicit to those
     defining a parametric ellipse.
 
     The input coefficients are those of the implicit ellipse equation:
@@ -153,6 +152,7 @@ def poly_to_parametric(rho_xx, rho_xy, rho_x0, rho_yy, rho_y0, rho_00):
             .. math::
                 x = c_{x1} * \\cos(\\alpha) + c_{x2} * \\sin(\\alpha) + c_{x3}
                 y = c_{y1} * \\cos(\\alpha) + c_{y2} * \\sin(\\alpha) + c_{y3}
+
     """
     r1, r2, xc, yc, cosa, sina = poly_to_parametric_helper(
         rho_xx, rho_xy, rho_x0, rho_yy, rho_y0, rho_00
@@ -179,8 +179,7 @@ def cartesian_intersection_to_parametric_angle(
     c_y2,
     c_y3,
 ):
-    """
-    Given a set of x and y coordinates corresponding to the intersection of the planet
+    """Given a set of x and y coordinates corresponding to the intersection of the planet
     and star, compute the angle :math:`\\alpha` that corresponds to each point.
 
     Here, :math:`\\alpha` is the parameter in the parametric equations of the ellipse.
@@ -200,7 +199,6 @@ def cartesian_intersection_to_parametric_angle(
         Array [Rstar]: The angle :math:`\\alpha` corresponding to each intersection point
 
     """
-
     # center the ellipse
     xs -= c_x3
     ys -= c_y3

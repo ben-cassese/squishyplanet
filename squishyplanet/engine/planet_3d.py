@@ -500,8 +500,7 @@ def _p_00(a, e, f, Omega, i, omega, r, obliq, prec, f1, f2):
 
 @jax.jit
 def planet_3d_coeffs(a, e, f, Omega, i, omega, r, obliq, prec, f1, f2, **kwargs):
-    """
-    Calculate and return the coefficients that describe the planet as an implicit
+    """Calculate and return the coefficients that describe the planet as an implicit
     surface in 3D space as a function of its orbital state.
 
     This function computes a dictionary of coefficients related to the 3D position
@@ -555,6 +554,7 @@ def planet_3d_coeffs(a, e, f, Omega, i, omega, r, obliq, prec, f1, f2, **kwargs)
 
             .. math::
                 p_{xx} x^2 + p_{xy} xy + p_{xz} xz + p_{x0} x + p_{yy} y^2 + p_{yz} yz + p_{y0} y + p_{zz} z^2 + p_{z0} z + p_{00} = 1
+
     """
     return {
         "p_xx": _p_xx(a, e, f, Omega, i, omega, r, obliq, prec, f1, f2),
@@ -573,8 +573,7 @@ def planet_3d_coeffs(a, e, f, Omega, i, omega, r, obliq, prec, f1, f2, **kwargs)
 def extended_illumination_offsets(
     a, e, f, Omega, i, omega, extended_illumination_points, **kwargs
 ):
-    """
-    Generate a set of points uniformly distributed on the portion of the star visible
+    """Generate a set of points uniformly distributed on the portion of the star visible
     from the planet.
 
     This takes a spherical cap of points centered on the north pole of the star,
@@ -611,7 +610,6 @@ def extended_illumination_offsets(
             centered on the sub-planet point on the star.
 
     """
-
     xc, yc, zc = skypos(a, e, f, Omega, i, omega)
 
     # account for the fact that an observer at the center of the planet couldn't see
@@ -683,8 +681,7 @@ def planet_3d_coeffs_extended_illumination(
     offsets,
     **kwargs,
 ):
-    """
-    Generate many sets of p coefficients that describe same planet offset from its
+    """Generate many sets of p coefficients that describe same planet offset from its
     true position by different amounts.
 
     Since the star is not actually a point source, we slightly underestimate the
@@ -749,7 +746,6 @@ def planet_3d_coeffs_extended_illumination(
             offsets.
 
     """
-
     if prec.shape != f.shape:
         prec = jnp.ones_like(f) * prec
 

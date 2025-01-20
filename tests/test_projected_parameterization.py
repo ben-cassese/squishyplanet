@@ -1,12 +1,11 @@
 import jax
 
 jax.config.update("jax_enable_x64", True)
+import astropy.units as u
 import jax.numpy as jnp
+from tqdm import tqdm
 
 from squishyplanet import OblateSystem
-
-import astropy.units as u
-from tqdm import tqdm
 
 
 def test_projected_parameterization():
@@ -55,7 +54,7 @@ def test_projected_parameterization():
     }
     planet2 = OblateSystem(**injected_state2)
 
-    for i in tqdm(range(2_000)):
+    for _i in tqdm(range(2_000)):
         key, *subkeys = jax.random.split(key, (5,))
 
         # the 3d planet

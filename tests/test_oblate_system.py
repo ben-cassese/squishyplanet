@@ -2,15 +2,14 @@ import jax
 
 jax.config.update("jax_enable_x64", True)
 import jax.numpy as jnp
+import matplotlib.pyplot as plt
 
 from squishyplanet import OblateSystem
-
-import matplotlib.pyplot as plt
 
 
 def test_limb_darkening_profile_helper():
     key = jax.random.PRNGKey(0)
-    for i in range(1_000):
+    for _i in range(1_000):
         key, *subkeys = jax.random.split(key, (3,))
         poly_order = jax.random.randint(subkeys[0], (1,), minval=2, maxval=7)
         poly_order = int(poly_order[0])

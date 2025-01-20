@@ -19,7 +19,7 @@ python -m pip install git+https://github.com/ben-cassese/squishyplanet
 ```
 
 <span style="font-size:larger;">Option 3: clone and install an editable version:</span>
-    
+
 ```bash
 git clone https://github.com/ben-cassese/squishyplanet
 cd squishyplanet

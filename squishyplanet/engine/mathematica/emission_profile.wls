@@ -29,7 +29,7 @@ coeffs = CoefficientRules[w[[1]], {x,y,z}];
 Do[
 Export[files[[v]],
  FortranForm[Simplify[coeffs[[v]][[2]]]]], {v, 1, 4}]
- 
+
 files = {
 StringJoin[NotebookDirectory[], "y_x.txt"],
 StringJoin[NotebookDirectory[], "y_y.txt"],
@@ -40,8 +40,8 @@ coeffs = CoefficientRules[w[[2]], {x,y,z}];
 Do[
 Export[files[[v]],
  FortranForm[Simplify[coeffs[[v]][[2]]]]], {v, 1, 4}]
- 
- 
+
+
 files = {
 StringJoin[NotebookDirectory[], "z_x.txt"],
 StringJoin[NotebookDirectory[], "z_y.txt"],

@@ -1,18 +1,18 @@
 import jax
 
 jax.config.update("jax_enable_x64", True)
-import jax.numpy as jnp
-
-from quadax import quadgk
 from functools import partial
 
-from squishyplanet.engine.planet_3d import planet_3d_coeffs
-from squishyplanet.engine.planet_2d import planet_2d_coeffs
-from squishyplanet.engine.parametric_ellipse import (
-    poly_to_parametric,
-    cartesian_intersection_to_parametric_angle,
-)
+import jax.numpy as jnp
+from quadax import quadgk
+
 from squishyplanet.engine.kepler import kepler, skypos, t0_to_t_peri
+from squishyplanet.engine.parametric_ellipse import (
+    cartesian_intersection_to_parametric_angle,
+    poly_to_parametric,
+)
+from squishyplanet.engine.planet_2d import planet_2d_coeffs
+from squishyplanet.engine.planet_3d import planet_3d_coeffs
 
 epsabs = epsrel = 1e-12
 
@@ -76,8 +76,7 @@ def _single_intersection_points(
 
 @jax.jit
 def parameterize_2d_helper(projected_r, projected_f, projected_theta, xc, yc):
-    """
-    Convert from the alternative sky-projected parameterization to the same format
+    """Convert from the alternative sky-projected parameterization to the same format
     used by the 3D parameterization.
 
     A good chunk of the code assumes that the planet's center is determined by the
@@ -146,8 +145,7 @@ def parameterize_2d_helper(projected_r, projected_f, projected_theta, xc, yc):
 
 @jax.jit
 def planet_solution_vec(a, b, g_coeffs, c_x1, c_x2, c_x3, c_y1, c_y2, c_y3):
-    """
-    Compute the "solution vector" for a 1D path across the star that lies on the outline
+    """Compute the "solution vector" for a 1D path across the star that lies on the outline
     of the planet.
 
     This computes Eq. 21 of `Agol, Luger, and Foreman-Mackey 2020
@@ -209,6 +207,7 @@ def planet_solution_vec(a, b, g_coeffs, c_x1, c_x2, c_x3, c_y1, c_y2, c_y3):
         Array:
             The solution vector for the path along the planet's outline. The shape will
             match that of the input ``g_coeffs``.
+
     """
 
     def s0_integrand(s):
@@ -278,8 +277,7 @@ def planet_solution_vec(a, b, g_coeffs, c_x1, c_x2, c_x3, c_y1, c_y2, c_y3):
 
 @jax.jit
 def star_solution_vec(a, b, g_coeffs, c_x1, c_x2, c_x3, c_y1, c_y2, c_y3):
-    """
-    Compute the "solution vector" for a 1D path across the star that lies on the edge
+    """Compute the "solution vector" for a 1D path across the star that lies on the edge
     of the star itself.
 
     This is equivalent to :func:`planet_solution_vec`, but instead of integrating over
@@ -398,8 +396,7 @@ def star_solution_vec(a, b, g_coeffs, c_x1, c_x2, c_x3, c_y1, c_y2, c_y3):
 
 @partial(jax.jit, static_argnames=("parameterize_with_projected_ellipse",))
 def lightcurve(state, parameterize_with_projected_ellipse):
-    """
-    The main function for computing a transit light curve.
+    """The main function for computing a transit light curve.
 
     This function will return a 1-D array representing the flux recieved from the star,
     where each entry corresponds to a time in the input `state` dictionary. It first
@@ -437,7 +434,6 @@ def lightcurve(state, parameterize_with_projected_ellipse):
             ``state["times"]``.
 
     """
-
     # array we'll modify if the planet is in transit
     fluxes = jnp.ones_like(state["times"])
 

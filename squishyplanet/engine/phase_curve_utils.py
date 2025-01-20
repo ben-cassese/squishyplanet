@@ -13,8 +13,7 @@ from squishyplanet.engine.planet_2d import planet_2d_coeffs
 
 @jax.jit
 def generate_sample_radii_thetas(key, num_points):
-    """
-    Create a random set of radii and thetas for sampling the planet's surface.
+    """Create a random set of radii and thetas for sampling the planet's surface.
 
     These are uniformly distributed through a unit circle and will be scaled and rotated
     to match the planet's shape and orientation at each timestep. However, they will
@@ -30,6 +29,7 @@ def generate_sample_radii_thetas(key, num_points):
         Tuple:
             A tuple of two arrays, the first containing the radii and the second
             containing the thetas.
+
     """
     key, subkey = jax.random.split(key)
     sample_radii = jnp.sqrt(
@@ -124,8 +124,7 @@ def sample_surface(
     p_00,
     **kwargs,
 ):
-    """
-    Convert randomly sampled :math:`(x, y)` points on the projected planet to
+    """Convert randomly sampled :math:`(x, y)` points on the projected planet to
     :math:`(x, y, z)` points on the planet's surface.
 
     The :math:`rho` coefficients are calculated with :func:`planet_2d.planet_2d_coeffs`,
@@ -205,8 +204,7 @@ def planet_surface_normal(
     p_z0,
     p_00,
 ):
-    """
-    Compute the unit normal vector to the planet's surface at a given point.
+    """Compute the unit normal vector to the planet's surface at a given point.
 
     The input :math:`(x, y, z)` points are assumed to lie on the planet's surface.
 
@@ -228,6 +226,7 @@ def planet_surface_normal(
     Returns:
         Array:
             An array of shape (3, n) containing the unit normal vectors at each point.
+
     """
     grad_planet = -jnp.array(
         [
@@ -248,8 +247,7 @@ def surface_star_cos_angle(
     z_c,
     **kwargs,
 ):
-    """
-    A helper function to compute the cosine of the angle between the planet's surface
+    """A helper function to compute the cosine of the angle between the planet's surface
     normal vector and the vector linking the center of the planet to the star.
 
     This is an approximation that the star is a) a point source and b) that
@@ -276,7 +274,6 @@ def surface_star_cos_angle(
 
 
     """
-
     star = jnp.array([x_c, y_c, z_c])
     star_norm = jnp.linalg.norm(star, axis=0)
 
@@ -385,8 +382,7 @@ def planet_from_star(
     z_c,
     **kwargs,
 ):
-    """
-    Compute the coefficients of the planet's 3D shape from the star's perspective,
+    """Compute the coefficients of the planet's 3D shape from the star's perspective,
     as if it were aligned the the :math:`z` axis.
 
     When computing the reflected flux from the planet, we need to know how much flux
@@ -577,8 +573,7 @@ def planet_from_star(
 
 @jax.jit
 def lambertian_reflection(surface_star_cos_angle, x, y, z):
-    """
-    Compute the reflected intensity at a specific point on the planet's surface assuming
+    """Compute the reflected intensity at a specific point on the planet's surface assuming
     a simple Lambertian reflection model.
 
     This is a simple model that assumes the planet reflects light according to Lambert's
@@ -636,8 +631,7 @@ def reflected_normalization(
     zo=0.0,
     **kwargs,
 ):
-    """
-    Compute the time-dependent normalization factor for the reflected light.
+    """Compute the time-dependent normalization factor for the reflected light.
 
     The reflected light computations are almost entirely carried out assuming the star
     is a point source 1 R_star from the center of the planet emitting plane-parallel
@@ -726,8 +720,7 @@ def reflected_phase_curve(
     yo=jnp.array([0.0]),
     zo=jnp.array([0.0]),
 ):
-    """
-    Compute the timeseries of light reflected from  the planet.
+    """Compute the timeseries of light reflected from  the planet.
 
     This function computes the reflected light from the planet at each time step. It
     assume the planet is a) a Lambertian reflector, b) that the star is a point source
@@ -778,7 +771,6 @@ def reflected_phase_curve(
 
 
     """
-
     # can be used to generate just a reflected curve alone
     # if doing emission also though, some of these calculations can be reused
 
@@ -909,8 +901,7 @@ def reflected_phase_curve(
 def extended_illumination_reflected_phase_curve(
     sample_radii, sample_thetas, two, three, state, x_c, y_c, z_c, offsets
 ):
-    """
-    WIP, not yet implemented. Hiding behind a NotImplementedError when setting
+    """WIP, not yet implemented. Hiding behind a NotImplementedError when setting
     `extended_illumination_npts` to anything greater than 1 when initializing an
     :class:`OblateSystem` object.
     """
@@ -1032,8 +1023,7 @@ def _z_0(a, e, f, Omega, i, omega, r, obliq, prec):
 
 @jax.jit
 def pre_squish_transform(a, e, f, Omega, i, omega, r, obliq, prec, **kwargs):
-    """
-    Compute the rotation matrix to go from the sky frame to the planet's.
+    """Compute the rotation matrix to go from the sky frame to the planet's.
 
     This is the underlying transformation behind everything in
     :func:`planet_3d.planet_3d_coeffs`, except that module never actually uses it
@@ -1189,11 +1179,9 @@ def corrected_emission_profile(
     hotspot_concentration,
     **kwargs,
 ):
-    """
-    A helper function to :func:`emission_at_timestep`, broken out only to be used for
+    """A helper function to :func:`emission_at_timestep`, broken out only to be used for
     illustrations in :func:`OblateSystem.illustrate`.
     """
-
     # always one time slice at a time
 
     # do this check before you transform into the planet frame
@@ -1249,8 +1237,7 @@ def emission_at_timestep(
     hotspot_longitude,
     hotspot_concentration,
 ):
-    """
-    Compute the emitted intensity at a given point on the planet's surface.
+    """Compute the emitted intensity at a given point on the planet's surface.
 
     Args:
         x (Array):
@@ -1281,6 +1268,7 @@ def emission_at_timestep(
     Returns:
         Array:
             The intensity of the emitted light at each point.
+
     """
     # always one time slice at a time
 
@@ -1319,8 +1307,7 @@ def emission_phase_curve(
     state,
     **kwargs,
 ):
-    """
-    Compute the timeseries of the emitted light from the planet.
+    """Compute the timeseries of the emitted light from the planet.
 
     This function does a Monte Carlo estimation of the visible flux emitted by the
     planet at each time step assuming that a) the surface intensity is modeled by a
@@ -1466,8 +1453,7 @@ def emission_phase_curve(
 
 @jax.jit
 def stellar_ellipsoidal_variations(true_anomalies, stellar_ellipsoidal_alpha, period):
-    """
-    Compute the contributions to a phase curve for a star with ellipsoidal variations.
+    """Compute the contributions to a phase curve for a star with ellipsoidal variations.
 
     A simple sinusoid model with minima at primary and secondary eclipse, meant to
     capture gravitational  Works only for a circular orbit and assumes
@@ -1504,8 +1490,7 @@ def stellar_ellipsoidal_variations(true_anomalies, stellar_ellipsoidal_alpha, pe
 
 @jax.jit
 def stellar_doppler_variations(true_anomalies, stellar_doppler_alpha, period):
-    """
-    Compute the contributions to a phase curve for a star with Doppler variations.
+    """Compute the contributions to a phase curve for a star with Doppler variations.
 
     A simple sinusoid model with a phase of 90 degrees at primary transit meant to
     capture Doppler boosting/flux falling in and out of the bandpass.
@@ -1521,8 +1506,8 @@ def stellar_doppler_variations(true_anomalies, stellar_doppler_alpha, period):
     Returns:
         Array:
             The contribution to the phase curve from the star's Doppler variations.
-    """
 
+    """
     amp = stellar_doppler_alpha  # / period**(-1/3)
     phi = true_anomalies - jnp.pi / 2  # orbital phase is zero at primary transit
     phi = jnp.where(phi < 0, phi + 2 * jnp.pi, phi)
@@ -1537,8 +1522,7 @@ def stellar_doppler_variations(true_anomalies, stellar_doppler_alpha, period):
 
 @jax.jit
 def phase_curve(sample_radii, sample_thetas, two, three, state, x_c, y_c, z_c):
-    """
-    Compute the reflected and emitted phase curves of the planet.
+    """Compute the reflected and emitted phase curves of the planet.
 
     This is essentially a wrapper for :func:`reflected_phase_curve` and
     :func:`emission_phase_curve`, except is reuses computations where it can, and also
@@ -1574,7 +1558,6 @@ def phase_curve(sample_radii, sample_thetas, two, three, state, x_c, y_c, z_c):
             The correctly scaled reflected and emitted contributions to the phase curve.
 
     """
-
     if two["rho_xx"].shape != two["rho_x0"].shape:
         two["rho_xx"] = jnp.ones_like(x_c) * two["rho_xx"]
         two["rho_xy"] = jnp.ones_like(x_c) * two["rho_xy"]

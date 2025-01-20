@@ -1,50 +1,48 @@
 import jax
 
 jax.config.update("jax_enable_x64", True)
-import jax.numpy as jnp
-
 import copy
-from functools import partial
 import pprint
+from functools import partial
+
+import jax.numpy as jnp
 import matplotlib.pyplot as plt
 
-from squishyplanet.engine.planet_3d import (
-    planet_3d_coeffs,
-    extended_illumination_offsets,
-    planet_3d_coeffs_extended_illumination,
-)
-from squishyplanet.engine.planet_2d import planet_2d_coeffs
-from squishyplanet.engine.parametric_ellipse import (
-    poly_to_parametric_helper,
-    poly_to_parametric,
-)
 from squishyplanet.engine.greens_basis_transform import generate_change_of_basis_matrix
 from squishyplanet.engine.kepler import kepler, skypos, t0_to_t_peri
+from squishyplanet.engine.parametric_ellipse import (
+    poly_to_parametric,
+    poly_to_parametric_helper,
+)
+from squishyplanet.engine.phase_curve_utils import (
+    corrected_emission_profile,
+    emission_phase_curve,
+    extended_illumination_reflected_phase_curve,
+    generate_sample_radii_thetas,
+    lambertian_reflection,
+    phase_curve,
+    planet_surface_normal,
+    pre_squish_transform,
+    reflected_phase_curve,
+    sample_surface,
+    stellar_doppler_variations,
+    stellar_ellipsoidal_variations,
+    surface_star_cos_angle,
+)
+from squishyplanet.engine.planet_2d import planet_2d_coeffs
+from squishyplanet.engine.planet_3d import (
+    extended_illumination_offsets,
+    planet_3d_coeffs,
+    planet_3d_coeffs_extended_illumination,
+)
 from squishyplanet.engine.polynomial_limb_darkened_transit import (
     lightcurve as poly_lightcurve,
 )
 from squishyplanet.engine.polynomial_limb_darkened_transit import parameterize_2d_helper
 
-from squishyplanet.engine.phase_curve_utils import (
-    pre_squish_transform,
-    generate_sample_radii_thetas,
-    sample_surface,
-    planet_surface_normal,
-    surface_star_cos_angle,
-    lambertian_reflection,
-    corrected_emission_profile,
-    reflected_phase_curve,
-    extended_illumination_reflected_phase_curve,
-    emission_phase_curve,
-    phase_curve,
-    stellar_ellipsoidal_variations,
-    stellar_doppler_variations,
-)
-
 
 class OblateSystem:
-    """
-    The core user interface for ``squishyplanet``, used to model potentially-triaxial
+    """The core user interface for ``squishyplanet``, used to model potentially-triaxial
     exoplanet transits/phase curves.
 
     Note, all instances will have values associated with phase curve
@@ -386,7 +384,7 @@ class OblateSystem:
 
         if not self._state["parameterize_with_projected_ellipse"]:
             self._coeffs_3d = planet_3d_coeffs(**self._state)
-            for key in self._coeffs_3d.keys():
+            for key in self._coeffs_3d:
                 if self._coeffs_3d[key].shape[0] == ():
                     self._coeffs_3d[key] = jnp.array([self._coeffs_3d[key]])
 
@@ -428,8 +426,7 @@ class OblateSystem:
 
     @property
     def state(self):
-        """
-        A dictionary that includes all of the parameters of the system.
+        """A dictionary that includes all of the parameters of the system.
 
         This is an immutable property, and will raise an error if you try to set it.
         If altering parameters that would affect a lightcurve, pass those as a
@@ -443,7 +440,6 @@ class OblateSystem:
             two.
 
         """
-
         # we internally changed "times" if oversample > 1, but we alwasy bin it back
         # down to the original times, so we can undo that expansion here
         s = copy.deepcopy(self._state)
@@ -456,10 +452,9 @@ class OblateSystem:
     def _validate_inputs(self):
         for key, val in self._state.items():
             if val is None:
-                if key == "r":
-                    if self._state["parameterize_with_projected_ellipse"]:
-                        self._state["r"] = 0.0
-                        continue
+                if (key == "r") & (self._state["parameterize_with_projected_ellipse"]):
+                    self._state["r"] = 0.0
+                    continue
                 if key == "t_peri":
                     continue
                 if key == "t0":
@@ -485,7 +480,7 @@ class OblateSystem:
             assert self._state["omega"] == 0, "omega must be 0 for a circular orbit"
 
         shapes = []
-        for key in self._state.keys():
+        for key in self._state:
             if (
                 (key == "times")
                 | (key == "ld_u_coeffs")
@@ -498,9 +493,7 @@ class OblateSystem:
                 | (key == "oversample")
                 | (key == "oversample_correction_order")
                 | (key == "extended_illumination_npts")
-            ):
-                continue
-            elif isinstance(self._state[key], bool):
+            ) or isinstance(self._state[key], bool):
                 continue
 
             if isinstance(self._state[key], (float, int)):
@@ -712,7 +705,7 @@ class OblateSystem:
             self._state["z_c"] = positions[2, :]
             if not self._state["parameterize_with_projected_ellipse"]:
                 self._coeffs_3d = planet_3d_coeffs(**self._state)
-                for key in self._coeffs_3d.keys():
+                for key in self._coeffs_3d:
                     if self._coeffs_3d[key].shape[0] == ():
                         self._coeffs_3d[key] = jnp.array([self._coeffs_3d[key]])
 
@@ -833,8 +826,7 @@ class OblateSystem:
         nsamples=50_000,
         figsize=(8, 8),
     ):
-        """
-        Visualize the layout of the system at one or more times.
+        """Visualize the layout of the system at one or more times.
 
         This method, if run in a jupyter notebook, will display a plot of some
         combination of the star, planet, and its orbit. It can color in the planet
@@ -843,7 +835,6 @@ class OblateSystem:
         and/or its orientation after deformation.
 
         Args:
-
             times (array-like, [Days], default=None):
                 The times at which to illustrate the system. The gap between times is
                 assumed to be in units of days, but any zero-point/standard system
@@ -886,7 +877,6 @@ class OblateSystem:
             return value.
 
         """
-
         if emitted:
             assert not reflected, "Can't illustrate both reflected and emitted flux"
             assert not self._state["parameterize_with_projected_ellipse"], (
@@ -995,8 +985,7 @@ class OblateSystem:
 
     @staticmethod
     def fit_limb_darkening_profile(intensities, order=None, mus=None, rs=None):
-        """
-        Convert a stellar limb darkening profile to a polynomial representation.
+        """Convert a stellar limb darkening profile to a polynomial representation.
 
         Given a set of stellar parameters, one can use a grid of stellar models to compute
         the limb darkening profile as a function of projected `r` or of
@@ -1035,8 +1024,7 @@ class OblateSystem:
 
     @staticmethod
     def limb_darkening_profile(ld_u_coeffs=None, r=None, mu=None):
-        """
-        Compute the limb darkening profile of the star at a given radius.
+        """Compute the limb darkening profile of the star at a given radius.
 
         Meant as a helper function for sanity checks and plotting, especially if you're
         using higher-order limb darkening laws and are concerned if the profile is
@@ -1086,8 +1074,7 @@ class OblateSystem:
             return jax.vmap(inner)(r)
 
     def lightcurve(self, params={}):
-        """
-        Compute the light curve of the system.
+        """Compute the light curve of the system.
 
         This method will return the light curve of the system at the times specified
         when the system was initialized. If you want to compute the light curve at
@@ -1128,8 +1115,7 @@ class OblateSystem:
         return self._lightcurve_fwd_grad_enforced(params)
 
     def loglike(self, params={}):
-        """
-        Compute the log likelihood of the system given the observed data and some set of
+        """Compute the log likelihood of the system given the observed data and some set of
         parameters.
 
         This method will call :func:`lightcurve` with the provided parameters and
@@ -1181,7 +1167,7 @@ def _lightcurve(
     state,
 ):
     # always compute the primary transit and trend
-    for key in params.keys():
+    for key in params:
         state[key] = params[key]
     transit = poly_lightcurve(state, parameterize_with_projected_ellipse)
     trend = jnp.polyval(state["systematic_trend_coeffs"], state["times"])
@@ -1355,7 +1341,7 @@ def _loglike(
         state,
     )
 
-    for key in params.keys():
+    for key in params:
         state[key] = params[key]
 
     resids = state["data"] - lc
@@ -1366,8 +1352,7 @@ def _loglike(
 
 @partial(jax.jit, static_argnums=(1,))
 def _fit_limb_darkening_profile(intensities, order=None, mus=None, rs=None):
-    """
-    Convert a stellar limb darkening profile to a polynomial representation.
+    """Convert a stellar limb darkening profile to a polynomial representation.
 
     Given a set of stellar parameters, one can use a grid of stellar models to compute
     the limb darkening profile as a function of projected `r` or of

@@ -3,9 +3,10 @@
 import jax
 
 jax.config.update("jax_enable_x64", True)
+from functools import partial
+
 import jax.numpy as jnp
 
-from functools import partial
 from squishyplanet import OblateSystem
 
 mu_grid = jnp.linspace(0, 1, 500)
@@ -13,8 +14,7 @@ mu_grid = jnp.linspace(0, 1, 500)
 
 @partial(jax.jit, static_argnames=("return_profile"))
 def linear_ld_law(u1, return_profile=False):
-    """
-    Linear limb-darkening law.
+    """Linear limb-darkening law.
 
     .. math::
         \\frac{I(\\mu)}{I(\\mu = 1)} = 1 - u_1 (1 - \\mu)
@@ -30,6 +30,7 @@ def linear_ld_law(u1, return_profile=False):
             (here it's just [u1, 0], since we always need at least two coefficients)
         dict (if return_profile=True):
             Dictionary describing the intensity profile
+
     """
     u_coeffs = jnp.array([u1, 0])
 
@@ -54,8 +55,7 @@ def linear_ld_law(u1, return_profile=False):
 
 @partial(jax.jit, static_argnames=("return_profile"))
 def quadratic_ld_law(u1, u2, return_profile=False):
-    """
-    Quadratic limb-darkening law.
+    """Quadratic limb-darkening law.
 
     .. math::
         \\frac{I(\\mu)}{I(\\mu = 1)} = 1 - u_1 (1 - \\mu) - u_2 (1 - \\mu)^2
@@ -73,6 +73,7 @@ def quadratic_ld_law(u1, u2, return_profile=False):
             included only to give a consistent interface to the limb-darkening laws)
         dict (if return_profile=True):
             Dictionary describing the intensity profile
+
     """
     u_coeffs = jnp.array([u1, u2])
 
@@ -97,8 +98,7 @@ def quadratic_ld_law(u1, u2, return_profile=False):
 
 @partial(jax.jit, static_argnames=("return_profile"))
 def kipping_ld_law(q1, q2, return_profile=False):
-    """
-    Kipping limb-darkening law.
+    """Kipping limb-darkening law.
 
     A restriction of the quadratic law from Kipping 2013 that guaratees a monotonic
     increasing intensity profile
@@ -129,6 +129,7 @@ def kipping_ld_law(q1, q2, return_profile=False):
 
             If `return_profile` is True, returns a dictionary describing the intensity
             profile.
+
     """
     u1 = 2.0 * q1**0.5 * q2
     u2 = q1**0.5 * (1 - 2.0 * q2)
@@ -155,8 +156,7 @@ def kipping_ld_law(q1, q2, return_profile=False):
 
 @partial(jax.jit, static_argnames=("return_profile"))
 def squareroot_ld_law(u1, u2, order=12, return_profile=False):
-    """
-    Square root limb-darkening law.
+    """Square root limb-darkening law.
 
     .. math::
         \\frac{I(\\mu)}{I(\\mu = 1)} = 1 - u_1 (1 - \\mu) - u_2 (1 - \\sqrt{\\mu})
@@ -174,6 +174,7 @@ def squareroot_ld_law(u1, u2, order=12, return_profile=False):
             created by the limb-darkening law across a dense grid of mu values
         dict (if return_profile=True):
             Dictionary describing the intensity profile
+
     """
     intensity_profile = 1 - u1 * (1 - mu_grid) - u2 * (1 - mu_grid**0.5)
     u_coeffs = OblateSystem.fit_limb_darkening_profile(
@@ -201,8 +202,7 @@ def squareroot_ld_law(u1, u2, order=12, return_profile=False):
 
 @partial(jax.jit, static_argnames=("return_profile"))
 def nonlinear_3param_ld_law(u1, u2, u3, order=12, return_profile=False):
-    """
-    Non-linear 3-parameter limb-darkening law.
+    """Non-linear 3-parameter limb-darkening law.
 
     .. math::
         \\frac{I(\\mu)}{I(\\mu = 1)} = 1 - u_1 (1 - \\mu) - u_2 (1 - \\mu^{1.5}) - u_3 (1 - \\mu^2)
@@ -221,6 +221,7 @@ def nonlinear_3param_ld_law(u1, u2, u3, order=12, return_profile=False):
             created by the limb-darkening law across a dense grid of mu values
         dict (if return_profile=True):
             Dictionary describing the intensity profile
+
     """
     intensity_profile = (
         1 - u1 * (1 - mu_grid) - u2 * (1 - mu_grid**1.5) - u3 * (1 - mu_grid**2)
@@ -250,8 +251,7 @@ def nonlinear_3param_ld_law(u1, u2, u3, order=12, return_profile=False):
 
 @partial(jax.jit, static_argnames=(["order", "return_profile"]))
 def nonlinear_4param_ld_law(u1, u2, u3, u4, order=12, return_profile=False):
-    """
-    Non-linear 4-parameter limb-darkening law.
+    """Non-linear 4-parameter limb-darkening law.
 
     .. math::
         \\frac{I(\\mu)}{I(\\mu = 1)} = 1 - u_1 (1 - \\mu^{0.5}) - u_2 (1 - \\mu) - u_2 (1 - \\mu^{1.5}) - u_3 (1 - \\mu^2)
@@ -271,6 +271,7 @@ def nonlinear_4param_ld_law(u1, u2, u3, u4, order=12, return_profile=False):
             created by the limb-darkening law across a dense grid of mu values
         dict (if return_profile=True):
             Dictionary describing the intensity profile
+
     """
     intensity_profile = (
         1
