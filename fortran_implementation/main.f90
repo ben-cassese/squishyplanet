@@ -1,0 +1,67 @@
+program main
+    !!!!!!!!!
+   ! imports
+    !!!!!!!!!
+   use model_types, only: orbit_parameters, planet_parameters
+   use constants, only: PI
+   use read_in_files, only: read_time_array, read_change_of_basis_matrix
+   use keplerian, only: kepler, t0_to_t_peri
+   use squishyplanet
+
+    !!!!!!!!!!!
+   ! variables
+    !!!!!!!!!!!
+   real(dp), allocatable :: times(:)
+   real(dp), allocatable :: fluxes(:)
+
+   type(orbit_parameters) :: orbit_params
+   type(planet_parameters) :: planet_params
+
+   ! this has to match the length of your ld_u_coeffs array
+   ! will read in the appropriate change of basis matrix based on that
+   real(dp), dimension(8) :: ld_u_coeffs
+
+   character(len=256) :: filename
+   real(dp), dimension(size(ld_u_coeffs) + 1, size(ld_u_coeffs) + 1) :: change_of_basis_matrix
+
+
+    !!!!!!!!!!!
+   ! setup
+    !!!!!!!!!!!
+   times = read_time_array('../times.txt')
+
+   write (filename, '(a,i0,a)') '../change_of_basis_matricies/g_matrix_', size(ld_u_coeffs), '.bin'
+   change_of_basis_matrix = read_change_of_basis_matrix(filename, size(ld_u_coeffs))
+
+   orbit_params%semi = 200.0_dp
+   orbit_params%ecc = 0.3_dp
+   orbit_params%inc = 89.75_dp*PI/180.0_dp
+   orbit_params%big_Omega = 80.0_dp*PI/180.0_dp
+   orbit_params%little_omega = PI/3.5_dp
+   orbit_params%period = 1001.0_dp
+   orbit_params%t0 = 0.2_dp
+
+   planet_params%r_eff = 0.5_dp
+   planet_params%f_squish_proj = 0.8_dp
+   planet_params%theta_proj = 0.2_dp
+
+   ld_u_coeffs = (/0.008_dp, 0.007_dp, 0.006_dp, 0.005_dp, 0.004_dp, 0.003_dp, 0.002_dp, 0.001_dp/)
+
+   allocate (fluxes(size(times)))
+
+    !!!!!!!!!!!
+   ! run it
+    !!!!!!!!!!!
+
+   call squishyplanet_lightcurve(&
+      ! these change with each sample
+      orbit_params=orbit_params, &
+      planet_params=planet_params, &
+      ld_u_coeffs=ld_u_coeffs, &
+      ! these don't change with each sample
+      times=times, &
+      fluxes=fluxes, &
+      change_of_basis_matrix=change_of_basis_matrix &
+   )
+
+end program main
