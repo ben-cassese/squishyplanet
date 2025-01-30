@@ -652,7 +652,17 @@ class OblateSystem:
             raise ValueError("Provide either times or true anomalies but not both")
 
         if times is not None:
-            time_deltas = times - self._state["t_peri"]
+            t_peri = self._state.get(
+                "t_peri",
+                t0_to_t_peri(
+                    e=self._state["ecc"],
+                    i=self._state["inc"],
+                    omega=self._state["omega"],
+                    period=self._state["period"],
+                    t0=self._state["t0"],
+                ),
+            )
+            time_deltas = times - t_peri
             mean_anomalies = 2 * jnp.pi * time_deltas / self._state["period"]
             true_anomalies = kepler(mean_anomalies, self._state["e"])
         elif true_anomalies is not None:

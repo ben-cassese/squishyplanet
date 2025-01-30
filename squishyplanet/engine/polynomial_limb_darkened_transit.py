@@ -130,14 +130,59 @@ def parameterize_2d_helper(projected_r, projected_f, projected_theta, xc, yc):
         + (xc**2 * sin_t**2) / projected_r2**2,
     }
 
-    # para = {
-    #     "c_x1": jnp.ones_like(xc) * (projected_r * cos_t),
-    #     "c_x2": jnp.ones_like(xc) * (-projected_r2 * sin_t),
-    #     "c_x3": xc,
-    #     "c_y1": jnp.ones_like(xc) * (projected_r * sin_t),
-    #     "c_y2": jnp.ones_like(xc) * (projected_r2 * cos_t),
-    #     "c_y3": yc,
+    # two alternative takes cooked up during the Fortran implementation-
+    # check later for numerical implications
+
+    # projected_r_sq = projected_r * projected_r
+    # projected_r2_sq = projected_r2 * projected_r2
+    # cos_t_sq = cos_t * cos_t
+    # sin_t_sq = sin_t * sin_t
+    # xc_sq = xc * xc
+    # yc_sq = yc * yc
+
+    # two = {
+    #     "rho_xx": cos_t_sq / projected_r_sq + sin_t_sq / projected_r2_sq,
+    #     "rho_xy": (2 * cos_t * sin_t) / projected_r_sq
+    #     - (2 * cos_t * sin_t) / projected_r2_sq,
+    #     "rho_x0": (
+    #         ((-2 * cos_t_sq * xc) - (2 * cos_t * yc * sin_t)) / projected_r_sq
+    #         + ((2 * cos_t * yc * sin_t) - (2 * xc * sin_t_sq)) / projected_r2_sq
+    #     ),
+    #     "rho_yy": cos_t_sq / projected_r2_sq + sin_t_sq / projected_r_sq,
+    #     "rho_y0": (
+    #         (- (2 * cos_t * xc * sin_t) - (2 * yc * sin_t_sq)) / projected_r_sq +
+    #         ((-2 * cos_t_sq * yc) + (2 * cos_t * xc * sin_t)) / projected_r2_sq
+    #     ),
+    #     "rho_00": (
+    #         ((cos_t_sq * xc_sq) + (2 * cos_t * xc * yc * sin_t) + (yc_sq * sin_t_sq)) / projected_r_sq +
+    #         ((cos_t_sq * yc_sq) - (2 * cos_t * xc * yc * sin_t) + (xc_sq * sin_t_sq)) / projected_r2_sq
+    #     )
     # }
+    # two = {}
+    # two["rho_xx"] = cos_t_sq / projected_r_sq + sin_t_sq / projected_r2_sq
+
+    # tmp1 = 2.0 * cos_t * sin_t
+    # two["rho_xy"] = tmp1 / projected_r_sq - tmp1 / projected_r2_sq
+
+    # tmp1 = 2.0 * cos_t * yc * sin_t
+    # two["rho_x0"] = ((-2.0 * cos_t_sq * xc) - tmp1) / projected_r_sq + (
+    #     tmp1 - (2.0 * xc * sin_t_sq)
+    # ) / projected_r2_sq
+
+    # two["rho_yy"] = cos_t_sq / projected_r2_sq + sin_t_sq / projected_r_sq
+
+    # tmp1 = 2.0 * cos_t * xc * sin_t
+    # two["rho_y0"] = ((-2.0 * cos_t_sq * yc) + (tmp1)) / projected_r2_sq - (
+    #     (2.0 * cos_t * xc * sin_t) + (2.0 * yc * sin_t_sq)
+    # ) / projected_r_sq
+
+    # tmp1 = 2.0 * cos_t * xc * yc * sin_t
+    # two["rho_00"] = (
+    #     (cos_t_sq * xc_sq) + (tmp1) + (yc_sq * sin_t_sq)
+    # ) / projected_r_sq + (
+    #     (cos_t_sq * yc_sq) - (tmp1) + (xc_sq * sin_t_sq)
+    # ) / projected_r2_sq
+
     para = poly_to_parametric(**two)
 
     return two, para

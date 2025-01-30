@@ -1,6 +1,11 @@
 Changelog
 ++++++++++
 
+.. next release
+**(next release)**
+- Added pre-commit requirements, most notably the ruff linter to check for common
+python code style issues.
+
 **0.3.1 (10/2024)**
 
 - Enforced forward-mode differentiation under the hood in ``OblateSystem`` to speed up gradient evaluation for ``OblateSystem.loglike`` or any functions that use ``OblateSystem.lightcurve``.
