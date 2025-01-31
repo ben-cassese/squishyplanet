@@ -2,6 +2,7 @@ module parametric_ellipse
    use, intrinsic :: iso_fortran_env, only: dp => real64
    use model_types, only: rho_coefficients, para_helper_coeffs, para_coefficients
    use constants, only: PI, HALF_PI
+   implicit none
 
 contains
 

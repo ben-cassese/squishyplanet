@@ -26,12 +26,14 @@ add_executable(squishyplanet
     main.f90
     read_in_files.f90
     model_types.f90
-    squishyplanet.f90
+    squishyplanet_2d.f90
     constants.f90
     keplerian.f90
     parametric_ellipse.f90
     intersection_pts.f90
     integrals.f90
+    planet_3d.f90
+    squishyplanet_3d.f90
 )
 
 target_link_libraries(local_lapack_routines PUBLIC blas)

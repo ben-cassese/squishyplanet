@@ -13,11 +13,20 @@ module model_types
    end type orbit_parameters
 
 
-   type :: planet_parameters
+   type :: planet_parameters_2d
       real(dp) :: r_eff
       real(dp) :: f_squish_proj
       real(dp) :: theta_proj
-   end type planet_parameters
+   end type planet_parameters_2d
+
+
+   type :: planet_parameters_3d
+      real(dp) :: r
+      real(dp) :: f_squish_1
+      real(dp) :: f_squish_2
+      real(dp) :: obliquity
+      real(dp) :: precession
+   end type planet_parameters_3d
 
 
    type :: skypos_positions
@@ -55,5 +64,19 @@ module model_types
       real(dp) :: cosa
       real(dp) :: sina
    end type para_helper_coeffs
+
+   type :: p_coefficients
+      real(dp) :: p_xx
+      real(dp) :: p_xy
+      real(dp) :: p_xz
+      real(dp) :: p_x0
+      real(dp) :: p_yy
+      real(dp) :: p_yz
+      real(dp) :: p_y0
+      real(dp) :: p_zz
+      real(dp) :: p_z0
+      real(dp) :: p_00
+   end type p_coefficients
+
 
 end module

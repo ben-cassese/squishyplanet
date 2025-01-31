@@ -1,41 +1,48 @@
 module intersection_pts
     use, intrinsic :: iso_fortran_env, only: dp => real64
     use model_types, only: rho_coefficients
+    implicit none
 
 contains
 
     function t4_term(rho) result(t4)
+        implicit none
         type(rho_coefficients), intent(in) :: rho
         real(dp) :: t4
         t4 = -1._dp + rho%rho_00 - rho%rho_x0 + rho%rho_xx
     end function t4_term
 
     function t3_term(rho) result(t3)
+        implicit none
         type(rho_coefficients), intent(in) :: rho
         real(dp) :: t3
         t3 = -2._dp * rho%rho_xy + 2._dp * rho%rho_y0
     end function t3_term
 
     function t2_term(rho) result(t2)
+        implicit none
         type(rho_coefficients), intent(in) :: rho
         real(dp) :: t2
         t2 = -2._dp + 2._dp * rho%rho_00 - 2._dp * rho%rho_xx + 4._dp * rho%rho_yy
     end function t2_term
 
     function t1_term(rho) result(t1)
+        implicit none
         type(rho_coefficients), intent(in) :: rho
         real(dp) :: t1
         t1 = 2._dp * rho%rho_xy + 2._dp * rho%rho_y0
     end function t1_term
 
     function t0_term(rho) result(t0)
+        implicit none
         type(rho_coefficients), intent(in) :: rho
         real(dp) :: t0
         t0 = -1._dp + rho%rho_00 + rho%rho_x0 + rho%rho_xx
     end function t0_term
 
 
-    function single_intersection_points(rho) result(intersections)
+    function intersection_points(rho) result(intersections)
+        implicit none
         type(rho_coefficients), intent(in) :: rho
         real(dp), dimension(4,2) :: intersections
         complex(dp), dimension(4) :: roots_complex
@@ -47,6 +54,7 @@ contains
         real(dp), dimension(2*4) :: rwork
         integer :: info
         real(dp), dimension(4) :: t_roots
+        integer :: i
 
 
         t4 = t4_term(rho)
@@ -97,6 +105,6 @@ contains
             intersections(i,2) = 2 * t_roots(i) / (1 + t_roots(i)*t_roots(i))
         end do
 
-    end function single_intersection_points
+    end function intersection_points
 
 end module intersection_pts

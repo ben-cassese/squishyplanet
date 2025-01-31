@@ -5,6 +5,7 @@ module read_in_files
 contains
 
    function read_time_array(filename) result(times)
+      implicit none
       character(len=*), intent(in) :: filename
       real(dp), allocatable :: times(:)
       integer :: io_unit, n_times, i, io_status
@@ -34,6 +35,7 @@ contains
 
 
    function read_change_of_basis_matrix(filename, dims) result(matrix)
+      implicit none
       character(len=*), intent(in) :: filename
       integer, intent(in) :: dims
       real(dp), dimension((dims+1),(dims+1)) :: matrix

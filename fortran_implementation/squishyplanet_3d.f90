@@ -1,38 +1,39 @@
-module squishyplanet
+module squishyplanet_3d
    use, intrinsic :: iso_fortran_env, only: dp => real64
    use constants, only: PI, TWO_PI
-   use model_types, only: orbit_parameters, planet_parameters, rho_coefficients, skypos_positions, para_coefficients, para_helper_coeffs
+   use model_types, only: orbit_parameters, planet_parameters_3d, p_coefficients, rho_coefficients, skypos_positions, para_coefficients, para_helper_coeffs
    use keplerian, only: kepler, t0_to_t_peri, skypos
    use parametric_ellipse, only: calculate_rho_coefficients, poly_to_parametric, cartesian_intersection_to_parametric_angle
-   use intersection_pts, only: single_intersection_points
+   use intersection_pts, only: intersection_points
    use solution_vecs, only: planet_solution_vec, star_solution_vec
+   use three_d_coefficients, only: compute_3d_coeffs, compute_2d_coeffs
    implicit none
 
 contains
 
-   subroutine squishyplanet_lightcurve( &
+   subroutine squishyplanet_lightcurve_3d( &
       orbit_params, &
       planet_params, &
       ld_u_coeffs, &
+      tidally_locked, &
       times, &
       change_of_basis_matrix, &
       fluxes)
+      implicit none
 
       ! inputs that change with each sample
       type(orbit_parameters), intent(in) :: orbit_params
-      type(planet_parameters), intent(in) :: planet_params
+      type(planet_parameters_3d), intent(inout) :: planet_params ! might change the precession if tidally locked
       real(dp), dimension(:), intent(in) :: ld_u_coeffs
 
       ! inputs that don't change with each sample
+      logical, intent(in) :: tidally_locked
       real(dp), dimension(:), intent(in) :: times
       real(dp), dimension(:, :), intent(in) :: change_of_basis_matrix
       real(dp), dimension(:), intent(out) :: fluxes
 
       ! things that only have to be computed once per lightcurve
       real(dp) :: t_peri
-      real(dp) :: area
-      real(dp) :: r1
-      real(dp) :: r2
       real(dp), dimension(size(ld_u_coeffs) + 1) :: padded_u
       real(dp), allocatable :: g_coeffs(:)
       real(dp) :: normalization_constant
@@ -50,6 +51,7 @@ contains
       real(dp) :: star_contribution
 
       ! if it's plausibly transiting
+      type(p_coefficients) :: p_coeffs
       type(rho_coefficients) :: rho
       type(para_coefficients) :: para
       real(dp), dimension(4, 2) :: pts
@@ -59,18 +61,15 @@ contains
       real(dp), dimension(4) :: alphas ! parametric angle on the planet of star intersection
       real(dp) :: test_ang, test_val ! check the orientation of the planet
 
-      !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+       !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
       ! compute everything that only has to be done once
-      !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+       !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
       t_peri = t0_to_t_peri( &
                e=orbit_params%ecc, &
                i=orbit_params%inc, &
                omega=orbit_params%little_omega, &
                period=orbit_params%period, &
                t0=orbit_params%t0)
-      area = PI*planet_params%r_eff**2
-      r1 = sqrt(area/((1 - planet_params%f_squish_proj)*PI))
-      r2 = r1*(1 - planet_params%f_squish_proj)
 
       padded_u = -1
       padded_u(2:size(ld_u_coeffs) + 1) = ld_u_coeffs
@@ -78,9 +77,9 @@ contains
 
       normalization_constant = 1._dp/(PI*(g_coeffs(1) + (2._dp/3._dp)*g_coeffs(2)))
 
-      !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+       !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
       ! the loop over times
-      !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+       !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
       do i = 1, size(times)
 
          print *, "timestep:", i
@@ -93,7 +92,7 @@ contains
          pos = skypos(orbit_params=orbit_params, f=true_anomaly)
 
          ! if we're far from the star, don't bother doing anything else
-         possibly_in_transit = pos%x**2 + pos%y**2 <= (1.0 + r1*1.1)**2 .and. pos%z > 0
+         possibly_in_transit = pos%x**2 + pos%y**2 <= (1.0 + planet_params%r*1.1)**2 .and. pos%z > 0
          if (.not. possibly_in_transit) then
             fluxes(i) = 1.0_dp
             print *, "not in transit, continuing"
@@ -103,17 +102,33 @@ contains
             print *, "in transit"
          end if
 
-         ! this one introduces a numerical difference w/ the jax version
-         rho = calculate_rho_coefficients( &
-               projected_r=r1, &
-               projected_f=planet_params%f_squish_proj, &
-               projected_theta=planet_params%theta_proj, &
-               xc=pos%x, &
-               yc=pos%y)
+         ! force the planet to "precess" s.t. its nose always points towards the star
+         if (tidally_locked) then
+            planet_params%precession = true_anomaly
+         end if
 
+         ! compute the p coefficients, the coeffs that describe the 3d xyz quadratic planet shape
+         call compute_3d_coeffs( &
+            orbit_params=orbit_params, &
+            planet_params=planet_params, &
+            true_anomaly=true_anomaly, &
+            p_coeffs=p_coeffs &
+            )
+
+         ! compute the rho coefficients, the coeffs that describe the 2d xy quadratic planet shape
+         call compute_2d_coeffs( &
+            p_coeffs=p_coeffs, &
+            rho_coeffs=rho &
+            )
+
+        ! from here on out, it's the exact same as the 2d version
+
+        ! convert the 2d rho coefficients to parametric form,
+            ! describe x and y of planet's outline as 1D functions of angle
          para = poly_to_parametric(rho=rho)
 
-         pts = single_intersection_points(rho=rho)
+         ! find the intersection points of the planet with the star
+         pts = intersection_points(rho=rho)
 
          ! check if we're on the limb
          on_limb = .false.
@@ -126,7 +141,7 @@ contains
          on_limb = num_intersections > 0
          print *, "num_intersections:", num_intersections
 
-         ! if we're not on the limb, we're either fully inside the star
+         ! if we're not on the limb, we're either fully inside or outside the star
          if (on_limb .eqv. .false.) then
             print *, "no intersections, so fully out or in transit"
 
@@ -143,12 +158,12 @@ contains
             print *, "on the limb"
 
             ! convert the x,y positions of the intersection to
-            ! parametric angles wrt the planet
+            ! parametric angles wrt the planet's frame
             alphas = cartesian_intersection_to_parametric_angle( &
                      xs=pts(:, 1), &
                      ys=pts(:, 2), &
                      para=para &
-            )
+                     )
             ! filter them to only look at the ones corresponding to real intersections
             do q = 1, 4
                if (pts(q, 1) .eq. 999._dp) then
@@ -183,7 +198,7 @@ contains
 
             if (num_intersections == 2) then
                print *, "two intersections, calling subroutine"
-               call two_intersections(&
+               call two_intersections( &
                   alpha_1=alphas(1), &
                   alpha_2=alphas(2), &
                   para=para, &
@@ -191,17 +206,17 @@ contains
                   normalization_constant=normalization_constant, &
                   planet_contribution=planet_contribution, &
                   star_contribution=star_contribution &
-               )
+                  )
             else
                print *, "four intersections"
-               call four_intersections(&
+               call four_intersections( &
                   alphas=alphas, &
                   para=para, &
                   g_coeffs=g_coeffs, &
                   normalization_constant=normalization_constant, &
                   planet_contribution=planet_contribution, &
                   star_contribution=star_contribution &
-               )
+                  )
             end if
          end if ! on_limb
 
@@ -209,9 +224,7 @@ contains
          print *, "fluxes(i):", fluxes(i)
       end do
 
-   end subroutine squishyplanet_lightcurve
-
-
+   end subroutine squishyplanet_lightcurve_3d
 
    subroutine not_on_limb( &
       para, &
@@ -220,6 +233,7 @@ contains
       planet_contribution, &
       star_contribution &
       )
+      implicit none
       type(para_coefficients), intent(in) :: para
       real(dp), allocatable, intent(in) :: g_coeffs(:)
       real(dp), intent(in) :: normalization_constant
@@ -257,8 +271,6 @@ contains
 
    end subroutine not_on_limb
 
-
-
    subroutine two_intersections( &
       alpha_1, &
       alpha_2, &
@@ -268,6 +280,7 @@ contains
       planet_contribution, &
       star_contribution &
       )
+      implicit none
       real(dp), intent(in) :: alpha_1
       real(dp), intent(in) :: alpha_2
       type(para_coefficients), intent(in) :: para
@@ -297,13 +310,13 @@ contains
          ! if you're outside the star, instead of integrating two legs separately,
          ! you can just wrap passed 2pi
          call planet_solution_vec( &
-            a=alpha_1, &
-            b=alpha_2 + TWO_PI, &
+            a=alpha_2, &
+            b=alpha_1 + TWO_PI, &
             g_coeffs=g_coeffs, &
             para=para, &
             solution_vector=planet_solution_vector &
-         )
-         print *, "planet_solution_vector:", planet_solution_vector
+            )
+
          planet_contribution = dot_product(g_coeffs, planet_solution_vector)*normalization_constant
       else
          print *, "test_val is inside the star"
@@ -313,7 +326,7 @@ contains
             g_coeffs=g_coeffs, &
             para=para, &
             solution_vector=planet_solution_vector &
-         )
+            )
          planet_contribution = dot_product(g_coeffs, planet_solution_vector)*normalization_constant
       end if
 
@@ -325,7 +338,7 @@ contains
          g_coeffs=g_coeffs, &
          para=para, &
          solution_vector=star_solution_vector &
-      )
+         )
       star_contribution = dot_product(g_coeffs, star_solution_vector)*normalization_constant
 
       print *, "planet_contribution:", planet_contribution
@@ -333,79 +346,78 @@ contains
 
    end subroutine two_intersections
 
-
-   subroutine four_intersections(&
+   subroutine four_intersections( &
       alphas, &
       para, &
       g_coeffs, &
       normalization_constant, &
       planet_contribution, &
       star_contribution &
-   )
-   real(dp), intent(in) :: alphas(4)
-   type(para_coefficients), intent(in) :: para
-   real(dp), allocatable, intent(in) :: g_coeffs(:)
-   real(dp), intent(in) :: normalization_constant
-   real(dp), intent(out) :: planet_contribution
-   real(dp), intent(out) :: star_contribution
+      )
+      implicit none
+      real(dp), intent(in) :: alphas(4)
+      type(para_coefficients), intent(in) :: para
+      real(dp), allocatable, intent(in) :: g_coeffs(:)
+      real(dp), intent(in) :: normalization_constant
+      real(dp), intent(out) :: planet_contribution
+      real(dp), intent(out) :: star_contribution
 
-   integer :: i
-   real(dp), dimension(4,2) :: alpha_pairs
-   real(dp) :: a1, a2, test_ang, test_val, tmp1, tmp2
-   logical :: is_planet_chunk
-   real(dp), allocatable :: planet_solution_vector(:), star_solution_vector(:)
+      integer :: i
+      real(dp), dimension(4, 2) :: alpha_pairs
+      real(dp) :: a1, a2, test_ang, test_val, tmp1, tmp2
+      logical :: is_planet_chunk
+      real(dp), allocatable :: planet_solution_vector(:), star_solution_vector(:)
 
-   star_contribution = 0.0_dp
-   planet_contribution = 0.0_dp
+      star_contribution = 0.0_dp
+      planet_contribution = 0.0_dp
 
-   do i = 1, 4
-      alpha_pairs(i,1) = alphas(i)
-      alpha_pairs(i,2) = alphas(mod(i, 4) + 1)
-   end do
+      do i = 1, 4
+         alpha_pairs(i, 1) = alphas(i)
+         alpha_pairs(i, 2) = alphas(mod(i, 4) + 1)
+      end do
 
-   do i=1, 4
-      a1 = alpha_pairs(i, 1)
-      a2 = alpha_pairs(i, 2)
+      do i = 1, 4
+         a1 = alpha_pairs(i, 1)
+         a2 = alpha_pairs(i, 2)
 
-      ! figure out if we're looking at a chunk that's along the edge
-      ! of the planet or the star
-      test_ang = a1 + (a2 - a1)/2.0_dp
-      if (test_ang > TWO_PI) then
-         test_ang = test_ang - TWO_PI
-      end if
-      tmp1 = dcos(test_ang)
-      tmp2 = dsin(test_ang)
+         ! figure out if we're looking at a chunk that's along the edge
+         ! of the planet or the star
+         test_ang = a1 + (a2 - a1)/2.0_dp
+         if (test_ang > TWO_PI) then
+            test_ang = test_ang - TWO_PI
+         end if
+         tmp1 = dcos(test_ang)
+         tmp2 = dsin(test_ang)
 
-      test_val = sqrt( &
-                 (para%c_x1*tmp1 + para%c_x2*tmp2 + para%c_x3)**2 + &
-                 (para%c_y1*tmp1 + para%c_y2*tmp2 + para%c_y3)**2 &
-                 )
-      is_planet_chunk = test_val < 1.0_dp
+         test_val = sqrt( &
+                    (para%c_x1*tmp1 + para%c_x2*tmp2 + para%c_x3)**2 + &
+                    (para%c_y1*tmp1 + para%c_y2*tmp2 + para%c_y3)**2 &
+                    )
+         is_planet_chunk = test_val < 1.0_dp
 
-      if (is_planet_chunk) then
-         call planet_solution_vec( &
-            a=a1, &
-            b=a2, &
-            g_coeffs=g_coeffs, &
-            para=para, &
-            solution_vector=planet_solution_vector &
-         )
-         planet_contribution = planet_contribution + dot_product(g_coeffs, planet_solution_vector)*normalization_constant
-         star_contribution = star_contribution + 0.0_dp
-      else
-         call star_solution_vec( &
-            a=a1, &
-            b=a2, &
-            g_coeffs=g_coeffs, &
-            para=para, &
-            solution_vector=star_solution_vector &
-         )
-         planet_contribution = planet_contribution + 0.0_dp
-         star_contribution = star_contribution + dot_product(g_coeffs, star_solution_vector)*normalization_constant
-      end if
-   end do
-
+         if (is_planet_chunk) then
+            call planet_solution_vec( &
+               a=a1, &
+               b=a2, &
+               g_coeffs=g_coeffs, &
+               para=para, &
+               solution_vector=planet_solution_vector &
+               )
+            planet_contribution = planet_contribution + dot_product(g_coeffs, planet_solution_vector)*normalization_constant
+            star_contribution = star_contribution + 0.0_dp
+         else
+            call star_solution_vec( &
+               a=a1, &
+               b=a2, &
+               g_coeffs=g_coeffs, &
+               para=para, &
+               solution_vector=star_solution_vector &
+               )
+            planet_contribution = planet_contribution + 0.0_dp
+            star_contribution = star_contribution + dot_product(g_coeffs, star_solution_vector)*normalization_constant
+         end if
+      end do
 
    end subroutine four_intersections
 
-end module squishyplanet
+end module squishyplanet_3d

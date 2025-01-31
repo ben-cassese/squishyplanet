@@ -6,15 +6,6 @@ module keplerian
 
 contains
    function true_anomaly_at_transit_center(e, i, omega) result(true_anomaly)
-      ! Computes the true anomaly at the instant of minimum star/planet separation
-      !
-      ! Arguments:
-      !   e     : Orbital eccentricity (dimensionless)
-      !   i     : Orbital inclination (radians)
-      !   omega : Argument of periapsis (radians)
-      !
-      ! Returns:
-      !   true_anomaly : True anomaly at minimum separation (radians)
       implicit none
 
       ! Input variables (all scalar)
