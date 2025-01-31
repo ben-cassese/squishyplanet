@@ -41,7 +41,7 @@ contains
 
       ! things associated with the loop over times
       integer :: i, q, w, num_intersections
-      real(dp) :: tmp1, tmp2
+      real(dp) :: tmp1
       real(dp) :: time_delta
       real(dp) :: mean_anomaly
       real(dp) :: true_anomaly
@@ -59,7 +59,6 @@ contains
 
       ! if it's on the limb
       real(dp), dimension(4) :: alphas ! parametric angle on the planet of star intersection
-      real(dp) :: test_ang, test_val ! check the orientation of the planet
 
       !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
       ! compute everything that only has to be done once
