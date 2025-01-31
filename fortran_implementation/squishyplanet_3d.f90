@@ -40,7 +40,7 @@ contains
 
       ! things associated with the loop over times
       integer :: i, q, w, num_intersections
-      real(dp) :: tmp1, tmp2
+      real(dp) :: tmp1
       real(dp) :: time_delta
       real(dp) :: mean_anomaly
       real(dp) :: true_anomaly
@@ -59,7 +59,6 @@ contains
 
       ! if it's on the limb
       real(dp), dimension(4) :: alphas ! parametric angle on the planet of star intersection
-      real(dp) :: test_ang, test_val ! check the orientation of the planet
 
        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
       ! compute everything that only has to be done once
@@ -82,8 +81,8 @@ contains
        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
       do i = 1, size(times)
 
-         print *, "timestep:", i
-         print *, "time:", times(i)
+         ! print *, "timestep:", i
+         ! print *, "time:", times(i)
 
          time_delta = times(i) - t_peri
          mean_anomaly = TWO_PI*time_delta/orbit_params%period
@@ -95,11 +94,11 @@ contains
          possibly_in_transit = pos%x**2 + pos%y**2 <= (1.0 + planet_params%r*1.1)**2 .and. pos%z > 0
          if (.not. possibly_in_transit) then
             fluxes(i) = 1.0_dp
-            print *, "not in transit, continuing"
-            print *, ""
+            ! print *, "not in transit, continuing"
+            ! print *, ""
             cycle
          else
-            print *, "in transit"
+            ! print *, "in transit"
          end if
 
          ! force the planet to "precess" s.t. its nose always points towards the star
@@ -121,10 +120,10 @@ contains
             rho_coeffs=rho &
             )
 
-        ! from here on out, it's the exact same as the 2d version
+         ! from here on out, it's the exact same as the 2d version
 
-        ! convert the 2d rho coefficients to parametric form,
-            ! describe x and y of planet's outline as 1D functions of angle
+         ! convert the 2d rho coefficients to parametric form,
+         ! describe x and y of planet's outline as 1D functions of angle
          para = poly_to_parametric(rho=rho)
 
          ! find the intersection points of the planet with the star
@@ -139,11 +138,11 @@ contains
             end if
          end do
          on_limb = num_intersections > 0
-         print *, "num_intersections:", num_intersections
+         ! print *, "num_intersections:", num_intersections
 
          ! if we're not on the limb, we're either fully inside or outside the star
          if (on_limb .eqv. .false.) then
-            print *, "no intersections, so fully out or in transit"
+            ! print *, "no intersections, so fully out or in transit"
 
             call not_on_limb( &
                para=para, &
@@ -155,7 +154,7 @@ contains
 
             ! if we're on the limb
          else
-            print *, "on the limb"
+            ! print *, "on the limb"
 
             ! convert the x,y positions of the intersection to
             ! parametric angles wrt the planet's frame
@@ -186,7 +185,7 @@ contains
 
             ! sort them
             do q = 1, 3
-               do w = 1, 4 - i
+               do w = 1, 4 - q
                   if (alphas(w) > alphas(w + 1)) then
                      ! Swap elements
                      tmp1 = alphas(w)
@@ -197,7 +196,7 @@ contains
             end do
 
             if (num_intersections == 2) then
-               print *, "two intersections, calling subroutine"
+               ! print *, "two intersections, calling subroutine"
                call two_intersections( &
                   alpha_1=alphas(1), &
                   alpha_2=alphas(2), &
@@ -208,7 +207,7 @@ contains
                   star_contribution=star_contribution &
                   )
             else
-               print *, "four intersections"
+               ! print *, "four intersections"
                call four_intersections( &
                   alphas=alphas, &
                   para=para, &
@@ -221,7 +220,7 @@ contains
          end if ! on_limb
 
          fluxes(i) = 1.0_dp - (planet_contribution + star_contribution)
-         print *, "fluxes(i):", fluxes(i)
+         ! print *, "fluxes(i):", fluxes(i)
       end do
 
    end subroutine squishyplanet_lightcurve_3d
@@ -248,13 +247,13 @@ contains
       fully_inside_star = (para%c_x3*para%c_x3 + para%c_y3*para%c_y3) <= 1
 
       if (fully_inside_star .neqv. .true.) then
-         print *, "actually, not in transit, fooled by the buffer"
+         ! print *, "actually, not in transit, fooled by the buffer"
          planet_contribution = 0.0_dp
          star_contribution = 0.0_dp
          return
       end if
 
-      print *, "ok, we're fully inside the star, integrating just the planet"
+      ! print *, "ok, we're fully inside the star, integrating just the planet"
 
       ! if we're fully inside the star, we just need to integrate the planet
       ! from 0 to 2*pi
@@ -306,7 +305,7 @@ contains
                  )
 
       if (test_val > 1.0_dp) then
-         print *, "test_val is outside the star"
+         ! print *, "test_val is outside the star"
          ! if you're outside the star, instead of integrating two legs separately,
          ! you can just wrap passed 2pi
          call planet_solution_vec( &
@@ -319,7 +318,7 @@ contains
 
          planet_contribution = dot_product(g_coeffs, planet_solution_vector)*normalization_constant
       else
-         print *, "test_val is inside the star"
+         ! print *, "test_val is inside the star"
          call planet_solution_vec( &
             a=alpha_1, &
             b=alpha_2, &
@@ -341,8 +340,8 @@ contains
          )
       star_contribution = dot_product(g_coeffs, star_solution_vector)*normalization_constant
 
-      print *, "planet_contribution:", planet_contribution
-      print *, "star_contribution:", star_contribution
+      ! print *, "planet_contribution:", planet_contribution
+      ! print *, "star_contribution:", star_contribution
 
    end subroutine two_intersections
 

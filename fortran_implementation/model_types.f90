@@ -12,13 +12,11 @@ module model_types
       real(dp) :: t0
    end type orbit_parameters
 
-
    type :: planet_parameters_2d
       real(dp) :: r_eff
       real(dp) :: f_squish_proj
       real(dp) :: theta_proj
    end type planet_parameters_2d
-
 
    type :: planet_parameters_3d
       real(dp) :: r
@@ -28,13 +26,11 @@ module model_types
       real(dp) :: precession
    end type planet_parameters_3d
 
-
    type :: skypos_positions
       real(dp) :: x
       real(dp) :: y
       real(dp) :: z
    end type skypos_positions
-
 
    type :: rho_coefficients
       real(dp) :: rho_xx
@@ -45,7 +41,6 @@ module model_types
       real(dp) :: rho_00
    end type rho_coefficients
 
-
    type :: para_coefficients
       real(dp) :: c_x1
       real(dp) :: c_x2
@@ -54,7 +49,6 @@ module model_types
       real(dp) :: c_y2
       real(dp) :: c_y3
    end type para_coefficients
-
 
    type :: para_helper_coeffs
       real(dp) :: r1
@@ -77,6 +71,5 @@ module model_types
       real(dp) :: p_z0
       real(dp) :: p_00
    end type p_coefficients
-
 
 end module

@@ -33,20 +33,19 @@ contains
       close (io_unit)
    end function
 
-
    function read_change_of_basis_matrix(filename, dims) result(matrix)
       implicit none
       character(len=*), intent(in) :: filename
       integer, intent(in) :: dims
-      real(dp), dimension((dims+1),(dims+1)) :: matrix
+      real(dp), dimension((dims + 1), (dims + 1)) :: matrix
       integer :: file_unit
 
-      open(newunit=file_unit, file=filename, form='unformatted', access='stream', status='old')
+      open (newunit=file_unit, file=filename, form='unformatted', access='stream', status='old')
 
-      read(file_unit) matrix
+      read (file_unit) matrix
 
-      close(file_unit)
+      close (file_unit)
 
-  end function
+   end function
 
 end module read_in_files

@@ -211,7 +211,7 @@ contains
 
       ! Second parenthesized term
       term2 = dcos(f)*(-dcos(little_omega)*dcos(big_Omega) + &
-                      dcos(i)*dsin(little_omega)*dsin(big_Omega))
+                       dcos(i)*dsin(little_omega)*dsin(big_Omega))
 
       x = -factor1*(term1 + term2)
    end function x_position
@@ -228,7 +228,7 @@ contains
       combined_angle = f + little_omega
 
       y = factor*(dcos(i)*dcos(big_Omega)*dsin(combined_angle) + &
-                   dcos(combined_angle)*dsin(big_Omega))
+                  dcos(combined_angle)*dsin(big_Omega))
    end function y_position
 
    function z_position(a, e, f, big_Omega, i, little_omega) result(z)

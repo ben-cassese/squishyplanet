@@ -46,7 +46,6 @@ contains
       rho_coeffs%rho_xy = tmp/projected_r_sq - &
                           tmp/projected_r2_sq
 
-
       tmp = 2.0_dp*cos_t*yc*sin_t
       rho_coeffs%rho_x0 = ((-2.0_dp*cos_t_sq*xc) - tmp)/projected_r_sq &
                           + (tmp - (2.0_dp*xc*sin_t_sq))/projected_r2_sq
@@ -145,7 +144,6 @@ contains
 
    end function poly_to_parametric
 
-
    function cartesian_intersection_to_parametric_angle(xs, ys, para) result(alphas)
       implicit none
 
@@ -156,7 +154,7 @@ contains
 
       ! Local variables
       real(dp) :: det, xs_centered(4), ys_centered(4), cosa(4), sina(4)
-      real(dp) :: inv_matrix(2,2)
+      real(dp) :: inv_matrix(2, 2)
       integer :: i
 
       ! Center the ellipse by subtracting c_x3 and c_y3
@@ -164,16 +162,16 @@ contains
       ys_centered = ys - para%c_y3
 
       ! Calculate inverse matrix
-      det = para%c_x1 * para%c_y2 - para%c_x2 * para%c_y1
-      inv_matrix(1,1) = para%c_y2 / det
-      inv_matrix(1,2) = -para%c_x2 / det
-      inv_matrix(2,1) = -para%c_y1 / det
-      inv_matrix(2,2) = para%c_x1 / det
+      det = para%c_x1*para%c_y2 - para%c_x2*para%c_y1
+      inv_matrix(1, 1) = para%c_y2/det
+      inv_matrix(1, 2) = -para%c_x2/det
+      inv_matrix(2, 1) = -para%c_y1/det
+      inv_matrix(2, 2) = para%c_x1/det
 
       ! Calculate cosa and sina for each point
       do i = 1, 4
-         cosa(i) = inv_matrix(1,1) * xs_centered(i) + inv_matrix(1,2) * ys_centered(i)
-         sina(i) = inv_matrix(2,1) * xs_centered(i) + inv_matrix(2,2) * ys_centered(i)
+         cosa(i) = inv_matrix(1, 1)*xs_centered(i) + inv_matrix(1, 2)*ys_centered(i)
+         sina(i) = inv_matrix(2, 1)*xs_centered(i) + inv_matrix(2, 2)*ys_centered(i)
       end do
 
       ! Calculate alpha using atan2
