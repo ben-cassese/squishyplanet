@@ -4,7 +4,7 @@
 
 ## Mac/Linux Users
 
-This is the most straightforward situtation to be in when installing. All of the usual methods should work fine:
+This is the most straightforward situation to be in when installing. All of the usual methods should work fine:
 
 <span style="font-size:larger;">Option 1: pip install:</span>
 
@@ -32,6 +32,6 @@ Things may be slightly more complicated on Windows but still manageable. One jus
 
 ## GPU Users
 
-Since ``squishyplanet`` is written entirely in ``JAX``, it can technically run on a GPU (or a TPU) as well as a CPU with no changes to the code. However, anyone attempting to do this will likely be dissapointed with the performance, since in its current state  ``squishyplanet`` is not optimized for GPU use. Many of the operations are run  sequentially to save on memory and it was entirely developed on a CPU.
+Since ``squishyplanet`` is written entirely in ``JAX``, it can technically run on a GPU (or a TPU) as well as a CPU with no changes to the code. However, anyone attempting to do this will likely be disappointed with the performance, since in its current state  ``squishyplanet`` is not optimized for GPU use. Many of the operations are run  sequentially to save on memory and it was entirely developed on a CPU.
 
 If you are interested in running ``squishyplanet`` on a GPU, be sure you first follow the instructions for installing ``jax`` and ``jaxlib`` on your specific system, then install ``squishyplanet`` as normal. If you run into any issues, or even better if you're interested in helping to optimize ``squishyplanet`` for GPU use, please open an issue on the GitHub repository.
