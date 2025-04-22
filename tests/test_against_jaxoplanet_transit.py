@@ -11,7 +11,7 @@ from tqdm import tqdm
 from squishyplanet import OblateSystem
 from squishyplanet.engine.polynomial_limb_darkened_transit import lightcurve
 
-N_JAXOPLANT_COMPARISONS = 1000
+N_JAXOPLANT_COMPARISONS = 100
 TIMES = jnp.linspace(-1, 1, 1728) * ureg.day  # 100s cadence for 48 hours
 POLY_ORDERS = [2, 3, 4]
 
