@@ -5,20 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "squishyplanet"
 version = "0.3.1"
-requires-python = ">=3.9"
-dependencies = [
-    "requests",
-    "jax",
-    "jaxlib",
-    "quadax",
-    "tqdm",
-    "black",
-    "astropy>5",
-    "matplotlib",
-    "sympy",
-    "ipykernel",
-    "ruff",
-]
+requires-python = ">=3.10"
 authors = [
   {name = "Ben Cassese", email = "b.c.cassese@columbia.edu"},
 ]
@@ -28,9 +15,42 @@ description = "A package for dealing with non-spherical exoplanets"
 readme = "README.md"
 classifiers = [
   "Programming Language :: Python",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
   "Intended Audience :: Science/Research",
   "Topic :: Scientific/Engineering :: Astronomy"
 ]
+
+dependencies = [
+    "astropy>=6.1.7",
+    "matplotlib>=3.10.1",
+    "numpy>=2.2.4",
+    "quadax>=0.2.7",
+    "sympy>=1.13.3",
+    "tqdm>=4.67.1",
+]
+
+[dependency-groups]
+dev = [
+    "black>=25.1.0",
+    "ipykernel>=6.29.5",
+    "pre-commit>=4.2.0",
+    "ruff>=0.11.6",
+    "uv>=0.6.15",
+]
+tests = [
+    "jaxoplanet",
+    "pytest>=8.3.5",
+    "pytest-cov>=6.1.1",
+    "pytest-xdist>=3.6.1",
+    "tox>=4.25.0",
+    "tox-gh-actions>=3.3.0",
+    "tox-uv>=1.25.0",
+    "uv>=0.6.15",
+]
+
 
 [project.urls]
 Homepage = "https://github.com/ben-cassese/squishyplanet"
@@ -59,7 +79,15 @@ ignore = [
     "RUF001", # allow greek characters for the Mathematica translator
 ]
 extend-select = ["W", "I", "B", "SIM", "UP", "RUF"]
+# extend-select = ["W", "I", "B", "SIM", "UP", "RUF", "D", "ANN"]
+exclude = [
+    "docs/*",
+]
+pydocstyle.convention = "google"
 
 [tool.coverage.run]
 source = ["squishyplanet"]
 omit = ["tests/*"]
+
+[tool.uv.sources]
+jaxoplanet = { git = "https://github.com/exoplanet-dev/jaxoplanet.git" }

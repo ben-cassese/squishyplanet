@@ -496,7 +496,7 @@ class OblateSystem:
             ) or isinstance(self._state[key], bool):
                 continue
 
-            if isinstance(self._state[key], (float, int)):
+            if isinstance(self._state[key], float | int):
                 self._state[key] = jnp.array([self._state[key]])
                 shapes.append(1)
             else:
@@ -669,7 +669,7 @@ class OblateSystem:
         else:
             true_anomalies = jnp.array([jnp.pi / 2])
 
-        if isinstance(true_anomalies, (float, int)):
+        if isinstance(true_anomalies, float | int):
             true_anomalies = jnp.array([true_anomalies])
 
         # the trace of the orbit
@@ -1077,7 +1077,7 @@ class OblateSystem:
             powers = jnp.arange(len(us))
             return -jnp.sum(us * (1 - mu) ** powers) * normalization_constant
 
-        if isinstance(r, (float, int)):
+        if isinstance(r, float | int):
             return inner(r)
         else:
             return jax.vmap(inner)(r)

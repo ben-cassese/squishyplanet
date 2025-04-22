@@ -3,8 +3,10 @@ Changelog
 
 .. next release
 **(next release)**
+- Dropped support for Python 3.9, keeping up with jaxoplanet for testing.
 - Added pre-commit requirements, most notably the ruff linter to check for common
-python code style issues.
+python code style issues. Many flags still not checked, especially those related to docstrings.
+- Switched to uv for dependency management, not yet building though.
 
 **0.3.1 (10/2024)**
 
