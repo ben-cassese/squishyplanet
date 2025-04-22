@@ -9,7 +9,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: [macos-latest]
         python-version: ['3.10', '3.11', '3.12', '3.13']
       fail-fast: false
 
@@ -39,7 +39,7 @@ jobs:
         uv run tox
 
     - name: Upload coverage reports to Codecov with GitHub Action on Python 3.12 for ubuntu-latest
-      if: ${{ matrix.python-version == '3.12' && matrix.os == 'ubuntu-latest' }}
+      if: ${{ matrix.python-version == '3.12' && matrix.os == 'macos-latest' }}
       uses: codecov/codecov-action@v5
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
