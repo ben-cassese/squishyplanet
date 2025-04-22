@@ -30,6 +30,10 @@ jobs:
         cache-suffix: ${{ matrix.python-version }}
         python-version: ${{ matrix.python-version }}
 
+    - name: Install tox
+      run: |
+        uv pip install -U tox tox-uv
+
     - name: Run tests # dependencies are installed by tox
       run: |
         uv run tox
