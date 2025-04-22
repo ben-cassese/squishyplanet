@@ -79,6 +79,11 @@ ignore = [
     "RUF001", # allow greek characters for the Mathematica translator
 ]
 extend-select = ["W", "I", "B", "SIM", "UP", "RUF"]
+# extend-select = ["W", "I", "B", "SIM", "UP", "RUF", "D", "ANN"]
+exclude = [
+    "docs/*",
+]
+pydocstyle.convention = "google"
 
 [tool.coverage.run]
 source = ["squishyplanet"]
