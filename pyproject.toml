@@ -35,6 +35,7 @@ dependencies = [
 [dependency-groups]
 dev = [
     "black>=25.1.0",
+    "codespell>=2.4.2",
     "ipykernel>=6.29.5",
     "pre-commit>=4.2.0",
     "pytest>=8.3.5",
@@ -92,3 +93,6 @@ omit = ["tests/*"]
 
 [tool.uv.sources]
 jaxoplanet = { git = "https://github.com/exoplanet-dev/jaxoplanet.git" }
+
+[tool.codespell]
+ignore-words-list = "Flagg,Leary,Winn,AAS,oint"

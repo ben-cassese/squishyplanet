@@ -13,7 +13,7 @@ class.
 The code itself is based heavily on `Agol, Luger, and Foreman-Mackey 2020 <https://ui.adsabs.harvard.edu/abs/2020AJ....159..123A/abstract>`_,
 and the documentation makes references to specific equations in that paper. Those going
 through this code are encouraged to review that paper and be familiar with the Green's
-basis tranformation used to convert 2D surface integrals to 1D line integrals.
+basis transformation used to convert 2D surface integrals to 1D line integrals.
 
 -----
 

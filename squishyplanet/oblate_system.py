@@ -311,7 +311,7 @@ class OblateSystem:
             two.
 
         """
-        # we internally changed "times" if oversample > 1, but we alwasy bin it back
+        # we internally changed "times" if oversample > 1, but we always bin it back
         # down to the original times, so we can undo that expansion here
         s = copy.deepcopy(self._state)
         if s["oversample"] > 1:

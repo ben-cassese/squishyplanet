@@ -107,7 +107,7 @@ We assume the star's intensity profile is described as:
 
     \frac{I(z)}{I_0} = 1 - u_1(1-z) - u_2(1-z)^2 - ... - u_n(1-z)^n = \tilde{u}^T \vec{u}
 
-where $\\tilde{u}$ is the "limb darkening basis" and $\\vec{u}$ is the vector of limb darkening coefficients (Eq. 3). We then find the change of basis matrix $A$ that converts $\\vec{u}$ into $\\vec{g}$, a transformed set of coeffients, that we will multiply with the "Green's basis", $\\tilde{g}$. This new basis takes the form:
+where $\\tilde{u}$ is the "limb darkening basis" and $\\vec{u}$ is the vector of limb darkening coefficients (Eq. 3). We then find the change of basis matrix $A$ that converts $\\vec{u}$ into $\\vec{g}$, a transformed set of coefficients, that we will multiply with the "Green's basis", $\\tilde{g}$. This new basis takes the form:
 
 .. math::
 

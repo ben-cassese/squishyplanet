@@ -443,17 +443,17 @@ def star_solution_vec(a, b, g_coeffs, c_x1, c_x2, c_x3, c_y1, c_y2, c_y3):
 def lightcurve(state, parameterize_with_projected_ellipse):
     """The main function for computing a transit light curve.
 
-    This function will return a 1-D array representing the flux recieved from the star,
+    This function will return a 1-D array representing the flux received from the star,
     where each entry corresponds to a time in the input `state` dictionary. It first
     transforms the `state` into the implicit 3D surface of the planet, the implicit 2D
     sky-projected outline of the planet, and a parametric form of that outline for each
-    time step. These are vectorized operations that are computed simulataneously across
+    time step. These are vectorized operations that are computed simultaneously across
     all times. It then solves for the intersection points of the planet and star, and
     if the planet is either partially or fully transiting, numerically solves the
     required 1D integrals that leverage Green's Theorem to compute the blocked flux. The
     flux-blocking calculations are done sequentially for each timestep using
     ``jax.lax.scan``, which seemed to be more efficient than vectorizing again while
-    switching between braches with something like ``jax.lax.cond``. Keep these different
+    switching between branches with something like ``jax.lax.cond``. Keep these different
     behaviors in mind when computing dense lightcurves with ~100s of thousands of time
     steps: the first part will require enough memory to compute and store ~30 values for
     each step, but then the actual 1D integrals will be computed sequentially.
