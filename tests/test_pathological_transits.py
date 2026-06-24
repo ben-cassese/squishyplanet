@@ -160,10 +160,21 @@ def _dense_lc(n, **over):
 # ---------------------------------------------------------------------------
 # assertion helpers
 # ---------------------------------------------------------------------------
+# Tolerance on the [0, 1] flux bound. Set at the package's ~1 ppm accuracy floor, not
+# at machine epsilon: at an *exact* degenerate tangency (b = 1 +/- r) the limb-crossing
+# quartic has a double root and zero overlap area, so the eig-based jnp.roots leaves
+# LAPACK-dependent noise (~1e-9 on Linux/OpenBLAS, ~0 on macOS/Accelerate) in the
+# near-zero blocked flux. 1e-6 sits far above that jitter but still well below any real
+# bound violation (the negative-limb-darkening overshoots are 1e-5 .. 1e-2).
+_BOUND_TOL = 1e-6
+
+
 def _assert_finite_bounded(flux, name):
     assert np.all(np.isfinite(flux)), f"{name}: non-finite flux value(s)"
-    assert np.all(flux <= 1.0 + 1e-9), f"{name}: flux exceeds 1 (negative blocked flux)"
-    assert np.all(flux >= -1e-9), f"{name}: flux below 0 (over-blocked)"
+    assert np.all(
+        flux <= 1.0 + _BOUND_TOL
+    ), f"{name}: flux exceeds 1 (negative blocked flux)"
+    assert np.all(flux >= -_BOUND_TOL), f"{name}: flux below 0 (over-blocked)"
 
 
 def _max_step(flux):
