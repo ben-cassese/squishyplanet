@@ -11,10 +11,11 @@ from squishyplanet.engine.parametric_ellipse import (
     cartesian_intersection_to_parametric_angle,
     poly_to_parametric,
 )
-from squishyplanet.engine.planet_2d import planet_2d_coeffs
-from squishyplanet.engine.planet_3d import planet_3d_coeffs
 
-epsabs = epsrel = 1e-12
+# Quadrature tolerance (both epsabs and epsrel) for the planet solution-vector
+# integrals. 1e-8 keeps the full-lightcurve value error well under 1 ppm (~1e-11)
+# while keeping jacfwd relative error ~1e-7.
+EPS = 1e-8
 
 
 def _t4(rho_xx, rho_xy, rho_x0, rho_yy, rho_y0, rho_00):
@@ -255,69 +256,86 @@ def planet_solution_vec(a, b, g_coeffs, c_x1, c_x2, c_x3, c_y1, c_y2, c_y3):
 
     """
 
-    def s0_integrand(s):
-        return (jnp.cos(s) * c_x1 + jnp.sin(s) * c_x2 + c_x3) * (
-            -(jnp.sin(s) * c_y1) + jnp.cos(s) * c_y2
-        )
+    # The s0, s1, and higher-order sn integrals are evaluated in a single
+    # vector-valued quadgk call sharing one Gauss-Kronrod node set (instead of three
+    # independent adaptive integrations over the same interval). The lax.scan over
+    # polynomial orders becomes a vectorized power.
+    ns = jnp.arange(g_coeffs.shape[0])[2:]
 
-    def s1_integrand(s):
-        return (
-            (-(jnp.sin(s) * c_y1) + jnp.cos(s) * c_y2)
-            * (
-                jnp.pi
-                + 6
-                * (jnp.cos(s) * c_x1 + jnp.sin(s) * c_x2 + c_x3)
-                * jnp.sqrt(
-                    1
-                    - (jnp.cos(s) * c_x1 + jnp.sin(s) * c_x2 + c_x3) ** 2
-                    - (jnp.cos(s) * c_y1 + jnp.sin(s) * c_y2 + c_y3) ** 2
-                )
-                - 6
-                * jnp.arctan(
-                    (jnp.cos(s) * c_x1 + jnp.sin(s) * c_x2 + c_x3)
-                    / jnp.sqrt(
-                        1
-                        - (jnp.cos(s) * c_x1 + jnp.sin(s) * c_x2 + c_x3) ** 2
-                        - (jnp.cos(s) * c_y1 + jnp.sin(s) * c_y2 + c_y3) ** 2
-                    )
-                )
-                * (-1 + (jnp.cos(s) * c_y1 + jnp.sin(s) * c_y2 + c_y3) ** 2)
-            )
+    def vec_integrand(s):
+        cs = jnp.cos(s)
+        sn = jnp.sin(s)
+        x = cs * c_x1 + sn * c_x2 + c_x3
+        y = cs * c_y1 + sn * c_y2 + c_y3
+        dy_da = -sn * c_y1 + cs * c_y2
+        one_minus = 1.0 - x**2 - y**2
+        root = jnp.sqrt(one_minus)
+
+        v0 = x * dy_da
+        v1 = (
+            dy_da * (jnp.pi + 6 * x * root - 6 * jnp.arctan(x / root) * (-1 + y**2))
         ) / 12.0
 
-    def sn_integrand(s):
-        def scan_func(carry, scan_over):
-            n = scan_over
-            integrand = -(
-                (
-                    1
-                    - (jnp.cos(s) * c_x1 + jnp.sin(s) * c_x2 + c_x3) ** 2
-                    - (jnp.cos(s) * c_y1 + jnp.sin(s) * c_y2 + c_y3) ** 2
-                )
-                ** (n / 2.0)
-                * (
-                    c_x3 * (jnp.sin(s) * c_y1 - jnp.cos(s) * c_y2)
-                    + c_x2 * (c_y1 + jnp.cos(s) * c_y3)
-                    - c_x1 * (c_y2 + jnp.sin(s) * c_y3)
-                )
-            )
-            return None, integrand
+        common = -(
+            c_x3 * (sn * c_y1 - cs * c_y2)
+            + c_x2 * (c_y1 + cs * c_y3)
+            - c_x1 * (c_y2 + sn * c_y3)
+        )
+        vn = one_minus ** (ns / 2.0) * common
+        return jnp.concatenate((jnp.array([v0, v1]), vn))
 
-        integrand = jax.lax.scan(scan_func, None, jnp.arange(g_coeffs.shape[0])[2:])[1]
-        return integrand
+    res, _ = quadgk(vec_integrand, jnp.array([a, b]), epsabs=EPS, epsrel=EPS)
+    return res
 
-    higher_terms, _ = quadgk(
-        sn_integrand, jnp.array([a, b]), epsabs=epsabs, epsrel=epsrel
-    )
 
-    s0, _ = quadgk(s0_integrand, jnp.array([a, b]), epsabs=epsabs, epsrel=epsrel)
-    s1, _ = quadgk(s1_integrand, jnp.array([a, b]), epsabs=epsabs, epsrel=epsrel)
+# Closed-form antiderivatives for the star-arc integrands (see star_solution_vec).
+_HALF_PI = jnp.pi / 2.0
+_THREE_HALF_PI = 3.0 * jnp.pi / 2.0
+_TWO_PI = 2.0 * jnp.pi
 
-    s0 = jnp.array(
-        [s0]
-    )  # needed b/c when scanning over individual phases, this will return a scalar
-    s1 = jnp.array([s1])
-    return jnp.concatenate((s0, s1, higher_terms))
+
+def _F0(t):
+    """Antiderivative of ``cos^2(t)``: ``t/2 + sin(2t)/4``."""
+    return t / 2.0 + jnp.sin(2.0 * t) / 4.0
+
+
+def _F_outer(t):
+    """Antiderivative of the ``s1`` outer piece, ``(pi/12)(4 sin t - sin^3 t)``."""
+    s = jnp.sin(t)
+    return (jnp.pi / 12.0) * (4.0 * s - s**3)
+
+
+def _F_inner(t):
+    """Antiderivative of the ``s1`` inner piece, ``(pi/12)(-2 sin t + sin^3 t)``."""
+    s = jnp.sin(t)
+    return (jnp.pi / 12.0) * (-2.0 * s + s**3)
+
+
+def _s0_definite(lo, hi):
+    """Closed-form ``integral_{lo}^{hi} cos^2(t) dt``."""
+    return _F0(hi) - _F0(lo)
+
+
+def _s1_definite(lo, hi):
+    """Closed-form ``integral_{lo}^{hi} s1_integrand(t) dt`` for ``0 <= lo <= hi <= 2 pi``.
+
+    Splits the interval at ``pi/2`` and ``3 pi/2`` by clamping the limits into each
+    region; the outer antiderivative is used on ``[0, pi/2]`` and ``[3 pi/2, 2 pi]``,
+    the inner antiderivative on ``[pi/2, 3 pi/2]``.
+    """
+    a1 = jnp.clip(lo, 0.0, _HALF_PI)
+    b1 = jnp.clip(hi, 0.0, _HALF_PI)
+    c1 = _F_outer(b1) - _F_outer(a1)
+
+    a2 = jnp.clip(lo, _HALF_PI, _THREE_HALF_PI)
+    b2 = jnp.clip(hi, _HALF_PI, _THREE_HALF_PI)
+    c2 = _F_inner(b2) - _F_inner(a2)
+
+    a3 = jnp.clip(lo, _THREE_HALF_PI, _TWO_PI)
+    b3 = jnp.clip(hi, _THREE_HALF_PI, _TWO_PI)
+    c3 = _F_outer(b3) - _F_outer(a3)
+
+    return c1 + c2 + c3
 
 
 @jax.jit
@@ -331,10 +349,11 @@ def star_solution_vec(a, b, g_coeffs, c_x1, c_x2, c_x3, c_y1, c_y2, c_y3):
     Foreman-Mackey 2020 <https://ui.adsabs.harvard.edu/abs/2020AJ....159..123A/abstract>`_,
     the contribution of all terms higher than :math:`G_1` will be zero in this case
     since we have limited ourselves to :math:`z=0` by remaining on the star's boundary.
-    This simplifies things somewhat, though we do still have to numerically integrate
-    the dot product of the parametric form of the star's outline with the :math:`G_0`
-    and :math:`G_1` terms written out in :func:`planet_solution_vec`. Technically we
-    probably could use the analytic solutions for these terms, but so far we have not.
+    This simplifies things somewhat: the dot product of the parametric form of the
+    star's outline with the :math:`G_0` and :math:`G_1` terms written out in
+    :func:`planet_solution_vec` reduces to elementary trigonometric polynomials, so we
+    evaluate the required integrals in closed form via their exact antiderivatives
+    rather than numerically.
 
     Args:
         a (float):
@@ -382,53 +401,14 @@ def star_solution_vec(a, b, g_coeffs, c_x1, c_x2, c_x3, c_y1, c_y2, c_y3):
     theta1 = jnp.where(_theta1 < _theta2, _theta1, _theta2)
     theta2 = jnp.where(_theta1 < _theta2, _theta2, _theta1)
 
-    delta = jnp.abs(jnp.arctan2(jnp.sin(theta1 - theta2), jnp.cos(theta1 - theta2)))
     delta = theta2 - theta1
 
-    def s0_integrand(t):
-        return jnp.cos(t) ** 2
-
-    def s1_integrand(t):
-        return jnp.where(
-            (t < jnp.pi / 2) | (t > 3 * jnp.pi / 2),
-            (jnp.pi * jnp.cos(t) * (5 + 3 * jnp.cos(2 * t))) / 24.0,
-            -(jnp.pi * jnp.cos(t) * (1 + 3 * jnp.cos(2 * t))) / 24.0,
-        )
-
     def no_wrap(delta):
-        s0, _ = quadgk(
-            s0_integrand,
-            jnp.array([theta1, theta2]),
-            epsabs=epsabs,
-            epsrel=epsrel,
-        )
-        s1, _ = quadgk(
-            s1_integrand,
-            jnp.array([theta1, theta2]),
-            epsabs=epsabs,
-            epsrel=epsrel,
-        )
-        return s0, s1
+        return _s0_definite(theta1, theta2), _s1_definite(theta1, theta2)
 
     def wrap(delta):
-        s0, _ = quadgk(
-            s0_integrand,
-            jnp.array([theta2, 2 * jnp.pi]),
-            epsabs=epsabs,
-            epsrel=epsrel,
-        )
-        s0 += quadgk(
-            s0_integrand, jnp.array([0, theta1]), epsabs=epsabs, epsrel=epsrel
-        )[0]
-        s1, _ = quadgk(
-            s1_integrand,
-            jnp.array([theta2, 2 * jnp.pi]),
-            epsabs=epsabs,
-            epsrel=epsrel,
-        )
-        s1 += quadgk(
-            s1_integrand, jnp.array([0, theta1]), epsabs=epsabs, epsrel=epsrel
-        )[0]
+        s0 = _s0_definite(theta2, 2 * jnp.pi) + _s0_definite(0.0, theta1)
+        s1 = _s1_definite(theta2, 2 * jnp.pi) + _s1_definite(0.0, theta1)
         return s0, s1
 
     s0, s1 = jax.lax.cond(delta < jnp.pi, no_wrap, wrap, delta)
@@ -437,6 +417,164 @@ def star_solution_vec(a, b, g_coeffs, c_x1, c_x2, c_x3, c_y1, c_y2, c_y3):
     solution_vec = solution_vec.at[0].set(s0)
     solution_vec = solution_vec.at[1].set(s1)
     return solution_vec
+
+
+def _rot(angle, axis):
+    """Batched rotation matrix about ``axis`` ('x', 'y', or 'z').
+
+    Args:
+        angle (Array): Rotation angle(s) [radian], any leading shape ``(...)``.
+        axis (str): One of ``"x"``, ``"y"``, ``"z"``.
+
+    Returns:
+        Array: Rotation matrices of shape ``(..., 3, 3)``.
+    """
+    c, s = jnp.cos(angle), jnp.sin(angle)
+    o, z = jnp.ones_like(c), jnp.zeros_like(c)
+    if axis == "x":
+        rows = [[o, z, z], [z, c, -s], [z, s, c]]
+    elif axis == "y":
+        rows = [[c, z, s], [z, o, z], [-s, z, c]]
+    elif axis == "z":
+        rows = [[c, -s, z], [s, c, z], [z, z, o]]
+    else:
+        raise ValueError(f"unknown axis {axis!r}")
+    return jnp.stack([jnp.stack(row, -1) for row in rows], -2)
+
+
+def outline_prelude(state):
+    """Direct construction of the planet's projected outline from orbital elements.
+
+    Drop-in replacement for the ``planet_3d_coeffs -> planet_2d_coeffs ->
+    poly_to_parametric`` chain (the full 3D-parameterization branch of
+    :func:`lightcurve`). Instead of expanding the implicit polynomials, it builds the
+    central 3D quadric ``M = R diag(d) R^T`` directly, eliminates ``z`` via a 2x2 Schur
+    complement to get the projected conic, and uses the planet's sky position
+    ``skypos(...)[:2]`` as the outline center exactly. This avoids the near-cancellation
+    divisions of the old chain and is machine-precision accurate (vs the chain's ~1e-9
+    worst case) as well as slightly faster.
+
+    Expects ``state["f"]`` to already hold the per-timestep true anomalies. Applies the
+    tidally-locked precession override internally (``prec = where(tidally_locked, f,
+    prec)``).
+
+    Args:
+        state (dict):
+            An :func:`OblateSystem` ``state`` dictionary. Uses the keys ``a, e, f,
+            Omega, i, omega, r, obliq, prec, f1, f2, tidally_locked``.
+
+    Returns:
+        tuple:
+            A tuple of two dictionaries. The first contains the implicit-conic
+            coefficients ``rho_xx, rho_xy, rho_x0, rho_yy, rho_y0, rho_00`` of the
+            outline (matching :func:`planet_2d.planet_2d_coeffs`). The second contains
+            the parametric coefficients ``c_x1, c_x2, c_x3, c_y1, c_y2, c_y3`` with
+            ``x = c_x1 cos(alpha) + c_x2 sin(alpha) + c_x3`` (and similarly for y),
+            matching :func:`parametric_ellipse.poly_to_parametric`. Every leaf is
+            broadcast to the time axis.
+    """
+    prec = jnp.where(state["tidally_locked"], state["f"], state["prec"])
+
+    # central 3D quadric M = R diag(d) R^T (depends only on orientation + shape)
+    R = (
+        _rot(state["Omega"], "z")
+        @ _rot(state["i"], "x")
+        @ _rot(state["omega"] + prec, "z")
+        @ _rot(state["obliq"], "y")
+    )
+    r = state["r"]
+    d = jnp.stack(
+        [1 / r**2, 1 / (r * (1 - state["f2"])) ** 2, 1 / (r * (1 - state["f1"])) ** 2],
+        -1,
+    )
+    M = jnp.einsum("...ij,...j,...kj->...ik", R, d, R)
+
+    # 2x2 outline conic via Schur complement eliminating z -> centered conic
+    #   A x'^2 + B x'y' + C y'^2 = 1
+    m22 = M[..., 2, 2]
+    col = M[..., :2, 2]
+    row = M[..., 2, :2]
+    Amat = (
+        M[..., :2, :2] - (col[..., :, None] * row[..., None, :]) / m22[..., None, None]
+    )
+    sxx = Amat[..., 0, 0]  # A
+    sxy = 2 * Amat[..., 0, 1]  # B
+    syy = Amat[..., 1, 1]  # C
+
+    # ellipse center is exactly the projected sky position
+    pos = skypos(
+        state["a"], state["e"], state["f"], state["Omega"], state["i"], state["omega"]
+    )
+    xc = pos[0]
+    yc = pos[1]
+
+    # parametric ellipse: identical convention to poly_to_parametric_helper
+    theta = jnp.where(
+        sxx - syy != 0.0,
+        0.5 * jnp.arctan2(sxy, (sxx - syy)) + jnp.pi / 2,
+        0.0,
+    )
+    theta = jnp.where(theta < 0.0, theta + jnp.pi, theta)
+    cosa = jnp.cos(theta)
+    sina = jnp.sin(theta)
+    aa = sxx * cosa**2 + sxy * cosa * sina + syy * sina**2
+    bb = sxx * sina**2 - sxy * cosa * sina + syy * cosa**2
+    r1 = 1 / jnp.sqrt(aa)
+    r2 = 1 / jnp.sqrt(bb)
+
+    # xc/yc always vary with the true anomaly (length n_times); the orientation-only
+    # quantities are scalar when prec is fixed. Broadcast them to the time axis so every
+    # leaf shares a leading dimension for the downstream lax.scan (this subsumes the
+    # rho_xx/rho_xy/rho_yy broadcast block the old 3D branch needed below).
+    ones = jnp.ones_like(xc)
+
+    para = {
+        "c_x1": ones * (r1 * cosa),
+        "c_x2": ones * (-r2 * sina),
+        "c_x3": xc,
+        "c_y1": ones * (r1 * sina),
+        "c_y2": ones * (r2 * cosa),
+        "c_y3": yc,
+    }
+
+    two = {
+        "rho_xx": ones * sxx,
+        "rho_xy": ones * sxy,
+        "rho_x0": -2 * sxx * xc - sxy * yc,
+        "rho_yy": ones * syy,
+        "rho_y0": -2 * syy * yc - sxy * xc,
+        "rho_00": sxx * xc**2 + sxy * xc * yc + syy * yc**2,
+    }
+
+    return two, para
+
+
+def ellipse_bound(c_x1, c_x2, c_x3, c_y1, c_y2, c_y3):
+    """Decide whether a step straddles the star edge (and so needs the quartic solve).
+
+    The outline center is ``(c_x3, c_y3)`` and a safe upper bound on the distance of any
+    outline point from the center is ``bound = sqrt(c_x1^2 + c_x2^2 + c_y1^2 + c_y2^2)``
+    (it equals ``sqrt(r1^2 + r2^2) >= max(r1, r2)``). With center distance
+    ``d = sqrt(c_x3^2 + c_y3^2)``: ``d + bound < 1`` is provably fully inside,
+    ``d - bound > 1`` provably fully outside; otherwise the step straddles and the
+    quartic must be solved. A conservative bound is safe -- a straddling-classified step
+    with no real root is harmless (the center-inside test resolves it).
+
+    Args:
+        c_x1 (float): Parametric outline coefficient (x, cos term).
+        c_x2 (float): Parametric outline coefficient (x, sin term).
+        c_x3 (float): Parametric outline coefficient (x, center).
+        c_y1 (float): Parametric outline coefficient (y, cos term).
+        c_y2 (float): Parametric outline coefficient (y, sin term).
+        c_y3 (float): Parametric outline coefficient (y, center).
+
+    Returns:
+        bool: ``True`` if straddling (solve the quartic), ``False`` if provably fully
+        inside or fully outside.
+    """
+    bound = jnp.sqrt(c_x1**2 + c_x2**2 + c_y1**2 + c_y2**2)
+    d = jnp.sqrt(c_x3**2 + c_y3**2)
+    return (d + bound >= 1.0) & (d - bound <= 1.0)
 
 
 @partial(jax.jit, static_argnames=("parameterize_with_projected_ellipse",))
@@ -520,14 +658,11 @@ def lightcurve(state, parameterize_with_projected_ellipse):
         largest_r = jnp.max(jnp.array([r1, r2]))
 
     else:
-        state["prec"] = jnp.where(state["tidally_locked"], state["f"], state["prec"])
-
-        # the coefficients of the implicit 3d surface
-        three = planet_3d_coeffs(**state)
-        # the coefficients of the implicit 2d surface
-        two = planet_2d_coeffs(**three)
-        # the coefficients of the parametric projected ellipse
-        para = poly_to_parametric(**two)
+        # direct orbital-elements -> outline construction (M = R D R^T + Schur),
+        # replacing the planet_3d_coeffs -> planet_2d_coeffs -> poly_to_parametric
+        # chain. It applies the tidally-locked prec override and broadcasts every leaf
+        # to the time axis internally.
+        two, para = outline_prelude(state)
 
         largest_r = state["r"]
 
@@ -618,19 +753,29 @@ def lightcurve(state, parameterize_with_projected_ellipse):
 
     def transiting(X):
         indv_para, indv_two = X
-        (
-            xs,
-            ys,
-        ) = _single_intersection_points(**indv_two)
 
-        on_limb = jnp.sum(xs) != 999 * 4
+        # conservative bounding pre-test: only steps whose outline straddles the star
+        # edge need the quartic solve. Fully inside/outside steps are resolved by the
+        # center-inside test in not_on_limb, bit-identically to the eig path.
+        straddling = ellipse_bound(**indv_para)
 
-        return jax.lax.cond(
-            on_limb,
-            partially_transiting,
-            not_on_limb,
-            (indv_para, xs, ys),
-        )
+        def run_roots(args):
+            indv_para, indv_two = args
+            xs, ys = _single_intersection_points(**indv_two)
+            on_limb = jnp.sum(xs) != 999 * 4
+            return jax.lax.cond(
+                on_limb,
+                partially_transiting,
+                not_on_limb,
+                (indv_para, xs, ys),
+            )
+
+        def skip_roots(args):
+            indv_para, _ = args
+            dummy = jnp.full(4, 999.0)
+            return not_on_limb((indv_para, dummy, dummy))
+
+        return jax.lax.cond(straddling, run_roots, skip_roots, (indv_para, indv_two))
 
     def not_transiting(X):
         return 0.0
@@ -641,12 +786,13 @@ def lightcurve(state, parameterize_with_projected_ellipse):
             mask, transiting, not_transiting, (indv_para, indv_two)
         )
 
-    # if prec isn't the same length as f, we've actually made
-    # it to this point with some of the three, two vectors being
-    # the same length as f, and the others are just scalars
-    # if prec isn't changing, the planet's orientation isn't either,
-    # so none of your quadratic terms vary
-    if state["prec"].shape != true_anomalies.shape:
+    # The 3D branch's outline_prelude already broadcasts every leaf to the time axis,
+    # so this fixup is only needed for the projected-ellipse branch: if prec isn't the
+    # same length as f, parameterize_2d_helper left the orientation-only quadratic
+    # terms as scalars while the centers are length-n. Broadcast them to match.
+    if parameterize_with_projected_ellipse and (
+        state["prec"].shape != true_anomalies.shape
+    ):
         two["rho_xx"] = jnp.ones_like(state["f"]) * two["rho_xx"]
         two["rho_xy"] = jnp.ones_like(state["f"]) * two["rho_xy"]
         two["rho_yy"] = jnp.ones_like(state["f"]) * two["rho_yy"]
