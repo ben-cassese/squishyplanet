@@ -3,6 +3,7 @@ import jax
 jax.config.update("jax_enable_x64", True)
 import astropy.units as u
 import jax.numpy as jnp
+import numpy as np
 from tqdm import tqdm
 
 from squishyplanet import OblateSystem
@@ -97,8 +98,46 @@ def test_projected_parameterization():
 
         # looking out for spikes (tolerance absorbs ulp-level overshoot from the
         # oversample-correction binning; real spikes are orders of magnitude larger)
-        assert jnp.all(lc1 <= 1.0 + 1e-12)
-        assert jnp.all(lc2 <= 1.0 + 1e-12)
+        tol = 1.0 + 1e-12
+        over1 = float(jnp.max(lc1) - 1.0)
+        over2 = float(jnp.max(lc2) - 1.0)
+        if (over1 > 1e-12) or (over2 > 1e-12):
+            a1 = np.asarray(lc1)
+            a2 = np.asarray(lc2)
+            i1 = int(np.argmax(a1))
+            i2 = int(np.argmax(a2))
+            n = a2.shape[0]
+            print(f"\n[SPIKE DIAG] iter={_i}  n_points={n}")
+            print(
+                f"  lc1 max-1 = {over1:.3e} at idx {i1}; "
+                f"lc2 max-1 = {over2:.3e} at idx {i2}"
+            )
+            print(
+                f"  baseline (idx 0): lc1-1 = {a1[0] - 1.0:.3e}, "
+                f"lc2-1 = {a2[0] - 1.0:.3e}"
+            )
+            print(
+                f"  # points over tol: lc1 = {int(np.sum(a1 > tol))}, "
+                f"lc2 = {int(np.sum(a2 > tol))}"
+            )
+            lo, hi = max(0, i2 - 3), min(n, i2 + 4)
+            print(f"  lc2[{lo}:{hi}] = {a2[lo:hi]!r}")
+            print(f"  lc1[{lo}:{hi}] = {a1[lo:hi]!r}")
+            print(f"  |lc1 - lc2| max = {float(np.max(np.abs(a1 - a2))):.3e}")
+            pr = float(np.asarray(injected_state2["projected_effective_r"]).ravel()[0])
+            pf = float(np.asarray(injected_state2["projected_f"]).ravel()[0])
+            pt = float(np.asarray(injected_state2["projected_theta"]).ravel()[0])
+            print(f"  geom: projected_r={pr:.6f}, projected_f={pf:.6f}, theta={pt:.6f}")
+            print(
+                "  params: "
+                + ", ".join(
+                    f"{k}={float(np.asarray(params[k]).ravel()[0]):.6f}"
+                    for k in ("f1", "f2", "obliq", "prec")
+                )
+            )
+
+        assert jnp.all(lc1 <= tol)
+        assert jnp.all(lc2 <= tol)
 
         r = planet1.state["projected_effective_r"][0]
         assert jnp.min(lc1 >= r**2)
