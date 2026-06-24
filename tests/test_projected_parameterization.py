@@ -95,6 +95,12 @@ def test_projected_parameterization():
 
         lc2 = planet2.lightcurve(injected_state2)
 
+        # NaN guard: a quadrature node landing on the grazing tangent (1 - x^2 - y^2
+        # -> 0) used to produce platform-dependent NaNs; fail loudly if that regresses
+        # rather than via the cryptic "all 1.0" array below.
+        assert not jnp.any(jnp.isnan(lc1)), "lc1 contains NaN"
+        assert not jnp.any(jnp.isnan(lc2)), "lc2 contains NaN"
+
         # looking out for spikes
         assert jnp.all(lc1 <= 1.0)
         assert jnp.all(lc2 <= 1.0)
