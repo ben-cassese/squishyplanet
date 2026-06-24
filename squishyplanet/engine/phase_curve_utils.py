@@ -17,7 +17,7 @@ def generate_sample_radii_thetas(key, num_points):
 
     These are uniformly distributed through a unit circle and will be scaled and rotated
     to match the planet's shape and orientation at each timestep. However, they will
-    be re-used at every time step, which could introduce a bias but makes things much
+    be reused at every time step, which could introduce a bias but makes things much
     faster. Be sure you use sufficient samples to keep the bias small, then try multiple
     random keys to quantify it.
 
@@ -640,7 +640,7 @@ def reflected_normalization(
     actually subtends as seen from the star. a) is easy and common across all
     implementations, it's just the inverse square law. b) is more complicated for oblate
     planets than spherical planets however, since even on circular orbits, the subtended
-    area (and consequently area that is recieves flux and and is able to reflect it) can
+    area (and consequently area that is receives flux and and is able to reflect it) can
     change as a function of orbital phase. Note however that it will not vary with phase
     if the planet is tidally locked and always shows the same face to the star.
 
@@ -1085,7 +1085,7 @@ def _uncorrected_emission_profile(
     y = y / (r * (1 - f2))
     z = z / (r * (1 - f1))
 
-    # then, evalutate the pdf of the von Mises-Fisher distribution:
+    # then, evaluate the pdf of the von Mises-Fisher distribution:
     return (
         (
             jnp.exp(
@@ -1119,7 +1119,7 @@ def _uncorrected_emission_profile(
 #     `von Mises-Fisher distribution
 #     <https://https://en.wikipedia.org/wiki/Von_Mises%E2%80%93Fisher_distribution>`_ to
 #     model a hotspot. But, that's defined on the unit sphere, and after compressing it to
-#     the squished planet, the surface denisty of emission intensity will be warped. We
+#     the squished planet, the surface density of emission intensity will be warped. We
 #     need to correct for that warping here. The input coordinates here are **IN THE
 #     PLANET'S FRAME, NOT THE SKY FRAME.** After getting :math:`x,y,z` samples in the sky
 #     frame, apply the rotation matrix from :func:`pre_squish_transform` to get these.
@@ -1313,7 +1313,7 @@ def emission_phase_curve(
     planet at each time step assuming that a) the surface intensity is modeled by a
     von Mises-Fisher distribution and b) the planet is a Lambertian emitter. To save
     on computation, it takes one set of randomly generated samples of a unit disk,
-    then coverts these to points on the planet's visible disk at each timestep. This
+    then converts these to points on the planet's visible disk at each timestep. This
     introduces some bias- be sure to use a large enough sample it is below an
     appropriate threshold. Also, to compute secondary eclipses, samples are zeroed
     out when they fall behind the star.

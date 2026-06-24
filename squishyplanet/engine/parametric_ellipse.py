@@ -69,7 +69,7 @@ def poly_to_parametric_helper(rho_xx, rho_xy, rho_x0, rho_yy, rho_y0, rho_00):
     yc = (rho_xy * rho_x0 - 2 * rho_xx * rho_y0) / (4 * rho_xx * rho_yy - rho_xy**2)
 
     # get new coefficients for the centered ellipse: all others are zero now,
-    # explicitly got rid of rho_00 so there's a lot more divison
+    # explicitly got rid of rho_00 so there's a lot more division
     rho_xx_shift = -(
         (rho_xx * (rho_xy**2 - 4 * rho_xx * rho_yy))
         / (
