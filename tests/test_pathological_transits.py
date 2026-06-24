@@ -171,10 +171,16 @@ _BOUND_TOL = 1e-6
 
 def _assert_finite_bounded(flux, name):
     assert np.all(np.isfinite(flux)), f"{name}: non-finite flux value(s)"
-    assert np.all(
-        flux <= 1.0 + _BOUND_TOL
-    ), f"{name}: flux exceeds 1 (negative blocked flux)"
-    assert np.all(flux >= -_BOUND_TOL), f"{name}: flux below 0 (over-blocked)"
+    over = float(flux.max() - 1.0)
+    under = float(-(flux.min()))
+    n_over = int(np.sum(flux > 1.0 + _BOUND_TOL))
+    assert flux.max() <= 1.0 + _BOUND_TOL, (
+        f"{name}: flux exceeds 1 (negative blocked flux); "
+        f"max(flux)-1 = {over:.3e} at {n_over} point(s)"
+    )
+    assert (
+        flux.min() >= -_BOUND_TOL
+    ), f"{name}: flux below 0 (over-blocked); min = {under:.3e}"
 
 
 def _max_step(flux):
