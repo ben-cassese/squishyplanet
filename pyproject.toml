@@ -96,3 +96,4 @@ jaxoplanet = { git = "https://github.com/exoplanet-dev/jaxoplanet.git" }
 
 [tool.codespell]
 ignore-words-list = "Flagg,Leary,Winn,AAS,oint"
+skip = "*.ipynb"

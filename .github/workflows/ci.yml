@@ -30,6 +30,9 @@ jobs:
       - name: Run codespell
         run: uv run codespell
 
+      - name: Run codespell on notebook markdown cells
+        run: uv run python tools/codespell_notebook_markdown.py $(find . -name "*.ipynb" -not -path "./.git/*")
+
 
   tests:
     runs-on: ${{ matrix.os }}
