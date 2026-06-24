@@ -95,9 +95,10 @@ def test_projected_parameterization():
 
         lc2 = planet2.lightcurve(injected_state2)
 
-        # looking out for spikes
-        assert jnp.all(lc1 <= 1.0)
-        assert jnp.all(lc2 <= 1.0)
+        # looking out for spikes (tolerance absorbs ulp-level overshoot from the
+        # oversample-correction binning; real spikes are orders of magnitude larger)
+        assert jnp.all(lc1 <= 1.0 + 1e-12)
+        assert jnp.all(lc2 <= 1.0 + 1e-12)
 
         r = planet1.state["projected_effective_r"][0]
         assert jnp.min(lc1 >= r**2)
