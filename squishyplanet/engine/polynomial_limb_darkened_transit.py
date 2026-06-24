@@ -4,7 +4,7 @@ jax.config.update("jax_enable_x64", True)
 from functools import partial
 
 import jax.numpy as jnp
-from quadax import quadgk
+import numpy as np
 
 from squishyplanet.engine.kepler import kepler, skypos, t0_to_t_peri
 from squishyplanet.engine.parametric_ellipse import (
@@ -12,10 +12,51 @@ from squishyplanet.engine.parametric_ellipse import (
     poly_to_parametric,
 )
 
-# Quadrature tolerance (both epsabs and epsrel) for the planet solution-vector
-# integrals. 1e-8 keeps the full-lightcurve value error well under 1 ppm (~1e-11)
-# while keeping jacfwd relative error ~1e-7.
-EPS = 1e-8
+# Fixed-grid quadrature for the planet solution-vector integrals, replacing the
+# previous adaptive quadax.quadgk call. A single unrolled pass is faster to
+# evaluate and differentiate than the old adaptive refinement loop. The integrand
+# behaves differently in the two ways planet_solution_vec is called, so we use a
+# different fixed rule for each:
+#
+#   * Partial-transit arcs (a, b are the parametric angles where the outline
+#     crosses the stellar limb): the integrand has a square-root-type singularity
+#     at BOTH endpoints, where 1 - x^2 - y^2 -> 0. We integrate on a cubic
+#     "smoothstep" reparameterization of [a, b] with zero derivative at each
+#     endpoint, which regularizes the sqrt singularity into a smooth integrand and
+#     recovers spectral GL convergence (solution-vector value error ~1e-14 and
+#     jacfwd relative error ~1e-10 worst case over LD orders 2-8 and a wide range
+#     of geometries, vs the old adaptive scheme's ~1e-7 jacfwd error).
+#   * Full transit (a=0, b=2*pi, planet fully inside the star): the integrand is
+#     smooth and periodic with no endpoint singularity, but can develop a sharp
+#     near-cusp mid-arc when the outline grazes the limb internally
+#     (1 - x^2 - y^2 -> 0 away from the endpoints). The smoothstep clusters nodes
+#     at the endpoints -- the wrong place -- and under-resolves that feature. Here
+#     we use the periodic trapezoid rule, which is spectrally accurate for smooth
+#     periodic integrands and resolves the interior near-cusp far more efficiently
+#     than a plain GL rule.
+#
+# The two schemes meet at internal tangency (d_center = 1 - r, i.e. second/third
+# contact), where the full-circle integrand is at its most grazing. Their
+# independent errors there set the size of any flux discontinuity at the handoff.
+# N_TRAP is chosen so that worst-case step is ~5e-12 -- below the genuine physical
+# contact-point kink (~2e-11) that any transit model has -- so the scheme switch
+# introduces no discontinuity beyond the unavoidable physics.
+#
+# GL nodes are open (never land on +/-1), so the smoothstep samples never hit the
+# exact endpoints and we avoid sqrt(negative)/nan even if the quartic roots are
+# slightly off the limb.
+N_GL = 48  # smoothstep GL nodes for partial-transit arcs
+N_TRAP = 256  # periodic trapezoid nodes for the full circle
+_gl_nodes, _gl_weights = np.polynomial.legendre.leggauss(N_GL)
+# smoothstep map phi(t) = (3 t - t^3) / 2 on [-1, 1] (phi(+/-1) = +/-1) and its
+# derivative dphi(t) = (3 - 3 t^2) / 2 (dphi(+/-1) = 0), evaluated at the nodes.
+_GL_PHI = jnp.asarray((3.0 * _gl_nodes - _gl_nodes**3) / 2.0)
+_GL_WDPHI = jnp.asarray(_gl_weights * (3.0 - 3.0 * _gl_nodes**2) / 2.0)
+# equally-spaced nodes on [0, 2*pi) for the periodic trapezoid (full circle).
+_TRAP_NODES = jnp.asarray(np.linspace(0.0, 2.0 * np.pi, N_TRAP, endpoint=False))
+_TRAP_WEIGHT = 2.0 * jnp.pi / N_TRAP
+# A full-circle call is detected by its span being (numerically) 2*pi.
+_FULL_SPAN = 2.0 * jnp.pi - 1e-9
 
 
 def _t4(rho_xx, rho_xy, rho_x0, rho_yy, rho_y0, rho_00):
@@ -196,8 +237,9 @@ def planet_solution_vec(a, b, g_coeffs, c_x1, c_x2, c_x3, c_y1, c_y2, c_y3):
 
     This computes Eq. 21 of `Agol, Luger, and Foreman-Mackey 2020
     <https://ui.adsabs.harvard.edu/abs/2020AJ....159..123A/abstract>`_. But, instead of
-    doing it analytically, this uses the ``quadax`` package to numerically solve the
-    required integrals. For terms s_2 and higher, this is straightforward to do based on
+    doing it analytically, this numerically solves the required integrals with a
+    fixed-grid Gauss-Legendre rule (see ``N_GL`` and the module-level notes). For terms
+    s_2 and higher, this is straightforward to do based on
     the equations in the paper: we simply parameterize the outline of the planet by
     some angle :math:`\\alpha`, then numerically integrate the dot product of Eq. 62
     with that parameterization between the two endpoints of the path. For the first two
@@ -256,9 +298,9 @@ def planet_solution_vec(a, b, g_coeffs, c_x1, c_x2, c_x3, c_y1, c_y2, c_y3):
 
     """
 
-    # The s0, s1, and higher-order sn integrals are evaluated in a single
-    # vector-valued quadgk call sharing one Gauss-Kronrod node set (instead of three
-    # independent adaptive integrations over the same interval). The lax.scan over
+    # The s0, s1, and higher-order sn integrals are evaluated together as a single
+    # vector-valued integrand sharing one fixed Gauss-Legendre node set (instead of
+    # three independent integrations over the same interval). The lax.scan over
     # polynomial orders becomes a vectorized power.
     ns = jnp.arange(g_coeffs.shape[0])[2:]
 
@@ -284,8 +326,20 @@ def planet_solution_vec(a, b, g_coeffs, c_x1, c_x2, c_x3, c_y1, c_y2, c_y3):
         vn = one_minus ** (ns / 2.0) * common
         return jnp.concatenate((jnp.array([v0, v1]), vn))
 
-    res, _ = quadgk(vec_integrand, jnp.array([a, b]), epsabs=EPS, epsrel=EPS)
-    return res
+    # Full-circle calls use the periodic trapezoid; partial arcs use the smoothstep
+    # reparameterization of [a, b] that regularizes the sqrt endpoint singularity:
+    #   s = mid + half * phi(t),  integral = half * sum_k w_k dphi(t_k) f(s_k).
+    def full_circle(_):
+        vals = jax.vmap(vec_integrand)(_TRAP_NODES)
+        return _TRAP_WEIGHT * jnp.sum(vals, axis=0)
+
+    def partial_arc(_):
+        half = 0.5 * (b - a)
+        mid = 0.5 * (a + b)
+        vals = jax.vmap(vec_integrand)(mid + half * _GL_PHI)
+        return half * jnp.sum(_GL_WDPHI[:, None] * vals, axis=0)
+
+    return jax.lax.cond((b - a) >= _FULL_SPAN, full_circle, partial_arc, None)
 
 
 # Closed-form antiderivatives for the star-arc integrands (see star_solution_vec).

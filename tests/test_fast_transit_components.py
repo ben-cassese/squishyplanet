@@ -20,7 +20,11 @@ import jax.numpy as jnp
 import mpmath as mp
 import numpy as np
 
+import squishyplanet.engine.polynomial_limb_darkened_transit as pld
+from squishyplanet import OblateSystem
+from squishyplanet.engine.kepler import skypos
 from squishyplanet.engine.polynomial_limb_darkened_transit import (
+    lightcurve,
     outline_prelude,
     planet_solution_vec,
     star_solution_vec,
@@ -287,3 +291,85 @@ def test_outline_prelude_matches_mpmath():
             gx, gy = _mp_outline_point(p, float(alpha))
             worst = max(worst, float(np.hypot(x - gx, y - gy)))
     assert worst < 1e-10, f"outline_prelude vs mpmath worst = {worst:.2e}"
+
+
+# ---------------------------------------------------------------------------
+# scheme handoff continuity (smoothstep-GL partial arc <-> trapezoid full circle)
+# ---------------------------------------------------------------------------
+def _gold_lightcurve(state):
+    """Recompute the light curve with both quadrature rules cranked to ~machine
+    precision, giving the (physically continuous) truth to compare against.
+
+    Temporarily swaps the module-level node tables and clears the JIT cache so the
+    swap takes effect, restoring everything afterward.
+    """
+    saved = (pld._GL_PHI, pld._GL_WDPHI, pld._TRAP_NODES, pld._TRAP_WEIGHT)
+    try:
+        n, w = np.polynomial.legendre.leggauss(200)
+        pld._GL_PHI = jnp.asarray((3.0 * n - n**3) / 2.0)
+        pld._GL_WDPHI = jnp.asarray(w * (3.0 - 3.0 * n**2) / 2.0)
+        pld._TRAP_NODES = jnp.asarray(
+            np.linspace(0.0, 2.0 * np.pi, 4096, endpoint=False)
+        )
+        pld._TRAP_WEIGHT = 2.0 * np.pi / 4096
+        jax.clear_caches()
+        return np.asarray(lightcurve(state, False))
+    finally:
+        pld._GL_PHI, pld._GL_WDPHI, pld._TRAP_NODES, pld._TRAP_WEIGHT = saved
+        jax.clear_caches()
+
+
+def test_scheme_handoff_is_continuous():
+    """No flux discontinuity where the two quadrature schemes meet.
+
+    ``planet_solution_vec`` integrates partial-transit arcs with a smoothstep
+    Gauss-Legendre rule and the full circle with a periodic trapezoid. They hand
+    off at internal tangency (``d_center = 1 - r``, i.e. second/third contact),
+    which is also the most grazing the full-circle integrand ever gets. A large
+    planet sampled finely straddling tangency is the worst case; we check that the
+    production light curve tracks the machine-precision ``_gold_lightcurve`` across
+    the handoff and that the scheme-induced step is far below 1 ppm.
+    """
+    r = 0.25
+    base = dict(
+        t0=0.0,
+        period=15.0,
+        a=15.0,
+        e=0.0,
+        i=jnp.pi / 2,
+        Omega=jnp.pi,
+        omega=0.0,
+        f1=0.0,
+        f2=0.0,
+        r=r,
+        obliq=0.0,
+        prec=0.0,
+        ld_u_coeffs=jnp.array([0.5, 0.2]),
+        tidally_locked=False,
+    )
+
+    # locate the internal-tangency time (d_center = 1 - r) on the ingress side
+    tt = jnp.linspace(-1.0, 0.0, 400001)
+    pos = np.asarray(skypos(**OblateSystem(times=tt, **base)._state))
+    dc = np.hypot(pos[0], pos[1])
+    front = pos[2] > 0
+    tc = float(
+        np.asarray(tt)[int(np.argmin(np.where(front, np.abs(dc - (1 - r)), 9.0)))]
+    )
+
+    # dense window straddling tangency
+    tw = jnp.linspace(tc - 2e-4, tc + 2e-4, 4001)
+    state = OblateSystem(times=tw, **base)._state
+    prod = np.asarray(lightcurve(state, False))
+    gold = _gold_lightcurve(state)
+
+    # production tracks the continuous truth across the handoff
+    worst = float(np.max(np.abs(prod - gold)))
+    assert worst < 5e-11, f"max |prod - gold| across handoff = {worst:.2e}"
+
+    # the scheme-induced flux step across the handoff is far below 1 ppm
+    dcw = np.hypot(*np.asarray(skypos(**state))[:2])
+    h = int(np.argmin(np.abs(dcw - (1 - r))))
+    err = prod - gold
+    step = abs(np.mean(err[h + 3 : h + 60]) - np.mean(err[h - 60 : h - 3]))
+    assert step < 5e-11, f"handoff flux step = {step:.2e}"
