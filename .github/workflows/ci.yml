@@ -8,13 +8,13 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@v8
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.13"
 
@@ -32,7 +32,7 @@ jobs:
 
 
   tests:
-    runs-on: ${{ ubuntu-latest }}
+    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         os: [ubuntu-latest]
@@ -40,7 +40,7 @@ jobs:
       fail-fast: false
     steps:
       - name: Check out
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Set up python
         uses: actions/setup-python@v6
@@ -48,7 +48,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v7
+        uses: astral-sh/setup-uv@v8
         with:
           version: 0.5.9
           enable-cache: "true"
@@ -63,7 +63,7 @@ jobs:
 
       - name: Upload coverage reports to Codecov with GitHub Action on Python 3.13 for macos
         if: ${{ matrix.python-version == '3.13' && matrix.os == 'ubuntu-latest' }}
-        uses: codecov/codecov-action@v6
+        uses: codecov/codecov-action@v7
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
 
@@ -71,7 +71,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
