@@ -52,8 +52,13 @@ _gl_nodes, _gl_weights = np.polynomial.legendre.leggauss(N_GL)
 # derivative dphi(t) = (3 - 3 t^2) / 2 (dphi(+/-1) = 0), evaluated at the nodes.
 _GL_PHI = jnp.asarray((3.0 * _gl_nodes - _gl_nodes**3) / 2.0)
 _GL_WDPHI = jnp.asarray(_gl_weights * (3.0 - 3.0 * _gl_nodes**2) / 2.0)
-# equally-spaced nodes on [0, 2*pi) for the periodic trapezoid (full circle).
-_TRAP_NODES = jnp.asarray(np.linspace(0.0, 2.0 * np.pi, N_TRAP, endpoint=False))
+# Equally-spaced nodes for the periodic trapezoid (full circle), offset by half a
+# step to (k + 1/2) * 2*pi / N_TRAP. This is equally spectrally accurate for smooth
+# periodic integrands but keeps nodes off the "nice" angles 0, pi/2, pi, ... so they
+# don't sit exactly on the grazing tangent of an axis-aligned outline (where
+# 1 - x^2 - y^2 = 0). The integrand is nan-safe there regardless; this just avoids
+# sampling the cusp itself.
+_TRAP_NODES = jnp.asarray((np.arange(N_TRAP) + 0.5) * (2.0 * np.pi / N_TRAP))
 _TRAP_WEIGHT = 2.0 * jnp.pi / N_TRAP
 # A full-circle call is detected by its span being (numerically) 2*pi.
 _FULL_SPAN = 2.0 * jnp.pi - 1e-9
@@ -310,12 +315,24 @@ def planet_solution_vec(a, b, g_coeffs, c_x1, c_x2, c_x3, c_y1, c_y2, c_y3):
         x = cs * c_x1 + sn * c_x2 + c_x3
         y = cs * c_y1 + sn * c_y2 + c_y3
         dy_da = -sn * c_y1 + cs * c_y2
-        one_minus = 1.0 - x**2 - y**2
-        root = jnp.sqrt(one_minus)
+        # Guard the grazing tangent. When the outline just touches the stellar limb
+        # (fully-inside case), 1 - x^2 - y^2 -> 0 at one angle, and a fixed quadrature
+        # node can land on or just past it. Two failure modes follow: (1) rounding of
+        # x^2 + y^2 can make 1 - x^2 - y^2 slightly negative (platform-dependent),
+        # giving sqrt(neg)=nan and (neg)**(n/2)=nan; (2) at exactly 1 - x^2 - y^2 = 0,
+        # sqrt and arctan(x/root) have infinite derivatives, giving a nan *gradient*
+        # even when the value is fine. The true outline has 1 - x^2 - y^2 >= 0 here, so
+        # we use a nan-safe formulation: clamp, a guarded sqrt, and arctan2 (which
+        # equals arctan(x/root) for root > 0 but stays finite in value and gradient at
+        # root == 0). This is a no-op wherever 1 - x^2 - y^2 > 0.
+        om = 1.0 - x**2 - y**2
+        pos = om > 0.0
+        one_minus = jnp.where(pos, om, 0.0)
+        root = jnp.where(pos, jnp.sqrt(jnp.where(pos, om, 1.0)), 0.0)
 
         v0 = x * dy_da
         v1 = (
-            dy_da * (jnp.pi + 6 * x * root - 6 * jnp.arctan(x / root) * (-1 + y**2))
+            dy_da * (jnp.pi + 6 * x * root - 6 * jnp.arctan2(x, root) * (-1 + y**2))
         ) / 12.0
 
         common = -(
