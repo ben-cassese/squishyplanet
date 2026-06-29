@@ -553,9 +553,11 @@ def outline_prelude(state):
         @ _rot(state["omega"] + prec, "z")
         @ _rot(state["obliq"], "y")
     )
-    r = state["r"]
+    r = jnp.asarray(state["r"]).ravel()[0]
+    f1 = jnp.asarray(state["f1"]).ravel()[0]
+    f2 = jnp.asarray(state["f2"]).ravel()[0]
     d = jnp.stack(
-        [1 / r**2, 1 / (r * (1 - state["f2"])) ** 2, 1 / (r * (1 - state["f1"])) ** 2],
+        [1 / r**2, 1 / (r * (1 - f2)) ** 2, 1 / (r * (1 - f1)) ** 2],
         -1,
     )
     M = jnp.einsum("...ij,...j,...kj->...ik", R, d, R)

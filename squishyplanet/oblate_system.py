@@ -278,6 +278,8 @@ class OblateSystem:
             self._state["projected_f"] = effective_f
         else:
             self._coeffs_3d = {}
+            for key in ("projected_effective_r", "projected_f", "projected_theta"):
+                self._state[key] = jnp.asarray(self._state[key]).ravel()[0]
             area = jnp.pi * self._state["projected_effective_r"] ** 2
             r1 = jnp.sqrt(area / ((1 - self._state["projected_f"]) * jnp.pi))
             r2 = r1 * (1 - self._state["projected_f"])

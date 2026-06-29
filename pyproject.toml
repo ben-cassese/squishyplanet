@@ -45,6 +45,7 @@ dev = [
 tests = [
     "jaxoplanet",
     "mpmath>=1.3.0",
+    "nbmake>=1.5.5",
     "pytest>=8.3.5",
     "pytest-cov>=6.1.1",
     "pytest-xdist>=3.6.1",
@@ -87,6 +88,10 @@ exclude = [
     "docs/*",
 ]
 pydocstyle.convention = "google"
+
+[tool.pytest.ini_options]
+addopts = "--nbmake --ignore=docs/tutorials/fit_oblate_transit.ipynb --ignore=docs/tutorials/lightcurve_compare.ipynb"
+testpaths = ["tests", "docs/tutorials", "docs/quickstart.ipynb"]
 
 [tool.coverage.run]
 source = ["squishyplanet"]
