@@ -8,7 +8,7 @@ from tqdm import tqdm
 from squishyplanet import OblateSystem
 
 
-def test_projected_parameterization():
+def test_projected_parameterization() -> None:
     key = jax.random.PRNGKey(0)
     t_exp = 5 * u.min
     times = jnp.arange(-30, 30, t_exp.to(u.hour).value) * u.hour.to(u.day)

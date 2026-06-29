@@ -80,12 +80,12 @@ FUZZ_N = 501  # grid for the randomized finiteness sweep
 # ---------------------------------------------------------------------------
 # builders
 # ---------------------------------------------------------------------------
-def _incl_for_b(b, a=SMA):
+def _incl_for_b(b: float, a: float = SMA) -> float:
     """Inclination [rad] giving (circular) impact parameter ``b = a cos(i)``."""
     return float(np.arccos(np.clip(b / a, -1.0, 1.0)))
 
 
-def _ld_min_intensity(u):
+def _ld_min_intensity(u: jax.Array | np.ndarray) -> float:
     """Minimum of the polynomial LD profile ``I(mu) = 1 - sum_k u_k (1 - mu)^k``."""
     u = np.asarray(u)
     mu = np.linspace(0.0, 1.0, 1001)
@@ -95,7 +95,7 @@ def _ld_min_intensity(u):
     return float(intensity.min())
 
 
-def _valid_ld(order, rng, total=0.8):
+def _valid_ld(order: int, rng: np.random.Generator, total: float = 0.8) -> jax.Array:
     """Random physically-valid LD coefficients: ``u_k >= 0`` and ``sum_k u_k = total``.
 
     ``u_k >= 0`` with ``sum_k u_k <= 1`` guarantees ``I(mu) >= 0`` over the whole disk
@@ -107,7 +107,7 @@ def _valid_ld(order, rng, total=0.8):
     return jnp.array(u)
 
 
-def _transit_half_window(a, period, r, e):
+def _transit_half_window(a: float, period: float, r: float, e: float) -> float:
     """Generous half-window [days] guaranteed to bracket ingress and egress.
 
     ~3x the small-angle transit half-duration, inflated by the eccentric
@@ -118,12 +118,18 @@ def _transit_half_window(a, period, r, e):
     return 3.0 * half
 
 
-def _times(n, a=SMA, period=PERIOD, r=R_DEF, e=0.0):
+def _times(
+    n: int,
+    a: float = SMA,
+    period: float = PERIOD,
+    r: float = R_DEF,
+    e: float = 0.0,
+) -> jax.Array:
     w = _transit_half_window(a, period, r, e)
     return jnp.linspace(-w, w, n)
 
 
-def _build_state(times, **over):
+def _build_state(times: jax.Array, **over: object) -> dict:
     """Build an ``OblateSystem`` ``_state`` for the 3D-parameterization branch.
 
     Defaults give an edge-on, central, circular, quadratic-LD transit; ``over``
@@ -152,7 +158,7 @@ def _build_state(times, **over):
     return OblateSystem(times=times, **base)._state
 
 
-def _dense_lc(n, **over):
+def _dense_lc(n: int, **over: object) -> np.ndarray:
     """Light curve (numpy) over a window auto-sized to ``over``'s a/period/r/e."""
     a = float(over.get("a", SMA))
     period = float(over.get("period", PERIOD))
@@ -174,7 +180,12 @@ def _dense_lc(n, **over):
 _BOUND_TOL = 1e-9
 
 
-def _assert_finite_bounded(flux, name, strict_upper=True, strict_lower=True):
+def _assert_finite_bounded(
+    flux: np.ndarray,
+    name: str,
+    strict_upper: bool = True,
+    strict_lower: bool = True,
+) -> None:
     """Assert flux is finite, and (optionally) within ``[0, 1]``.
 
     ``strict_upper``/``strict_lower`` can be disabled for *exact* degenerate-tangency
@@ -198,11 +209,13 @@ def _assert_finite_bounded(flux, name, strict_upper=True, strict_lower=True):
         ), f"{name}: flux below 0 (over-blocked); min = {under:.3e}"
 
 
-def _max_step(flux):
+def _max_step(flux: np.ndarray) -> float:
     return float(np.max(np.abs(np.diff(flux))))
 
 
-def _assert_continuous(name, floor=1e-7, ratio=0.6, **over):
+def _assert_continuous(
+    name: str, floor: float = 1e-7, ratio: float = 0.6, **over: object
+) -> None:
     """No value-discontinuity: the max adjacent step must shrink under 4x refinement.
 
     Skips the refinement check when the coarse max step is below ``floor`` (the curve is
@@ -265,7 +278,7 @@ _CONTINUITY_CASES = [
 @pytest.mark.parametrize(
     "name, over", _CONTINUITY_CASES, ids=[c[0] for c in _CONTINUITY_CASES]
 )
-def test_no_spikes_curated(name, over):
+def test_no_spikes_curated(name: str, over: dict[str, object]) -> None:
     """No NaNs, bounds violations, or value discontinuities in spike-prone geometries."""
     _assert_continuous(name, **over)
 
@@ -273,12 +286,12 @@ def test_no_spikes_curated(name, over):
 # ===========================================================================
 # 2. Grazing / tangency sweeps (finite + bounded)
 # ===========================================================================
-def _is_exact_tangency(b, r=R_DEF):
+def _is_exact_tangency(b: float, r: float = R_DEF) -> bool:
     """True if ``b`` lands (to ~ULP) on external/internal tangency ``1 +/- r``."""
     return min(abs(b - (1.0 + r)), abs(b - (1.0 - r))) < 1e-9
 
 
-def test_grazing_sweep_spherical():
+def test_grazing_sweep_spherical() -> None:
     """Sweep the impact parameter straight through external tangency (b = 1 + r).
 
     This crosses every transit branch boundary: full miss -> straddling -> partial ->
@@ -299,7 +312,7 @@ def test_grazing_sweep_spherical():
         )
 
 
-def test_grazing_sweep_oblate():
+def test_grazing_sweep_oblate() -> None:
     """Same impact-parameter sweep for a flattened, tilted planet, where the grazing
     geometry depends on the projected ellipse orientation."""
     for b in np.linspace(0.80, 1.20, 41):
@@ -310,7 +323,7 @@ def test_grazing_sweep_oblate():
 
 
 @pytest.mark.parametrize("b", [1.0 - R_DEF, 1.0, 1.0 + R_DEF])
-def test_exact_tangency(b):
+def test_exact_tangency(b: float) -> None:
     """Exact internal tangency (b = 1 - r, the 2nd/3rd-contact scheme handoff), the
     center-on-limb case (b = 1), and exact external tangency (b = 1 + r).
 
@@ -338,7 +351,7 @@ def test_exact_tangency(b):
         "hardened against the double-root case."
     ),
 )
-def test_exact_tangency_negative_blocked_flux_known_issue():
+def test_exact_tangency_negative_blocked_flux_known_issue() -> None:
     """Pin the exact-tangency negative-blocked-flux spike as a tracked known issue.
 
     Asserts the *correct* invariant (flux <= 1) at b = 1 + r so that, on the platform
@@ -353,7 +366,7 @@ def test_exact_tangency_negative_blocked_flux_known_issue():
     ), f"exact-tangency negative blocked flux: max(flux)-1 = {over:.3e}"
 
 
-def test_total_miss_stays_flat():
+def test_total_miss_stays_flat() -> None:
     """A planet that never reaches the limb (b well above 1 + r) returns flat unit flux."""
     flux = _dense_lc(COARSE_N, i=_incl_for_b(1.5))
     _assert_finite_bounded(flux, "total_miss")
@@ -378,21 +391,21 @@ _SPECIAL_ANGLES = [
 
 
 @pytest.mark.parametrize("ang", _SPECIAL_ANGLES)
-def test_special_Omega(ang):
+def test_special_Omega(ang: float) -> None:
     """Ascending node at the 'nice' angles that can axis-align the projected ellipse."""
     flux = _dense_lc(COARSE_N, Omega=ang, i=_incl_for_b(0.5), f1=0.4, obliq=jnp.pi / 6)
     _assert_finite_bounded(flux, f"Omega={ang:.4f}")
 
 
 @pytest.mark.parametrize("ang", _SPECIAL_ANGLES)
-def test_special_omega(ang):
+def test_special_omega(ang: float) -> None:
     """Argument of periastron at special angles (e > 0 so it is meaningful)."""
     flux = _dense_lc(COARSE_N, e=0.3, omega=ang, i=_incl_for_b(0.5))
     _assert_finite_bounded(flux, f"omega={ang:.4f}")
 
 
 @pytest.mark.parametrize("ang", [0.0, np.pi / 6, np.pi / 4, np.pi / 3, np.pi / 2])
-def test_special_obliq(ang):
+def test_special_obliq(ang: float) -> None:
     """Planet obliquity at special angles for a flattened planet (axis-aligned ->
     tilted -> pole-on outline)."""
     flux = _dense_lc(COARSE_N, obliq=ang, f1=0.5, i=_incl_for_b(0.5))
@@ -400,7 +413,7 @@ def test_special_obliq(ang):
 
 
 @pytest.mark.parametrize("ang", _SPECIAL_ANGLES)
-def test_special_prec(ang):
+def test_special_prec(ang: float) -> None:
     """Planet precession angle at special angles for a triaxial planet."""
     flux = _dense_lc(COARSE_N, prec=ang, f1=0.4, f2=0.25, obliq=0.6, i=_incl_for_b(0.5))
     _assert_finite_bounded(flux, f"prec={ang:.4f}")
@@ -411,7 +424,7 @@ def test_special_prec(ang):
 # ===========================================================================
 @pytest.mark.parametrize("e", [0.0, 0.2, 0.4, 0.6, 0.8, 0.9])
 @pytest.mark.parametrize("omega", [np.pi / 2, np.pi, 3 * np.pi / 2])
-def test_eccentricity_sweep(e, omega):
+def test_eccentricity_sweep(e: float, omega: float) -> None:
     flux = _dense_lc(
         COARSE_N, e=e, omega=(0.0 if e == 0.0 else omega), i=_incl_for_b(0.4)
     )
@@ -419,14 +432,14 @@ def test_eccentricity_sweep(e, omega):
 
 
 @pytest.mark.parametrize("r", [1e-4, 1e-3, 1e-2, 0.05, 0.1, 0.2, 0.3, 0.5])
-def test_radius_sweep(r):
+def test_radius_sweep(r: float) -> None:
     flux = _dense_lc(COARSE_N, r=r, i=_incl_for_b(0.4))
     _assert_finite_bounded(flux, f"r={r:.4g}")
 
 
 @pytest.mark.parametrize("f1", [0.0, 0.1, 0.3, 0.5, 0.8, 0.95])
 @pytest.mark.parametrize("f2", [0.0, 0.3, 0.6])
-def test_flattening_sweep(f1, f2):
+def test_flattening_sweep(f1: float, f2: float) -> None:
     """Oblateness/triaxiality up to extreme values, at a tilted orientation."""
     flux = _dense_lc(
         COARSE_N, f1=f1, f2=f2, obliq=jnp.pi / 5, prec=0.7, i=_incl_for_b(0.4)
@@ -435,7 +448,7 @@ def test_flattening_sweep(f1, f2):
 
 
 @pytest.mark.parametrize("order", [2, 3, 4, 5, 6, 8])
-def test_ld_order_sweep(order):
+def test_ld_order_sweep(order: int) -> None:
     """Polynomial limb darkening of increasing order (physically valid profiles)."""
     rng = np.random.default_rng(100 + order)
     u = _valid_ld(order, rng)
@@ -453,13 +466,13 @@ def test_ld_order_sweep(order):
         jnp.array([0.9, 0.05]),
     ],
 )
-def test_ld_special_coeffs(u):
+def test_ld_special_coeffs(u: jax.Array) -> None:
     assert _ld_min_intensity(u) >= -1e-12, "test case is meant to be a valid LD profile"
     flux = _dense_lc(COARSE_N, ld_u_coeffs=u, i=_incl_for_b(0.5))
     _assert_finite_bounded(flux, f"ld_coeffs={np.asarray(u)}")
 
 
-def test_negative_limb_darkening_overshoots():
+def test_negative_limb_darkening_overshoots() -> None:
     """Unphysical LD (negative intensity near the limb) makes flux > 1 -- by design.
 
     This is NOT a transit-model bug: if the limb-darkening polynomial dips below zero
@@ -519,7 +532,7 @@ _GRAD_PARAMS = ["i", "r", "e", "omega", "obliq", "f1", "a"]
 
 
 @pytest.mark.parametrize("name, over", _GRAD_CASES, ids=[c[0] for c in _GRAD_CASES])
-def test_gradients_finite(name, over):
+def test_gradients_finite(name: str, over: dict[str, object]) -> None:
     """jacfwd of the light curve w.r.t each orbital element stays finite.
 
     The grazing tangent is where sqrt/arctan2 have infinite derivatives, so this is the
@@ -537,7 +550,7 @@ def test_gradients_finite(name, over):
         if key == "omega" and float(state["e"][0]) == 0.0:
             continue
 
-        def f(x, _key=key):
+        def f(x: jax.Array, _key: str = key) -> jax.Array:
             s = dict(state)
             s[_key] = x
             return lightcurve(s, False)
@@ -551,7 +564,7 @@ def test_gradients_finite(name, over):
 # ===========================================================================
 # 6. Randomized fuzz sweep (finite + bounded)
 # ===========================================================================
-def test_random_pathological_fuzz():
+def test_random_pathological_fuzz() -> None:
     """Many random configurations spanning the full pathological input space.
 
     Covers simultaneous combinations (eccentric + triaxial + tilted + high-order LD +
@@ -584,7 +597,9 @@ def test_random_pathological_fuzz():
 # ===========================================================================
 # 7. Projected-ellipse parameterization branch
 # ===========================================================================
-def _dense_lc_projected(n, projected_effective_r=0.1, **over):
+def _dense_lc_projected(
+    n: int, projected_effective_r: float = 0.1, **over: object
+) -> np.ndarray:
     a = float(over.get("a", SMA))
     period = float(over.get("period", PERIOD))
     e = float(over.get("e", 0.0))
@@ -612,7 +627,7 @@ def _dense_lc_projected(n, projected_effective_r=0.1, **over):
 
 
 @pytest.mark.parametrize("pf", [0.0, 0.2, 0.5, 0.8, 0.95])
-def test_projected_flattening_sweep(pf):
+def test_projected_flattening_sweep(pf: float) -> None:
     """Projected-ellipse branch with flattening up to a near-degenerate sliver.
 
     As ``projected_f -> 1`` the (area-preserving) minor axis collapses toward zero,
@@ -625,7 +640,7 @@ def test_projected_flattening_sweep(pf):
 
 
 @pytest.mark.parametrize("ang", _SPECIAL_ANGLES)
-def test_projected_theta_special(ang):
+def test_projected_theta_special(ang: float) -> None:
     """Projected-ellipse orientation at the 'nice' angles (axis-aligned outlines)."""
     flux = _dense_lc_projected(
         COARSE_N, projected_f=0.4, projected_theta=ang, i=_incl_for_b(0.4)
@@ -633,7 +648,7 @@ def test_projected_theta_special(ang):
     _assert_finite_bounded(flux, f"projected_theta={ang:.4f}")
 
 
-def test_projected_branch_no_spikes():
+def test_projected_branch_no_spikes() -> None:
     """Refinement-continuity check for the projected-ellipse branch (grazing, tilted)."""
     over = dict(projected_f=0.5, projected_theta=jnp.pi / 4, i=_incl_for_b(0.95))
     coarse = _dense_lc_projected(COARSE_N, **over)

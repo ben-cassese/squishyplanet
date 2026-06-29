@@ -13,8 +13,7 @@ from squishyplanet.limb_darkening_laws import (
 )
 
 
-def test_limb_darkening_laws():
-
+def test_limb_darkening_laws() -> None:
     coeffs = linear_ld_law(u1=0.5)
     assert jnp.allclose(coeffs, jnp.array([0.5, 0.0]))
     profile = linear_ld_law(u1=0.5, return_profile=True)
