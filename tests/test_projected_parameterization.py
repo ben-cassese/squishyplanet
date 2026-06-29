@@ -8,7 +8,7 @@ from tqdm import tqdm
 from squishyplanet import OblateSystem
 
 
-def test_projected_parameterization():
+def test_projected_parameterization() -> None:
     key = jax.random.PRNGKey(0)
     t_exp = 5 * u.min
     times = jnp.arange(-30, 30, t_exp.to(u.hour).value) * u.hour.to(u.day)
@@ -94,6 +94,12 @@ def test_projected_parameterization():
         }
 
         lc2 = planet2.lightcurve(injected_state2)
+
+        # NaN guard: a quadrature node landing on the grazing tangent (1 - x^2 - y^2
+        # -> 0) used to produce platform-dependent NaNs; fail loudly if that regresses
+        # rather than via the cryptic "all 1.0" array below.
+        assert not jnp.any(jnp.isnan(lc1)), "lc1 contains NaN"
+        assert not jnp.any(jnp.isnan(lc2)), "lc2 contains NaN"
 
         # looking out for spikes
         assert jnp.all(lc1 <= 1.0)

@@ -13,7 +13,9 @@ mu_grid = jnp.linspace(0, 1, 500)
 
 
 @partial(jax.jit, static_argnames=("return_profile"))
-def linear_ld_law(u1, return_profile=False):
+def linear_ld_law(
+    u1: float, return_profile: bool = False
+) -> jax.Array | dict[str, jax.Array]:
     """Linear limb-darkening law.
 
     .. math::
@@ -54,7 +56,9 @@ def linear_ld_law(u1, return_profile=False):
 
 
 @partial(jax.jit, static_argnames=("return_profile"))
-def quadratic_ld_law(u1, u2, return_profile=False):
+def quadratic_ld_law(
+    u1: float, u2: float, return_profile: bool = False
+) -> jax.Array | dict[str, jax.Array]:
     """Quadratic limb-darkening law.
 
     .. math::
@@ -97,7 +101,9 @@ def quadratic_ld_law(u1, u2, return_profile=False):
 
 
 @partial(jax.jit, static_argnames=("return_profile"))
-def kipping_ld_law(q1, q2, return_profile=False):
+def kipping_ld_law(
+    q1: float, q2: float, return_profile: bool = False
+) -> jax.Array | dict[str, jax.Array]:
     """Kipping limb-darkening law.
 
     A restriction of the quadratic law from Kipping 2013 that guaratees a monotonic
@@ -155,7 +161,9 @@ def kipping_ld_law(q1, q2, return_profile=False):
 
 
 @partial(jax.jit, static_argnames=("return_profile"))
-def squareroot_ld_law(u1, u2, order=12, return_profile=False):
+def squareroot_ld_law(
+    u1: float, u2: float, order: int = 12, return_profile: bool = False
+) -> jax.Array | dict[str, jax.Array]:
     """Square root limb-darkening law.
 
     .. math::
@@ -201,7 +209,9 @@ def squareroot_ld_law(u1, u2, order=12, return_profile=False):
 
 
 @partial(jax.jit, static_argnames=("return_profile"))
-def nonlinear_3param_ld_law(u1, u2, u3, order=12, return_profile=False):
+def nonlinear_3param_ld_law(
+    u1: float, u2: float, u3: float, order: int = 12, return_profile: bool = False
+) -> jax.Array | dict[str, jax.Array]:
     """Non-linear 3-parameter limb-darkening law.
 
     .. math::
@@ -250,7 +260,14 @@ def nonlinear_3param_ld_law(u1, u2, u3, order=12, return_profile=False):
 
 
 @partial(jax.jit, static_argnames=(["order", "return_profile"]))
-def nonlinear_4param_ld_law(u1, u2, u3, u4, order=12, return_profile=False):
+def nonlinear_4param_ld_law(
+    u1: float,
+    u2: float,
+    u3: float,
+    u4: float,
+    order: int = 12,
+    return_profile: bool = False,
+) -> jax.Array | dict[str, jax.Array]:
     """Non-linear 4-parameter limb-darkening law.
 
     .. math::

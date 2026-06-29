@@ -3,34 +3,110 @@ import jax
 jax.config.update("jax_enable_x64", True)
 
 
-def _rho_xx(p_xx, p_xy, p_xz, p_x0, p_yy, p_yz, p_y0, p_zz, p_z0, p_00):
+def _rho_xx(
+    p_xx: jax.Array,
+    p_xy: jax.Array,
+    p_xz: jax.Array,
+    p_x0: jax.Array,
+    p_yy: jax.Array,
+    p_yz: jax.Array,
+    p_y0: jax.Array,
+    p_zz: jax.Array,
+    p_z0: jax.Array,
+    p_00: jax.Array,
+) -> jax.Array:
     return p_xx - p_xz**2 / (4.0 * p_zz)
 
 
-def _rho_xy(p_xx, p_xy, p_xz, p_x0, p_yy, p_yz, p_y0, p_zz, p_z0, p_00):
+def _rho_xy(
+    p_xx: jax.Array,
+    p_xy: jax.Array,
+    p_xz: jax.Array,
+    p_x0: jax.Array,
+    p_yy: jax.Array,
+    p_yz: jax.Array,
+    p_y0: jax.Array,
+    p_zz: jax.Array,
+    p_z0: jax.Array,
+    p_00: jax.Array,
+) -> jax.Array:
     return p_xy - (p_xz * p_yz) / (2.0 * p_zz)
 
 
-def _rho_x0(p_xx, p_xy, p_xz, p_x0, p_yy, p_yz, p_y0, p_zz, p_z0, p_00):
+def _rho_x0(
+    p_xx: jax.Array,
+    p_xy: jax.Array,
+    p_xz: jax.Array,
+    p_x0: jax.Array,
+    p_yy: jax.Array,
+    p_yz: jax.Array,
+    p_y0: jax.Array,
+    p_zz: jax.Array,
+    p_z0: jax.Array,
+    p_00: jax.Array,
+) -> jax.Array:
     return p_x0 - (p_xz * p_z0) / (2.0 * p_zz)
 
 
-def _rho_yy(p_xx, p_xy, p_xz, p_x0, p_yy, p_yz, p_y0, p_zz, p_z0, p_00):
+def _rho_yy(
+    p_xx: jax.Array,
+    p_xy: jax.Array,
+    p_xz: jax.Array,
+    p_x0: jax.Array,
+    p_yy: jax.Array,
+    p_yz: jax.Array,
+    p_y0: jax.Array,
+    p_zz: jax.Array,
+    p_z0: jax.Array,
+    p_00: jax.Array,
+) -> jax.Array:
     return p_yy - p_yz**2 / (4.0 * p_zz)
 
 
-def _rho_y0(p_xx, p_xy, p_xz, p_x0, p_yy, p_yz, p_y0, p_zz, p_z0, p_00):
+def _rho_y0(
+    p_xx: jax.Array,
+    p_xy: jax.Array,
+    p_xz: jax.Array,
+    p_x0: jax.Array,
+    p_yy: jax.Array,
+    p_yz: jax.Array,
+    p_y0: jax.Array,
+    p_zz: jax.Array,
+    p_z0: jax.Array,
+    p_00: jax.Array,
+) -> jax.Array:
     return p_y0 - (p_yz * p_z0) / (2.0 * p_zz)
 
 
-def _rho_00(p_xx, p_xy, p_xz, p_x0, p_yy, p_yz, p_y0, p_zz, p_z0, p_00):
+def _rho_00(
+    p_xx: jax.Array,
+    p_xy: jax.Array,
+    p_xz: jax.Array,
+    p_x0: jax.Array,
+    p_yy: jax.Array,
+    p_yz: jax.Array,
+    p_y0: jax.Array,
+    p_zz: jax.Array,
+    p_z0: jax.Array,
+    p_00: jax.Array,
+) -> jax.Array:
     return p_00 - p_z0**2 / (4.0 * p_zz)
 
 
 @jax.jit
 def planet_2d_coeffs(
-    p_xx, p_xy, p_xz, p_x0, p_yy, p_yz, p_y0, p_zz, p_z0, p_00, **kwargs
-):
+    p_xx: jax.Array,
+    p_xy: jax.Array,
+    p_xz: jax.Array,
+    p_x0: jax.Array,
+    p_yy: jax.Array,
+    p_yz: jax.Array,
+    p_y0: jax.Array,
+    p_zz: jax.Array,
+    p_z0: jax.Array,
+    p_00: jax.Array,
+    **kwargs: object,
+) -> dict[str, jax.Array]:
     """Compute the coefficients that describe the planet as an implicit 2D surface from the
     observer's perspective.
 

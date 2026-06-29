@@ -3,6 +3,7 @@ import jax
 jax.config.update("jax_enable_x64", True)
 import copy
 import pprint
+from collections.abc import Callable
 from functools import partial
 
 import jax.numpy as jnp
@@ -15,26 +16,14 @@ from squishyplanet.engine.parametric_ellipse import (
     poly_to_parametric_helper,
 )
 from squishyplanet.engine.phase_curve_utils import (
-    corrected_emission_profile,
-    emission_phase_curve,
-    extended_illumination_reflected_phase_curve,
     generate_sample_radii_thetas,
     lambertian_reflection,
-    phase_curve,
     planet_surface_normal,
-    pre_squish_transform,
-    reflected_phase_curve,
     sample_surface,
-    stellar_doppler_variations,
-    stellar_ellipsoidal_variations,
     surface_star_cos_angle,
 )
 from squishyplanet.engine.planet_2d import planet_2d_coeffs
-from squishyplanet.engine.planet_3d import (
-    extended_illumination_offsets,
-    planet_3d_coeffs,
-    planet_3d_coeffs_extended_illumination,
-)
+from squishyplanet.engine.planet_3d import planet_3d_coeffs
 from squishyplanet.engine.polynomial_limb_darkened_transit import (
     lightcurve as poly_lightcurve,
 )
@@ -43,13 +32,7 @@ from squishyplanet.engine.polynomial_limb_darkened_transit import parameterize_2
 
 class OblateSystem:
     """The core user interface for ``squishyplanet``, used to model potentially-triaxial
-    exoplanet transits/phase curves.
-
-    Note, all instances will have values associated with phase curve
-    calculations, such as albedo and hotspot location. However, if inputs such are
-    "compute_reflected_phase_curve" are set to ``False``, these values will not be used.
-    The :func:`lightcurve` method will return only the transit light curve in this case,
-    and should be used if computing a transit, reflected, or emitted phase curve.
+    exoplanet transits.
 
     All arguments will be internally converted to ``jax.numpy`` dtypes, and all methods
     will similarly return ``jax.numpy`` arrays. These can be treated similarly to
@@ -132,32 +115,6 @@ class OblateSystem:
             for some order polynomial :math:`N`. See
             `Agol, Luger, and Foreman-Mackey 2020
             <https://ui.adsabs.harvard.edu/abs/2020AJ....159..123A/abstract>`_ for more.
-        hotspot_latitude (float, [Radian], default=0.0):
-            The latitude of a potential hotspot on the planet. This is defined according
-            to the "physics" convention of spherical coordinates, not in the geography
-            sense: 0 is the north pole, :math:`\\pi/2` is the equator, and :math:`\\pi` is
-            the south pole.
-        hotspot_longitude (float, [Radian], default=0.0):
-            The longitude of a potential hotspot on the planet.
-        hotspot_concentration (float, default=0.2):
-            The "concentration" of the hotspot. This is the :math:`\\kappa` parameter in
-            the von Mises-Fisher distribution that describes the hotspot.
-        albedo (float, default=1.0):
-            The (spatialy uniform) albedo of the planet. This is the fraction of light
-            that is reflected, though the directional-dependent scattering is dictated
-            by Lambert's cosine law.
-        emitted_scale (float, default=1e-5):
-            A scale factor that sets the amplitude of the the emitted flux of the
-            planet.
-        systematic_trend_coeffs (array-like, default=jnp.array([0.0,0.0])):
-            The coefficients that determine the polynomial trend in time added to the
-            lightcurves. Used to optionally model long-term drifts in observed data.
-        log_jitter (float, default=-jnp.inf):
-            The log of the "jitter" term included in likelihood calculations. The jitter
-            is added in quadrature to the provided uncertainties to account for any
-            unmodeled noise in the data. This value is the *standard deviation* of the
-            jitter, not the variance. If set to -jnp.inf, the jitter term will not
-            affect the likelihood.
         projected_effective_r (float, [Rstar], default=0.0):
             The radius of a circle with the same area is the projected ellipse. This is
             only relevant if ``parameterize_with_projected_ellipse`` is set to ``True``,
@@ -170,51 +127,10 @@ class OblateSystem:
             The angle of the semi-major axis of the projected ellipse. This is only
             relevant if ``parameterize_with_projected_ellipse`` is set to ``True``,
             which will override ``r``, ``f1``, ``f2``, ``obliq``, and ``prec``.
-        extended_illumination_npts (int, default=1):
-            The number of points used to sample the star's projected disk as seen by
-            the planet when calculating the reflected flux and accounting for the star's
-            extended size. Closely follows the implementation in ``starry``,
-            specifically Sec. 4.1 of `Luger et al. 2022
-            <https://ui.adsabs.harvard.edu/abs/2022AJ....164....4L/abstract>`_.
-            IMPLEMENTATION IS INCOMPLETE, WILL RAISE A NOTIMPLEMENTEDERROR IF SET TO
-            ANYTHING OTHER THAN 1.
-        compute_reflected_phase_curve (bool, default=False):
-            Whether to include flux reflected by the planet when calling
-            :func:`lightcurve`.
-        compute_emitted_phase_curve (bool, default=False):
-            Whether to include flux emitted by the planet when calling
-            :func:`lightcurve`.
-        compute_stellar_ellipsoidal_variations (bool, default=False):
-            Whether to include stellar ellipsoidal variations in the light curve. This
-            is the effect of the star's shape changing due to the gravitational pull of
-            the planet, and here is modeled as a simple sinusoidal variation with 4
-            peaks per orbit.
-        compute_stellar_doppler_variations (bool, default=False):
-            Whether to include stellar doppler variations in the light curve. This
-            captures the effects of the star's radial velocity changing and boosting the
-            total flux/pushing some flux into/out of the bandpass of the observation.
-            Here, it is modeled as a simple sinusoidal variation with 2 peaks per orbit.
         parameterize_with_projected_ellipse (bool, default=False):
             Whether to parameterize the planet as a projected ellipse rather than a
             triaxial ellipsoid. If ``True``, then ``projected_effective_r``,
             ``projected_f``, and ``projected_theta`` will be used.
-        phase_curve_nsamples (int, default=50_000):
-            The number of random samples of the planet's surface to draw when performing
-            Monte Carlo estimates of the emitted/reflected flux. A larger number will
-            increase the resolution/shrink the error of the estimate but result in
-            longer computation times.
-        random_seed (int, default=0):
-            A random seed used for the Monte Carlo integrals in the phase curve. This
-            feeds into ``jax.random.PRNGKey``. Runs with the same ``random_seed`` will
-            always return identical outputs, so if checking the affect of altering
-            ``phase_curve_nsamples``, you should change this as well.
-        data (array-like, default=jnp.array([1.0])):
-            The observed data to compare to the light curve. Must be the same length as
-            ``times``. Only needed if calling :func:`loglike`.
-        uncertainties (array-like, default=jnp.array([0.01])):
-            The uncertainties on the observed data. Must be the same length as ``data``,
-            even if the errors are homoskedastic. Only needed if calling
-            :func:`loglike`.
         exposure_time (float, [Days], default=0.0):
             The length of each exposure in the light curve, used to correct for finite
             integration times if ``oversample`` is set to a value greater than 1.
@@ -240,49 +156,30 @@ class OblateSystem:
 
     def __init__(
         self,
-        times=None,
-        t_peri=None,
-        t0=None,
-        period=None,
-        a=None,
-        tidally_locked=None,
-        e=0.0,
-        i=jnp.pi / 2,
-        Omega=jnp.pi,
-        omega=0.0,
-        obliq=0.0,
-        prec=0.0,
-        r=None,
-        f1=0.0,
-        f2=0.0,
-        ld_u_coeffs=jnp.array([0.0, 0.0]),
-        hotspot_latitude=0.0,
-        hotspot_longitude=0.0,
-        hotspot_concentration=0.2,
-        albedo=1.0,
-        emitted_scale=1e-5,
-        stellar_ellipsoidal_alpha=1e-6,
-        stellar_doppler_alpha=1e-6,
-        systematic_trend_coeffs=jnp.array([0.0, 0.0]),
-        log_jitter=-jnp.inf,
-        projected_effective_r=0.0,
-        projected_f=0.0,
-        projected_theta=0.0,
-        extended_illumination_npts=1,
-        compute_reflected_phase_curve=False,
-        compute_emitted_phase_curve=False,
-        compute_stellar_ellipsoidal_variations=False,
-        compute_stellar_doppler_variations=False,
-        parameterize_with_projected_ellipse=False,
-        phase_curve_nsamples=50_000,
-        random_seed=0,
-        data=jnp.array([1.0]),
-        uncertainties=jnp.array([jnp.inf]),
-        exposure_time=0.0,
-        oversample=1,
-        oversample_correction_order=2,
-    ):
-
+        times: jax.Array | None = None,
+        t_peri: float | None = None,
+        t0: float | None = None,
+        period: float | None = None,
+        a: float | None = None,
+        tidally_locked: bool | None = None,
+        e: float = 0.0,
+        i: float = jnp.pi / 2,
+        Omega: float = jnp.pi,
+        omega: float = 0.0,
+        obliq: float = 0.0,
+        prec: float = 0.0,
+        r: float | None = None,
+        f1: float = 0.0,
+        f2: float = 0.0,
+        ld_u_coeffs: jax.Array = jnp.array([0.0, 0.0]),
+        projected_effective_r: float = 0.0,
+        projected_f: float = 0.0,
+        projected_theta: float = 0.0,
+        parameterize_with_projected_ellipse: bool = False,
+        exposure_time: float = 0.0,
+        oversample: int = 1,
+        oversample_correction_order: int = 2,
+    ) -> None:
         #######################################################################
         # setup
         #######################################################################
@@ -308,7 +205,6 @@ class OblateSystem:
 
         # for oversampling
         if self._state["oversample"] > 1:
-
             self._state["oversample"] += 1 - self._state["oversample"] % 2
             self._state["stencil"] = jnp.ones(self._state["oversample"])
 
@@ -337,31 +233,6 @@ class OblateSystem:
             self._state["stencil"] = (
                 None  # never used in this case, but to keep the state consistent
             )
-
-        # # for extended illumination reflection curves
-        # actually, still having trouble with this, so setting aside for now--
-        # leaving it for a specific enhancement after 0.1.0
-        if self._state["compute_reflected_phase_curve"] > 1:
-            raise NotImplementedError(
-                "Extended illumination reflection curves are not yet implemented"
-            )
-        # # based on starry._core.core.py's OpsReflected(OpsYlm) class
-        # # create a grid of points uniformly distributed on the projected disk of the
-        # # sta from an observer along the z-axis
-        # N = int(2 + jnp.sqrt(self._state["extended_illumination_npts"] * 4 / jnp.pi))
-
-        # # note these points will be squished closer together during calculations to
-        # # account for the a-dependent extent of the star from the planet's perspective
-        # dx = jnp.linspace(-1 + 1e-12, 1 - 1e-12, N)
-        # dx, dy = jnp.meshgrid(dx, dx)
-        # # dz = jnp.sqrt(1 - dx**2 - dy**2)
-        # dz = 1 - dx**2 - dy**2
-        # source_dx = dx[dz > 0].flatten()
-        # source_dy = dy[dz > 0].flatten()
-        # source_dz = dz[dz > 0].flatten()
-        # pts = jnp.array([source_dx, source_dy, jnp.sqrt(source_dz)]).T
-        # self._state["extended_illumination_points"] = pts
-        # self._state["extended_illumination_npts"] = len(pts)
 
         # everything below here is just an instantaneous snapshot mostly for plotting,
         # these will all vary with different parameter inputs
@@ -406,6 +277,8 @@ class OblateSystem:
             self._state["projected_f"] = effective_f
         else:
             self._coeffs_3d = {}
+            for key in ("projected_effective_r", "projected_f", "projected_theta"):
+                self._state[key] = jnp.asarray(self._state[key]).ravel()[0]
             area = jnp.pi * self._state["projected_effective_r"] ** 2
             r1 = jnp.sqrt(area / ((1 - self._state["projected_f"]) * jnp.pi))
             r2 = r1 * (1 - self._state["projected_f"])
@@ -418,14 +291,13 @@ class OblateSystem:
             )
 
         self._lightcurve_fwd_grad_enforced = self._setup_lightcurve_func()
-        self._loglike_fwd_grad_enforced = self._setup_loglike_func()
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         s = pprint.pformat(self.state)
         return f"OblateSystem(\n{s}\n)"
 
     @property
-    def state(self):
+    def state(self) -> dict:
         """A dictionary that includes all of the parameters of the system.
 
         This is an immutable property, and will raise an error if you try to set it.
@@ -440,7 +312,7 @@ class OblateSystem:
             two.
 
         """
-        # we internally changed "times" if oversample > 1, but we alwasy bin it back
+        # we internally changed "times" if oversample > 1, but we always bin it back
         # down to the original times, so we can undo that expansion here
         s = copy.deepcopy(self._state)
         if s["oversample"] > 1:
@@ -449,7 +321,7 @@ class OblateSystem:
             ).sum(axis=1)
         return s
 
-    def _validate_inputs(self):
+    def _validate_inputs(self) -> None:
         for key, val in self._state.items():
             if val is None:
                 if (key == "r") & (self._state["parameterize_with_projected_ellipse"]):
@@ -469,12 +341,6 @@ class OblateSystem:
         assert (
             self._state["ld_u_coeffs"].shape[0] >= 2
         ), "ld_u_coeffs must have at least 2 (even if higher-order terms are 0)"
-        assert isinstance(
-            self._state["phase_curve_nsamples"], int
-        ), "phase_curve_nsamples must be an integer"
-        assert isinstance(
-            self._state["random_seed"], int
-        ), "random_seed must be an integer"
 
         if self._state["e"] == 0:
             assert self._state["omega"] == 0, "omega must be 0 for a circular orbit"
@@ -484,15 +350,9 @@ class OblateSystem:
             if (
                 (key == "times")
                 | (key == "ld_u_coeffs")
-                | (key == "phase_curve_nsamples")
-                | (key == "random_seed")
-                | (key == "data")
-                | (key == "uncertainties")
-                | (key == "systematic_trend_coeffs")
                 | (key == "exposure_time")
                 | (key == "oversample")
                 | (key == "oversample_correction_order")
-                | (key == "extended_illumination_npts")
             ) or isinstance(self._state[key], bool):
                 continue
 
@@ -521,15 +381,6 @@ class OblateSystem:
                 "projected_effective_r must be greater than 0 if "
                 "parameterize_with_projected_ellipse is True"
             )
-            assert not (
-                self._state["compute_reflected_phase_curve"]
-                | self._state["compute_emitted_phase_curve"]
-                | self._state["compute_stellar_ellipsoidal_variations"]
-                | self._state["compute_stellar_doppler_variations"]
-            ), (
-                "parameterize_with_projected_ellipse is incompatible with phase "
-                "curve calculations"
-            )
 
             assert not self._state["tidally_locked"], (
                 "parameterize_with_projected_ellipse is incompatible with "
@@ -547,52 +398,27 @@ class OblateSystem:
                 self._state["exposure_time"] is not None
             ), "exposure_time must be provided if oversample > 1"
 
-        if self._state["compute_stellar_ellipsoidal_variations"]:
-            assert (
-                self._state["e"] == 0.0
-            ), "Stellar ellipsoidal variations are only valid for circular orbits"
-
-        if self._state["compute_stellar_doppler_variations"]:
-            assert (
-                self._state["e"] == 0.0
-            ), "Stellar doppler variations are only valid for circular orbits"
-
-    def _setup_lightcurve_func(self):
-
+    def _setup_lightcurve_func(self) -> Callable:
         constants = {
-            "tidally_locked": self._state["tidally_locked"],
-            "compute_reflected_phase_curve": self._state[
-                "compute_reflected_phase_curve"
-            ],
-            "compute_emitted_phase_curve": self._state["compute_emitted_phase_curve"],
-            "compute_stellar_ellipsoidal_variations": self._state[
-                "compute_stellar_ellipsoidal_variations"
-            ],
-            "compute_stellar_doppler_variations": self._state[
-                "compute_stellar_doppler_variations"
-            ],
             "parameterize_with_projected_ellipse": self._state[
                 "parameterize_with_projected_ellipse"
             ],
             "oversample": self._state["oversample"],
-            "random_seed": self._state["random_seed"],
-            "phase_curve_nsamples": self._state["phase_curve_nsamples"],
-            "extended_illumination_npts": self._state["extended_illumination_npts"],
             "state": self._state,
         }
 
         frozen = jax.tree_util.Partial(_lightcurve, **constants)
 
         @jax.custom_vjp
-        def lightcurve(params):
+        def lightcurve(params: dict) -> jax.Array:
             return frozen(params)
 
-        def lightcurve_fwd(params):
+        def lightcurve_fwd(params: dict) -> tuple:
             output = frozen(params)
             jac = jax.jacfwd(frozen)(params)
             return output, (jac,)
 
-        def lightcurve_bwd(res, g):
+        def lightcurve_bwd(res: tuple, g: jax.Array) -> tuple:
             jac = res
             val = jax.tree.map(lambda x: x.T @ g, jac)
             return val
@@ -602,52 +428,12 @@ class OblateSystem:
 
         return lightcurve
 
-    def _setup_loglike_func(self):
-
-        constants = {
-            "tidally_locked": self._state["tidally_locked"],
-            "compute_reflected_phase_curve": self._state[
-                "compute_reflected_phase_curve"
-            ],
-            "compute_emitted_phase_curve": self._state["compute_emitted_phase_curve"],
-            "compute_stellar_ellipsoidal_variations": self._state[
-                "compute_stellar_ellipsoidal_variations"
-            ],
-            "compute_stellar_doppler_variations": self._state[
-                "compute_stellar_doppler_variations"
-            ],
-            "parameterize_with_projected_ellipse": self._state[
-                "parameterize_with_projected_ellipse"
-            ],
-            "oversample": self._state["oversample"],
-            "random_seed": self._state["random_seed"],
-            "phase_curve_nsamples": self._state["phase_curve_nsamples"],
-            "extended_illumination_npts": self._state["extended_illumination_npts"],
-            "state": self._state,
-        }
-
-        frozen = jax.tree_util.Partial(_loglike, **constants)
-
-        @jax.custom_vjp
-        def loglike(params):
-            return frozen(params)
-
-        def loglike_fwd(params):
-            output = frozen(params)
-            jac = jax.jacfwd(frozen)(params)
-            return output, jac
-
-        def loglike_bwd(res, g):
-            val = jax.tree.map(lambda x: x.T * g, res)
-            return (val,)
-
-        loglike.defvjp(loglike_fwd, loglike_bwd)
-        loglike = jax.jit(loglike)
-
-        return loglike
-
-    def _illustrate_helper(self, times=None, true_anomalies=None, nsamples=50_000):
-
+    def _illustrate_helper(
+        self,
+        times: jax.Array | None = None,
+        true_anomalies: jax.Array | None = None,
+        nsamples: int = 50_000,
+    ) -> dict:
         if (times is not None) & (true_anomalies is not None):
             raise ValueError("Provide either times or true anomalies but not both")
 
@@ -697,9 +483,7 @@ class OblateSystem:
         Xs = []
         Ys = []
         Reflection = []
-        Emission = []
         for i in range(len(true_anomalies)):
-
             # all of these could just be done in one go,
             # but bookkeeping was easier this way
             self._state["f"] = jnp.array([true_anomalies[i]])
@@ -747,7 +531,6 @@ class OblateSystem:
             )
 
             if not self._state["parameterize_with_projected_ellipse"]:
-                # the phase curve bits
                 sample_radii, sample_thetas = generate_sample_radii_thetas(
                     jax.random.key(0), jnp.arange(nsamples)
                 )
@@ -758,7 +541,6 @@ class OblateSystem:
                     **self._coeffs_3d,
                 )
 
-                # the reflected brightness profile
                 normals = planet_surface_normal(x, y, z, **self._coeffs_3d)
                 star_cos_ang = surface_star_cos_angle(
                     normals,
@@ -768,44 +550,25 @@ class OblateSystem:
                 )
                 reflection = lambertian_reflection(star_cos_ang, x, y, z)
 
-                # the emitted brightness profile
-                # need to take the first index since you aren't scanning here
-                transform = pre_squish_transform(**self._state)[0]
-                emission = corrected_emission_profile(
-                    x,
-                    y,
-                    z,
-                    transform,
-                    **self._state,
-                )
-
                 behind_star = ((x**2 + y**2) < 1) & (z < 0)
                 reflection = jnp.where(behind_star, jnp.nan, reflection)
-                emission = jnp.where(behind_star, jnp.nan, emission)
 
             else:
                 x = jnp.nan
                 y = jnp.nan
                 reflection = jnp.nan
-                emission = jnp.nan
 
             X_outline.append(x_outline)
             Y_outline.append(y_outline)
             Xs.append(x)
             Ys.append(y)
             Reflection.append(reflection)
-            Emission.append(emission)
 
         X_outline = jnp.array(X_outline)
         Y_outline = jnp.array(Y_outline)
         Xs = jnp.array(Xs)
         Ys = jnp.array(Ys)
         Reflection = jnp.array(Reflection)
-        Emission = jnp.array(Emission)
-
-        # behind_star = ((Xs ** 2 + Ys ** 2) < 1)
-        # Reflection = jnp.where(Reflection == 0, jnp.nan, Reflection)
-        # Emission = jnp.where(Emission == 0, jnp.nan, Emission)
 
         self._state = original_state
         self._coeffs_3d = original_3d_coeffs
@@ -819,29 +582,26 @@ class OblateSystem:
             "sample_xs": Xs,
             "sample_ys": Ys,
             "reflected_intensity": Reflection,
-            "emitted_intensity": Emission,
         }
 
     def illustrate(
         self,
-        times=None,
-        true_anomalies=None,
-        orbit=True,
-        reflected=False,
-        emitted=False,
-        star_fill=True,
-        window_size=0.4,
-        star_centered=False,
-        nsamples=50_000,
-        figsize=(8, 8),
-    ):
+        times: jax.Array | None = None,
+        true_anomalies: jax.Array | None = None,
+        orbit: bool = True,
+        reflected: bool = False,
+        star_fill: bool = True,
+        window_size: float = 0.4,
+        star_centered: bool = False,
+        nsamples: int = 50_000,
+        figsize: tuple = (8, 8),
+    ) -> None:
         """Visualize the layout of the system at one or more times.
 
         This method, if run in a jupyter notebook, will display a plot of some
         combination of the star, planet, and its orbit. It can color in the planet
-        according to its reflected or emission profile, and the star according to its
-        limb darkening profile. Helpful for checking the orientation of planet hotspots
-        and/or its orientation after deformation.
+        according to its reflected flux profile, and the star according to its
+        limb darkening profile. Helpful for checking the planet's orientation.
 
         Args:
             times (array-like, [Days], default=None):
@@ -856,10 +616,6 @@ class OblateSystem:
                 Whether to plot a trace of the planet's orbital path
             reflected (bool, default=False):
                 Whether to color in the planet according to its reflected flux profile.
-                Can optionally include this or ``emitted`` but not both.
-            emitted (bool, default=False):
-                Whether to color in the planet according to its emitted flux profile.
-                Can optionally include this or ``reflected`` but not both.
             star_fill (bool, default=True):
                 Whether to color in the star according to its limb darkening profile.
                 Note that the lowest color contour is bounded at zero, so if you have an
@@ -886,20 +642,13 @@ class OblateSystem:
             return value.
 
         """
-        if emitted:
-            assert not reflected, "Can't illustrate both reflected and emitted flux"
-            assert not self._state["parameterize_with_projected_ellipse"], (
-                "Can't illustrate emitted flux when only describing the 2D outline of"
-                "the planet"
-            )
         if reflected:
-            assert not emitted, "Can't illustrate both reflected and emitted flux"
             assert not self._state["parameterize_with_projected_ellipse"], (
-                "Can't illustrate reflected flux when only describing the 2D outline of"
+                "Can't illustrate reflected flux when only describing the 2D outline of "
                 "the planet"
             )
 
-        fig, ax = plt.subplots(1, 1, figsize=(8, 8))
+        _, ax = plt.subplots(1, 1, figsize=(8, 8))
 
         info = self._illustrate_helper(
             times=times, true_anomalies=true_anomalies, nsamples=nsamples
@@ -923,7 +672,7 @@ class OblateSystem:
                 jnp.pi * (g_coeffs[0] + (2 / 3) * g_coeffs[1])
             )
 
-            def _star_radial_profile(r):
+            def _star_radial_profile(r: jax.Array) -> jax.Array:
                 us = jnp.ones(self._state["ld_u_coeffs"].shape[0] + 1) * (-1)
                 us = us.at[1:].set(self._state["ld_u_coeffs"])
                 mu = jnp.sqrt(1 - r**2)
@@ -974,16 +723,6 @@ class OblateSystem:
                     mincnt=1,
                 )
 
-            if emitted:
-                ax.hexbin(
-                    info["sample_xs"][i],
-                    info["sample_ys"][i],
-                    info["emitted_intensity"][i],
-                    cmap="plasma",
-                    gridsize=100,
-                    mincnt=1,
-                )
-
         ax.set(
             aspect="equal",
             xlim=(im_center_x - window_size / 2, im_center_x + window_size / 2),
@@ -993,7 +732,12 @@ class OblateSystem:
         return
 
     @staticmethod
-    def fit_limb_darkening_profile(intensities, order=None, mus=None, rs=None):
+    def fit_limb_darkening_profile(
+        intensities: jax.Array,
+        order: int | None = None,
+        mus: jax.Array | None = None,
+        rs: jax.Array | None = None,
+    ) -> jax.Array:
         """Convert a stellar limb darkening profile to a polynomial representation.
 
         Given a set of stellar parameters, one can use a grid of stellar models to compute
@@ -1032,7 +776,11 @@ class OblateSystem:
         )
 
     @staticmethod
-    def limb_darkening_profile(ld_u_coeffs=None, r=None, mu=None):
+    def limb_darkening_profile(
+        ld_u_coeffs: jax.Array | None = None,
+        r: jax.Array | float | None = None,
+        mu: jax.Array | float | None = None,
+    ) -> jax.Array:
         """Compute the limb darkening profile of the star at a given radius.
 
         Meant as a helper function for sanity checks and plotting, especially if you're
@@ -1070,7 +818,7 @@ class OblateSystem:
         # total flux from the star. 1/eq. 28 in Agol, Luger, and Foreman-Mackey 2020
         normalization_constant = 1 / (jnp.pi * (g_coeffs[0] + (2 / 3) * g_coeffs[1]))
 
-        def inner(r):
+        def inner(r: jax.Array) -> jax.Array:
             us = jnp.ones(ld_u_coeffs.shape[0] + 1) * (-1)
             us = us.at[1:].set(ld_u_coeffs)
             mu = jnp.sqrt(1 - r**2)
@@ -1082,7 +830,7 @@ class OblateSystem:
         else:
             return jax.vmap(inner)(r)
 
-    def lightcurve(self, params={}):
+    def lightcurve(self, params: dict = {}) -> jax.Array:
         """Compute the light curve of the system.
 
         This method will return the light curve of the system at the times specified
@@ -1106,261 +854,34 @@ class OblateSystem:
             Array: The timeseries lightcurve of the system. The length will be equal to
             `state["times"]`, and each index corresponds to a time in that array.
 
-        Examples:
-            >>> state = {
-                    "t_peri" : 0.0,
-                    "times" : jnp.linspace(-jnp.pi, 2*jnp.pi, 3504),
-                    "a" : 2.0,
-                    "period" : 2*jnp.pi,
-                    "r" : 0.1,
-                    "compute_reflected_phase_curve" : True,
-                    "compute_emitted_phase_curve" : True,
-                    "emitted_scale" : 1e-5,
-                }
-            >>> system = OblateSystem(**state)
-            >>> system.lightcurve()
-
         """
         return self._lightcurve_fwd_grad_enforced(params)
 
-    def loglike(self, params={}):
-        """Compute the log likelihood of the system given the observed data and some set of
-        parameters.
 
-        This method will call :func:`lightcurve` with the provided parameters and
-        compare the output to the observed data. The likelihood is assumed to be
-        Gaussian with no correlation between times. The jitter term is added in
-        quadrature to the provided uncertainties.
-
-        Args:
-            params (dict, default={}):
-                A dictionary of parameters to update in the system state. Any keys
-                not provided will be pulled from the current state of the system.
-
-        Returns:
-            float:
-            The log likelihood of the system given the observed data and the
-            provided parameters.
-
-        """
-        return self._loglike_fwd_grad_enforced(params)
-
-
-@partial(
-    jax.jit,
-    static_argnums=(
-        1,
-        2,
-        3,
-        4,
-        5,
-        6,
-        7,
-        8,
-        9,
-        10,
-    ),
-)
+@partial(jax.jit, static_argnums=(1, 2))
 def _lightcurve(
-    params,
-    tidally_locked,
-    compute_reflected_phase_curve,
-    compute_emitted_phase_curve,
-    compute_stellar_ellipsoidal_variations,
-    compute_stellar_doppler_variations,
-    parameterize_with_projected_ellipse,
-    oversample,
-    random_seed,
-    phase_curve_nsamples,
-    extended_illumination_npts,
-    state,
-):
-    # always compute the primary transit and trend
+    params: dict,
+    parameterize_with_projected_ellipse: bool,
+    oversample: int,
+    state: dict,
+) -> jax.Array:
     for key in params:
         state[key] = params[key]
     transit = poly_lightcurve(state, parameterize_with_projected_ellipse)
-    trend = jnp.polyval(state["systematic_trend_coeffs"], state["times"])
-
-    # if you don't want any phase curve stuff, you're done
-    if (not compute_reflected_phase_curve) & (not compute_emitted_phase_curve) and (
-        not compute_stellar_doppler_variations
-    ) & (not compute_stellar_ellipsoidal_variations):
-        oversampled_curve = transit + trend
-        if oversample > 1:
-            c = (
-                oversampled_curve.reshape(-1, oversample) * state["stencil"][None, :]
-            ).sum(axis=1)
-        else:
-            c = oversampled_curve
-        return c
-
-    ######################################################
-    # compute the planet's contribution to the phase curve
-    ######################################################
-
-    # generate the radii and thetas that you'll reuse at each timestep
-    sample_radii, sample_thetas = generate_sample_radii_thetas(
-        jax.random.key(random_seed),
-        jnp.arange(phase_curve_nsamples),
-    )
-
-    # solve Kepler's equation to get the true anomalies
-    time_deltas = state["times"] - state["t_peri"]
-    mean_anomalies = 2 * jnp.pi * time_deltas / state["period"]
-    true_anomalies = kepler(mean_anomalies, state["e"])
-    state["f"] = true_anomalies
-    if tidally_locked:
-        state["prec"] = state["f"]
-
-    # technically these are all calculated in "transit", but since phase
-    # curves are a) rare and b) expensive, we'll just do it again to keep
-    # the transit section of the code more self-contained
-    three = planet_3d_coeffs(**state)
-    two = planet_2d_coeffs(**three)
-    positions = skypos(**state)
-    x_c = positions[0, :]
-    y_c = positions[1, :]
-    z_c = positions[2, :]
-
-    # just the reflected component
-    if compute_reflected_phase_curve & (not compute_emitted_phase_curve):
-        if extended_illumination_npts == 1:
-            reflected = reflected_phase_curve(
-                sample_radii, sample_thetas, two, three, state, x_c, y_c, z_c
-            )
-        else:
-            offsets = extended_illumination_offsets(**state)
-            three = planet_3d_coeffs_extended_illumination(**state, offsets=offsets)
-            two = planet_2d_coeffs(**three)
-            reflected = extended_illumination_reflected_phase_curve(
-                sample_radii, sample_thetas, two, three, state, x_c, y_c, z_c, offsets
-            )
-        emitted = 0.0
-
-    # just the emitted component
-    elif (not compute_reflected_phase_curve) & compute_emitted_phase_curve:
-        reflected = 0.0
-        emitted = emission_phase_curve(sample_radii, sample_thetas, two, three, state)
-
-    # both reflected and emitted components. this function shares some of the
-    # computation between the two, so it's a bit faster than running them separately
-    elif (
-        compute_reflected_phase_curve
-        & compute_emitted_phase_curve
-        & (extended_illumination_npts == 1)
-    ):
-        reflected, emitted = phase_curve(
-            sample_radii, sample_thetas, two, three, state, x_c, y_c, z_c
-        )
-
-    elif (
-        compute_reflected_phase_curve
-        & compute_emitted_phase_curve
-        & (extended_illumination_npts != 1)
-    ):
-        if extended_illumination_npts == 1:
-            reflected = reflected_phase_curve(
-                sample_radii, sample_thetas, two, three, state, x_c, y_c, z_c
-            )
-        else:
-            offsets = extended_illumination_offsets(**state)
-            three = planet_3d_coeffs_extended_illumination(**state, offsets=offsets)
-            two = planet_2d_coeffs(**three)
-            reflected = extended_illumination_reflected_phase_curve(
-                sample_radii, sample_thetas, two, three, state, x_c, y_c, z_c, offsets
-            )
-        emitted = emission_phase_curve(sample_radii, sample_thetas, two, three, state)
-    else:
-        reflected = 0.0
-        emitted = 0.0
-
-    ####################################################
-    # compute the star's contribution to the phase curve
-    ####################################################
-
-    if compute_stellar_ellipsoidal_variations:
-        ellipsoidal = stellar_ellipsoidal_variations(
-            state["f"], state["stellar_ellipsoidal_alpha"], state["period"]
-        )
-    else:
-        ellipsoidal = 0.0
-
-    if compute_stellar_doppler_variations:
-        doppler = stellar_doppler_variations(
-            state["f"], state["stellar_doppler_alpha"], state["period"]
-        )
-    else:
-        doppler = 0.0
-
-    ####################################################
-    # put it all together
-    ####################################################
-
-    oversampled_curve = transit + trend + reflected + emitted + ellipsoidal + doppler
     if oversample > 1:
-        c = (oversampled_curve.reshape(-1, oversample) * state["stencil"][None, :]).sum(
-            axis=1
-        )
+        c = (transit.reshape(-1, oversample) * state["stencil"][None, :]).sum(axis=1)
     else:
-        c = oversampled_curve
+        c = transit
     return c
 
 
-@partial(
-    jax.jit,
-    static_argnums=(
-        1,
-        2,
-        3,
-        4,
-        5,
-        6,
-        7,
-        8,
-        9,
-        10,
-    ),
-)
-def _loglike(
-    params,
-    tidally_locked,
-    compute_reflected_phase_curve,
-    compute_emitted_phase_curve,
-    compute_stellar_ellipsoidal_variations,
-    compute_stellar_doppler_variations,
-    parameterize_with_projected_ellipse,
-    oversample,
-    random_seed,
-    phase_curve_nsamples,
-    extended_illumination_npts,
-    state,
-):
-    lc = _lightcurve(
-        params,
-        tidally_locked,
-        compute_reflected_phase_curve,
-        compute_emitted_phase_curve,
-        compute_stellar_ellipsoidal_variations,
-        compute_stellar_doppler_variations,
-        parameterize_with_projected_ellipse,
-        oversample,
-        random_seed,
-        phase_curve_nsamples,
-        extended_illumination_npts,
-        state,
-    )
-
-    for key in params:
-        state[key] = params[key]
-
-    resids = state["data"] - lc
-    var = jnp.exp(state["log_jitter"]) ** 2 + state["uncertainties"] ** 2
-
-    return jnp.sum(-0.5 * (resids**2 / var + jnp.log(2 * jnp.pi * var)))
-
-
 @partial(jax.jit, static_argnums=(1,))
-def _fit_limb_darkening_profile(intensities, order=None, mus=None, rs=None):
+def _fit_limb_darkening_profile(
+    intensities: jax.Array,
+    order: int | None = None,
+    mus: jax.Array | None = None,
+    rs: jax.Array | None = None,
+) -> jax.Array:
     """Convert a stellar limb darkening profile to a polynomial representation.
 
     Given a set of stellar parameters, one can use a grid of stellar models to compute

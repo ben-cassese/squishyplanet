@@ -12,12 +12,14 @@ from squishyplanet.engine.planet_2d import planet_2d_coeffs
 
 
 @jax.jit
-def generate_sample_radii_thetas(key, num_points):
+def generate_sample_radii_thetas(
+    key: jax.Array, num_points: jax.Array
+) -> tuple[jax.Array, jax.Array]:
     """Create a random set of radii and thetas for sampling the planet's surface.
 
     These are uniformly distributed through a unit circle and will be scaled and rotated
     to match the planet's shape and orientation at each timestep. However, they will
-    be re-used at every time step, which could introduce a bias but makes things much
+    be reused at every time step, which could introduce a bias but makes things much
     faster. Be sure you use sufficient samples to keep the bias small, then try multiple
     random keys to quantify it.
 
@@ -44,16 +46,16 @@ def generate_sample_radii_thetas(key, num_points):
 
 @jax.jit
 def _xy_on_surface(
-    sample_radii,
-    sample_thetas,
-    rho_xx,
-    rho_xy,
-    rho_x0,
-    rho_yy,
-    rho_y0,
-    rho_00,
-    **kwargs,
-):
+    sample_radii: jax.Array,
+    sample_thetas: jax.Array,
+    rho_xx: jax.Array,
+    rho_xy: jax.Array,
+    rho_x0: jax.Array,
+    rho_yy: jax.Array,
+    rho_y0: jax.Array,
+    rho_00: jax.Array,
+    **kwargs: object,
+) -> tuple[jax.Array, jax.Array]:
     # n = n.shape[0]
     r1, r2, xc, yc, cosa, sina = poly_to_parametric_helper(
         rho_xx, rho_xy, rho_x0, rho_yy, rho_y0, rho_00
@@ -73,8 +75,20 @@ def _xy_on_surface(
 
 @jax.jit
 def _z_on_surface(
-    x, y, p_xx, p_xy, p_xz, p_x0, p_yy, p_yz, p_y0, p_zz, p_z0, p_00, **kwargs
-):
+    x: jax.Array,
+    y: jax.Array,
+    p_xx: jax.Array,
+    p_xy: jax.Array,
+    p_xz: jax.Array,
+    p_x0: jax.Array,
+    p_yy: jax.Array,
+    p_yz: jax.Array,
+    p_y0: jax.Array,
+    p_zz: jax.Array,
+    p_z0: jax.Array,
+    p_00: jax.Array,
+    **kwargs: object,
+) -> jax.Array:
     z = (
         -0.5
         * (
@@ -104,26 +118,26 @@ def _z_on_surface(
 
 @jax.jit
 def sample_surface(
-    sample_radii,
-    sample_thetas,
-    rho_xx,
-    rho_xy,
-    rho_x0,
-    rho_yy,
-    rho_y0,
-    rho_00,
-    p_xx,
-    p_xy,
-    p_xz,
-    p_x0,
-    p_yy,
-    p_yz,
-    p_y0,
-    p_zz,
-    p_z0,
-    p_00,
-    **kwargs,
-):
+    sample_radii: jax.Array,
+    sample_thetas: jax.Array,
+    rho_xx: jax.Array,
+    rho_xy: jax.Array,
+    rho_x0: jax.Array,
+    rho_yy: jax.Array,
+    rho_y0: jax.Array,
+    rho_00: jax.Array,
+    p_xx: jax.Array,
+    p_xy: jax.Array,
+    p_xz: jax.Array,
+    p_x0: jax.Array,
+    p_yy: jax.Array,
+    p_yz: jax.Array,
+    p_y0: jax.Array,
+    p_zz: jax.Array,
+    p_z0: jax.Array,
+    p_00: jax.Array,
+    **kwargs: object,
+) -> tuple[jax.Array, jax.Array, jax.Array]:
     """Convert randomly sampled :math:`(x, y)` points on the projected planet to
     :math:`(x, y, z)` points on the planet's surface.
 
@@ -190,20 +204,20 @@ def sample_surface(
 
 @jax.jit
 def planet_surface_normal(
-    x,
-    y,
-    z,
-    p_xx,
-    p_xy,
-    p_xz,
-    p_x0,
-    p_yy,
-    p_yz,
-    p_y0,
-    p_zz,
-    p_z0,
-    p_00,
-):
+    x: jax.Array,
+    y: jax.Array,
+    z: jax.Array,
+    p_xx: jax.Array,
+    p_xy: jax.Array,
+    p_xz: jax.Array,
+    p_x0: jax.Array,
+    p_yy: jax.Array,
+    p_yz: jax.Array,
+    p_y0: jax.Array,
+    p_zz: jax.Array,
+    p_z0: jax.Array,
+    p_00: jax.Array,
+) -> jax.Array:
     """Compute the unit normal vector to the planet's surface at a given point.
 
     The input :math:`(x, y, z)` points are assumed to lie on the planet's surface.
@@ -241,12 +255,12 @@ def planet_surface_normal(
 
 @jax.jit
 def surface_star_cos_angle(
-    planet_surface_normal,
-    x_c,
-    y_c,
-    z_c,
-    **kwargs,
-):
+    planet_surface_normal: jax.Array,
+    x_c: jax.Array,
+    y_c: jax.Array,
+    z_c: jax.Array,
+    **kwargs: object,
+) -> jax.Array:
     """A helper function to compute the cosine of the angle between the planet's surface
     normal vector and the vector linking the center of the planet to the star.
 
@@ -281,7 +295,7 @@ def surface_star_cos_angle(
 
 
 @jax.jit
-def _surface_observer_cos_angle(planet_surface_normal):
+def _surface_observer_cos_angle(planet_surface_normal: jax.Array) -> jax.Array:
     # observer = jnp.array([0, 0, 1])
     return planet_surface_normal[2]
 
@@ -291,7 +305,21 @@ def _surface_observer_cos_angle(planet_surface_normal):
 ########################################################################################
 
 
-def _pxx(p_xx, p_xy, p_xz, p_x0, p_yy, p_yz, p_y0, p_zz, p_z0, p_00, x_c, y_c, z_c):
+def _pxx(
+    p_xx: jax.Array,
+    p_xy: jax.Array,
+    p_xz: jax.Array,
+    p_x0: jax.Array,
+    p_yy: jax.Array,
+    p_yz: jax.Array,
+    p_y0: jax.Array,
+    p_zz: jax.Array,
+    p_z0: jax.Array,
+    p_00: jax.Array,
+    x_c: jax.Array,
+    y_c: jax.Array,
+    z_c: jax.Array,
+) -> jax.Array:
     return (
         p_zz * (x_c**2 + y_c**2) ** 2
         + z_c
@@ -303,7 +331,21 @@ def _pxx(p_xx, p_xy, p_xz, p_x0, p_yy, p_yz, p_y0, p_zz, p_z0, p_00, x_c, y_c, z
     ) / ((x_c**2 + y_c**2) * (x_c**2 + y_c**2 + z_c**2))
 
 
-def _pxy(p_xx, p_xy, p_xz, p_x0, p_yy, p_yz, p_y0, p_zz, p_z0, p_00, x_c, y_c, z_c):
+def _pxy(
+    p_xx: jax.Array,
+    p_xy: jax.Array,
+    p_xz: jax.Array,
+    p_x0: jax.Array,
+    p_yy: jax.Array,
+    p_yz: jax.Array,
+    p_y0: jax.Array,
+    p_zz: jax.Array,
+    p_z0: jax.Array,
+    p_00: jax.Array,
+    x_c: jax.Array,
+    y_c: jax.Array,
+    z_c: jax.Array,
+) -> jax.Array:
     return (
         -(p_yz * x_c * (x_c**2 + y_c**2))
         + p_xz * y_c * (x_c**2 + y_c**2)
@@ -312,7 +354,21 @@ def _pxy(p_xx, p_xy, p_xz, p_x0, p_yy, p_yz, p_y0, p_zz, p_z0, p_00, x_c, y_c, z
     ) / ((x_c**2 + y_c**2) * jnp.sqrt(x_c**2 + y_c**2 + z_c**2))
 
 
-def _pxz(p_xx, p_xy, p_xz, p_x0, p_yy, p_yz, p_y0, p_zz, p_z0, p_00, x_c, y_c, z_c):
+def _pxz(
+    p_xx: jax.Array,
+    p_xy: jax.Array,
+    p_xz: jax.Array,
+    p_x0: jax.Array,
+    p_yy: jax.Array,
+    p_yz: jax.Array,
+    p_y0: jax.Array,
+    p_zz: jax.Array,
+    p_z0: jax.Array,
+    p_00: jax.Array,
+    x_c: jax.Array,
+    y_c: jax.Array,
+    z_c: jax.Array,
+) -> jax.Array:
     return (
         2
         * (p_xx * x_c**2 + y_c * (p_xy * x_c + p_yy * y_c) - p_zz * (x_c**2 + y_c**2))
@@ -322,17 +378,59 @@ def _pxz(p_xx, p_xy, p_xz, p_x0, p_yy, p_yz, p_y0, p_zz, p_z0, p_00, x_c, y_c, z
     ) / (jnp.sqrt(x_c**2 + y_c**2) * (x_c**2 + y_c**2 + z_c**2))
 
 
-def _px0(p_xx, p_xy, p_xz, p_x0, p_yy, p_yz, p_y0, p_zz, p_z0, p_00, x_c, y_c, z_c):
+def _px0(
+    p_xx: jax.Array,
+    p_xy: jax.Array,
+    p_xz: jax.Array,
+    p_x0: jax.Array,
+    p_yy: jax.Array,
+    p_yz: jax.Array,
+    p_y0: jax.Array,
+    p_zz: jax.Array,
+    p_z0: jax.Array,
+    p_00: jax.Array,
+    x_c: jax.Array,
+    y_c: jax.Array,
+    z_c: jax.Array,
+) -> jax.Array:
     return (-(p_z0 * (x_c**2 + y_c**2)) + (p_x0 * x_c + p_y0 * y_c) * z_c) / (
         jnp.sqrt(x_c**2 + y_c**2) * jnp.sqrt(x_c**2 + y_c**2 + z_c**2)
     )
 
 
-def _pyy(p_xx, p_xy, p_xz, p_x0, p_yy, p_yz, p_y0, p_zz, p_z0, p_00, x_c, y_c, z_c):
+def _pyy(
+    p_xx: jax.Array,
+    p_xy: jax.Array,
+    p_xz: jax.Array,
+    p_x0: jax.Array,
+    p_yy: jax.Array,
+    p_yz: jax.Array,
+    p_y0: jax.Array,
+    p_zz: jax.Array,
+    p_z0: jax.Array,
+    p_00: jax.Array,
+    x_c: jax.Array,
+    y_c: jax.Array,
+    z_c: jax.Array,
+) -> jax.Array:
     return (p_yy * x_c**2 - p_xy * x_c * y_c + p_xx * y_c**2) / (x_c**2 + y_c**2)
 
 
-def _pyz(p_xx, p_xy, p_xz, p_x0, p_yy, p_yz, p_y0, p_zz, p_z0, p_00, x_c, y_c, z_c):
+def _pyz(
+    p_xx: jax.Array,
+    p_xy: jax.Array,
+    p_xz: jax.Array,
+    p_x0: jax.Array,
+    p_yy: jax.Array,
+    p_yz: jax.Array,
+    p_y0: jax.Array,
+    p_zz: jax.Array,
+    p_z0: jax.Array,
+    p_00: jax.Array,
+    x_c: jax.Array,
+    y_c: jax.Array,
+    z_c: jax.Array,
+) -> jax.Array:
     return (
         -2 * p_xx * x_c * y_c
         + 2 * p_yy * x_c * y_c
@@ -342,11 +440,39 @@ def _pyz(p_xx, p_xy, p_xz, p_x0, p_yy, p_yz, p_y0, p_zz, p_z0, p_00, x_c, y_c, z
     ) / (jnp.sqrt(x_c**2 + y_c**2) * jnp.sqrt(x_c**2 + y_c**2 + z_c**2))
 
 
-def _py0(p_xx, p_xy, p_xz, p_x0, p_yy, p_yz, p_y0, p_zz, p_z0, p_00, x_c, y_c, z_c):
+def _py0(
+    p_xx: jax.Array,
+    p_xy: jax.Array,
+    p_xz: jax.Array,
+    p_x0: jax.Array,
+    p_yy: jax.Array,
+    p_yz: jax.Array,
+    p_y0: jax.Array,
+    p_zz: jax.Array,
+    p_z0: jax.Array,
+    p_00: jax.Array,
+    x_c: jax.Array,
+    y_c: jax.Array,
+    z_c: jax.Array,
+) -> jax.Array:
     return (p_y0 * x_c - p_x0 * y_c) / jnp.sqrt(x_c**2 + y_c**2)
 
 
-def _pzz(p_xx, p_xy, p_xz, p_x0, p_yy, p_yz, p_y0, p_zz, p_z0, p_00, x_c, y_c, z_c):
+def _pzz(
+    p_xx: jax.Array,
+    p_xy: jax.Array,
+    p_xz: jax.Array,
+    p_x0: jax.Array,
+    p_yy: jax.Array,
+    p_yz: jax.Array,
+    p_y0: jax.Array,
+    p_zz: jax.Array,
+    p_z0: jax.Array,
+    p_00: jax.Array,
+    x_c: jax.Array,
+    y_c: jax.Array,
+    z_c: jax.Array,
+) -> jax.Array:
     return (
         p_xx * x_c**2
         + p_xy * x_c * y_c
@@ -357,31 +483,59 @@ def _pzz(p_xx, p_xy, p_xz, p_x0, p_yy, p_yz, p_y0, p_zz, p_z0, p_00, x_c, y_c, z
     ) / (x_c**2 + y_c**2 + z_c**2)
 
 
-def _pz0(p_xx, p_xy, p_xz, p_x0, p_yy, p_yz, p_y0, p_zz, p_z0, p_00, x_c, y_c, z_c):
+def _pz0(
+    p_xx: jax.Array,
+    p_xy: jax.Array,
+    p_xz: jax.Array,
+    p_x0: jax.Array,
+    p_yy: jax.Array,
+    p_yz: jax.Array,
+    p_y0: jax.Array,
+    p_zz: jax.Array,
+    p_z0: jax.Array,
+    p_00: jax.Array,
+    x_c: jax.Array,
+    y_c: jax.Array,
+    z_c: jax.Array,
+) -> jax.Array:
     return (p_x0 * x_c + p_y0 * y_c + p_z0 * z_c) / jnp.sqrt(x_c**2 + y_c**2 + z_c**2)
 
 
-def _p00(p_xx, p_xy, p_xz, p_x0, p_yy, p_yz, p_y0, p_zz, p_z0, p_00, x_c, y_c, z_c):
+def _p00(
+    p_xx: jax.Array,
+    p_xy: jax.Array,
+    p_xz: jax.Array,
+    p_x0: jax.Array,
+    p_yy: jax.Array,
+    p_yz: jax.Array,
+    p_y0: jax.Array,
+    p_zz: jax.Array,
+    p_z0: jax.Array,
+    p_00: jax.Array,
+    x_c: jax.Array,
+    y_c: jax.Array,
+    z_c: jax.Array,
+) -> jax.Array:
     return p_00
 
 
 @jax.jit
 def planet_from_star(
-    p_xx,
-    p_xy,
-    p_xz,
-    p_x0,
-    p_yy,
-    p_yz,
-    p_y0,
-    p_zz,
-    p_z0,
-    p_00,
-    x_c,
-    y_c,
-    z_c,
-    **kwargs,
-):
+    p_xx: jax.Array,
+    p_xy: jax.Array,
+    p_xz: jax.Array,
+    p_x0: jax.Array,
+    p_yy: jax.Array,
+    p_yz: jax.Array,
+    p_y0: jax.Array,
+    p_zz: jax.Array,
+    p_z0: jax.Array,
+    p_00: jax.Array,
+    x_c: jax.Array,
+    y_c: jax.Array,
+    z_c: jax.Array,
+    **kwargs: object,
+) -> dict[str, jax.Array]:
     """Compute the coefficients of the planet's 3D shape from the star's perspective,
     as if it were aligned the the :math:`z` axis.
 
@@ -572,7 +726,9 @@ def planet_from_star(
 
 
 @jax.jit
-def lambertian_reflection(surface_star_cos_angle, x, y, z):
+def lambertian_reflection(
+    surface_star_cos_angle: jax.Array, x: jax.Array, y: jax.Array, z: jax.Array
+) -> jax.Array:
     """Compute the reflected intensity at a specific point on the planet's surface assuming
     a simple Lambertian reflection model.
 
@@ -603,34 +759,36 @@ def lambertian_reflection(surface_star_cos_angle, x, y, z):
 
 
 @jax.jit
-def _henyey_greenstein(g, theta):
+def _henyey_greenstein(g: jax.Array, theta: jax.Array) -> jax.Array:
     return 0.5 * (1 - g**2) / (1 + g**2 - 2 * g * jnp.cos(theta)) ** (1.5)
 
 
 @jax.jit
-def _two_term_henyey_greenstein(gf, gb, scatter_f, theta):
+def _two_term_henyey_greenstein(
+    gf: jax.Array, gb: jax.Array, scatter_f: jax.Array, theta: jax.Array
+) -> jax.Array:
     return scatter_f * _henyey_greenstein(gf, theta) + (
         1 - scatter_f
     ) * _henyey_greenstein(gb, theta)
 
 
 @jax.jit
-def _rayleigh_scattering(theta):
+def _rayleigh_scattering(theta: jax.Array) -> jax.Array:
     return (3 / 4) * (1 + jnp.cos(theta) ** 2)
 
 
 @jax.jit
 def reflected_normalization(
-    two,
-    three,
-    x_c,
-    y_c,
-    z_c,
-    xo=0.0,
-    yo=0.0,
-    zo=0.0,
-    **kwargs,
-):
+    two: dict[str, jax.Array],
+    three: dict[str, jax.Array],
+    x_c: jax.Array,
+    y_c: jax.Array,
+    z_c: jax.Array,
+    xo: float | jax.Array = 0.0,
+    yo: float | jax.Array = 0.0,
+    zo: float | jax.Array = 0.0,
+    **kwargs: object,
+) -> jax.Array:
     """Compute the time-dependent normalization factor for the reflected light.
 
     The reflected light computations are almost entirely carried out assuming the star
@@ -640,7 +798,7 @@ def reflected_normalization(
     actually subtends as seen from the star. a) is easy and common across all
     implementations, it's just the inverse square law. b) is more complicated for oblate
     planets than spherical planets however, since even on circular orbits, the subtended
-    area (and consequently area that is recieves flux and and is able to reflect it) can
+    area (and consequently area that is receives flux and and is able to reflect it) can
     change as a function of orbital phase. Note however that it will not vary with phase
     if the planet is tidally locked and always shows the same face to the star.
 
@@ -708,18 +866,18 @@ def reflected_normalization(
 
 @jax.jit
 def reflected_phase_curve(
-    sample_radii,
-    sample_thetas,
-    two,
-    three,
-    state,
-    x_c,
-    y_c,
-    z_c,
-    xo=jnp.array([0.0]),
-    yo=jnp.array([0.0]),
-    zo=jnp.array([0.0]),
-):
+    sample_radii: jax.Array,
+    sample_thetas: jax.Array,
+    two: dict[str, jax.Array],
+    three: dict[str, jax.Array],
+    state: dict[str, jax.Array],
+    x_c: jax.Array,
+    y_c: jax.Array,
+    z_c: jax.Array,
+    xo: jax.Array = jnp.array([0.0]),
+    yo: jax.Array = jnp.array([0.0]),
+    zo: jax.Array = jnp.array([0.0]),
+) -> jax.Array:
     """Compute the timeseries of light reflected from  the planet.
 
     This function computes the reflected light from the planet at each time step. It
@@ -790,7 +948,9 @@ def reflected_phase_curve(
         yo = jnp.ones_like(x_c) * yo
         zo = jnp.ones_like(x_c) * zo
 
-    def scan_func(carry, scan_over):
+    def scan_func(
+        carry: None, scan_over: tuple[jax.Array, ...]
+    ) -> tuple[None, jax.Array]:
         (
             rho_xx,
             rho_xy,
@@ -899,8 +1059,16 @@ def reflected_phase_curve(
 # still having trouble with this, leaving it for a specific enhancement after 0.1.0
 @jax.jit
 def extended_illumination_reflected_phase_curve(
-    sample_radii, sample_thetas, two, three, state, x_c, y_c, z_c, offsets
-):
+    sample_radii: jax.Array,
+    sample_thetas: jax.Array,
+    two: dict[str, jax.Array],
+    three: dict[str, jax.Array],
+    state: dict[str, jax.Array],
+    x_c: jax.Array,
+    y_c: jax.Array,
+    z_c: jax.Array,
+    offsets: jax.Array,
+) -> None:
     """WIP, not yet implemented. Hiding behind a NotImplementedError when setting
     `extended_illumination_npts` to anything greater than 1 when initializing an
     :class:`OblateSystem` object.
@@ -929,7 +1097,17 @@ def extended_illumination_reflected_phase_curve(
 ########################################################################################
 
 
-def _x_x(a, e, f, Omega, i, omega, r, obliq, prec):
+def _x_x(
+    a: jax.Array,
+    e: jax.Array,
+    f: jax.Array,
+    Omega: jax.Array,
+    i: jax.Array,
+    omega: jax.Array,
+    r: jax.Array,
+    obliq: jax.Array,
+    prec: jax.Array,
+) -> jax.Array:
     return (
         -(jnp.sin(i) * jnp.sin(obliq) * jnp.sin(Omega))
         - jnp.cos(obliq)
@@ -947,24 +1125,64 @@ def _x_x(a, e, f, Omega, i, omega, r, obliq, prec):
     )
 
 
-def _x_y(a, e, f, Omega, i, omega, r, obliq, prec):
+def _x_y(
+    a: jax.Array,
+    e: jax.Array,
+    f: jax.Array,
+    Omega: jax.Array,
+    i: jax.Array,
+    omega: jax.Array,
+    r: jax.Array,
+    obliq: jax.Array,
+    prec: jax.Array,
+) -> jax.Array:
     return jnp.cos(Omega) * (
         jnp.sin(i) * jnp.sin(obliq)
         + jnp.cos(i) * jnp.cos(obliq) * jnp.sin(prec + omega)
     ) + jnp.cos(obliq) * jnp.cos(prec + omega) * jnp.sin(Omega)
 
 
-def _x_z(a, e, f, Omega, i, omega, r, obliq, prec):
+def _x_z(
+    a: jax.Array,
+    e: jax.Array,
+    f: jax.Array,
+    Omega: jax.Array,
+    i: jax.Array,
+    omega: jax.Array,
+    r: jax.Array,
+    obliq: jax.Array,
+    prec: jax.Array,
+) -> jax.Array:
     return -(jnp.cos(i) * jnp.sin(obliq)) + jnp.cos(obliq) * jnp.sin(i) * jnp.sin(
         prec + omega
     )
 
 
-def _x_0(a, e, f, Omega, i, omega, r, obliq, prec):
+def _x_0(
+    a: jax.Array,
+    e: jax.Array,
+    f: jax.Array,
+    Omega: jax.Array,
+    i: jax.Array,
+    omega: jax.Array,
+    r: jax.Array,
+    obliq: jax.Array,
+    prec: jax.Array,
+) -> jax.Array:
     return (a * (-1 + e**2) * jnp.cos(f - prec) * jnp.cos(obliq)) / (1 + e * jnp.cos(f))
 
 
-def _y_x(a, e, f, Omega, i, omega, r, obliq, prec):
+def _y_x(
+    a: jax.Array,
+    e: jax.Array,
+    f: jax.Array,
+    Omega: jax.Array,
+    i: jax.Array,
+    omega: jax.Array,
+    r: jax.Array,
+    obliq: jax.Array,
+    prec: jax.Array,
+) -> jax.Array:
     return -(
         jnp.cos(omega)
         * (jnp.cos(Omega) * jnp.sin(prec) + jnp.cos(i) * jnp.cos(prec) * jnp.sin(Omega))
@@ -973,21 +1191,61 @@ def _y_x(a, e, f, Omega, i, omega, r, obliq, prec):
     )
 
 
-def _y_y(a, e, f, Omega, i, omega, r, obliq, prec):
+def _y_y(
+    a: jax.Array,
+    e: jax.Array,
+    f: jax.Array,
+    Omega: jax.Array,
+    i: jax.Array,
+    omega: jax.Array,
+    r: jax.Array,
+    obliq: jax.Array,
+    prec: jax.Array,
+) -> jax.Array:
     return jnp.cos(i) * jnp.cos(prec + omega) * jnp.cos(Omega) - jnp.sin(
         prec + omega
     ) * jnp.sin(Omega)
 
 
-def _y_z(a, e, f, Omega, i, omega, r, obliq, prec):
+def _y_z(
+    a: jax.Array,
+    e: jax.Array,
+    f: jax.Array,
+    Omega: jax.Array,
+    i: jax.Array,
+    omega: jax.Array,
+    r: jax.Array,
+    obliq: jax.Array,
+    prec: jax.Array,
+) -> jax.Array:
     return jnp.cos(prec + omega) * jnp.sin(i)
 
 
-def _y_0(a, e, f, Omega, i, omega, r, obliq, prec):
+def _y_0(
+    a: jax.Array,
+    e: jax.Array,
+    f: jax.Array,
+    Omega: jax.Array,
+    i: jax.Array,
+    omega: jax.Array,
+    r: jax.Array,
+    obliq: jax.Array,
+    prec: jax.Array,
+) -> jax.Array:
     return (a * (-1 + e**2) * jnp.sin(f - prec)) / (1 + e * jnp.cos(f))
 
 
-def _z_x(a, e, f, Omega, i, omega, r, obliq, prec):
+def _z_x(
+    a: jax.Array,
+    e: jax.Array,
+    f: jax.Array,
+    Omega: jax.Array,
+    i: jax.Array,
+    omega: jax.Array,
+    r: jax.Array,
+    obliq: jax.Array,
+    prec: jax.Array,
+) -> jax.Array:
     return (
         -(jnp.cos(Omega) * jnp.sin(prec) * jnp.sin(obliq) * jnp.sin(omega))
         + (
@@ -1004,25 +1262,66 @@ def _z_x(a, e, f, Omega, i, omega, r, obliq, prec):
     )
 
 
-def _z_y(a, e, f, Omega, i, omega, r, obliq, prec):
+def _z_y(
+    a: jax.Array,
+    e: jax.Array,
+    f: jax.Array,
+    Omega: jax.Array,
+    i: jax.Array,
+    omega: jax.Array,
+    r: jax.Array,
+    obliq: jax.Array,
+    prec: jax.Array,
+) -> jax.Array:
     return -(jnp.cos(obliq) * jnp.cos(Omega) * jnp.sin(i)) + jnp.sin(obliq) * (
         jnp.cos(i) * jnp.cos(Omega) * jnp.sin(prec + omega)
         + jnp.cos(prec + omega) * jnp.sin(Omega)
     )
 
 
-def _z_z(a, e, f, Omega, i, omega, r, obliq, prec):
+def _z_z(
+    a: jax.Array,
+    e: jax.Array,
+    f: jax.Array,
+    Omega: jax.Array,
+    i: jax.Array,
+    omega: jax.Array,
+    r: jax.Array,
+    obliq: jax.Array,
+    prec: jax.Array,
+) -> jax.Array:
     return jnp.cos(i) * jnp.cos(obliq) + jnp.sin(i) * jnp.sin(obliq) * jnp.sin(
         prec + omega
     )
 
 
-def _z_0(a, e, f, Omega, i, omega, r, obliq, prec):
+def _z_0(
+    a: jax.Array,
+    e: jax.Array,
+    f: jax.Array,
+    Omega: jax.Array,
+    i: jax.Array,
+    omega: jax.Array,
+    r: jax.Array,
+    obliq: jax.Array,
+    prec: jax.Array,
+) -> jax.Array:
     return (a * (-1 + e**2) * jnp.cos(f - prec) * jnp.sin(obliq)) / (1 + e * jnp.cos(f))
 
 
 @jax.jit
-def pre_squish_transform(a, e, f, Omega, i, omega, r, obliq, prec, **kwargs):
+def pre_squish_transform(
+    a: jax.Array,
+    e: jax.Array,
+    f: jax.Array,
+    Omega: jax.Array,
+    i: jax.Array,
+    omega: jax.Array,
+    r: jax.Array,
+    obliq: jax.Array,
+    prec: jax.Array,
+    **kwargs: object,
+) -> jax.Array:
     """Compute the rotation matrix to go from the sky frame to the planet's.
 
     This is the underlying transformation behind everything in
@@ -1068,8 +1367,16 @@ def pre_squish_transform(a, e, f, Omega, i, omega, r, obliq, prec, **kwargs):
 
 @jax.jit
 def _uncorrected_emission_profile(
-    x, y, z, r, f1, f2, hotspot_latitude, hotspot_longitude, hotspot_concentration
-):
+    x: jax.Array,
+    y: jax.Array,
+    z: jax.Array,
+    r: jax.Array,
+    f1: jax.Array,
+    f2: jax.Array,
+    hotspot_latitude: jax.Array,
+    hotspot_longitude: jax.Array,
+    hotspot_concentration: jax.Array,
+) -> jax.Array:
     # this will produce and UNNORMALIZED emission sample- we aren't correcting for the
     # sphere-to-ellipsoid mapping yet
 
@@ -1085,7 +1392,7 @@ def _uncorrected_emission_profile(
     y = y / (r * (1 - f2))
     z = z / (r * (1 - f1))
 
-    # then, evalutate the pdf of the von Mises-Fisher distribution:
+    # then, evaluate the pdf of the von Mises-Fisher distribution:
     return (
         (
             jnp.exp(
@@ -1119,7 +1426,7 @@ def _uncorrected_emission_profile(
 #     `von Mises-Fisher distribution
 #     <https://https://en.wikipedia.org/wiki/Von_Mises%E2%80%93Fisher_distribution>`_ to
 #     model a hotspot. But, that's defined on the unit sphere, and after compressing it to
-#     the squished planet, the surface denisty of emission intensity will be warped. We
+#     the squished planet, the surface density of emission intensity will be warped. We
 #     need to correct for that warping here. The input coordinates here are **IN THE
 #     PLANET'S FRAME, NOT THE SKY FRAME.** After getting :math:`x,y,z` samples in the sky
 #     frame, apply the rotation matrix from :func:`pre_squish_transform` to get these.
@@ -1167,18 +1474,18 @@ def _uncorrected_emission_profile(
 
 @jax.jit
 def corrected_emission_profile(
-    x,
-    y,
-    z,
-    transform,
-    r,
-    f1,
-    f2,
-    hotspot_latitude,
-    hotspot_longitude,
-    hotspot_concentration,
-    **kwargs,
-):
+    x: jax.Array,
+    y: jax.Array,
+    z: jax.Array,
+    transform: jax.Array,
+    r: jax.Array,
+    f1: jax.Array,
+    f2: jax.Array,
+    hotspot_latitude: jax.Array,
+    hotspot_longitude: jax.Array,
+    hotspot_concentration: jax.Array,
+    **kwargs: object,
+) -> jax.Array:
     """A helper function to :func:`emission_at_timestep`, broken out only to be used for
     illustrations in :func:`OblateSystem.illustrate`.
     """
@@ -1226,17 +1533,17 @@ def corrected_emission_profile(
 
 @jax.jit
 def emission_at_timestep(
-    x,
-    y,
-    z,
-    transform,
-    r,
-    f1,
-    f2,
-    hotspot_latitude,
-    hotspot_longitude,
-    hotspot_concentration,
-):
+    x: jax.Array,
+    y: jax.Array,
+    z: jax.Array,
+    transform: jax.Array,
+    r: jax.Array,
+    f1: jax.Array,
+    f2: jax.Array,
+    hotspot_latitude: jax.Array,
+    hotspot_longitude: jax.Array,
+    hotspot_concentration: jax.Array,
+) -> jax.Array:
     """Compute the emitted intensity at a given point on the planet's surface.
 
     Args:
@@ -1300,20 +1607,20 @@ def emission_at_timestep(
 
 @jax.jit
 def emission_phase_curve(
-    sample_radii,
-    sample_thetas,
-    two,
-    three,
-    state,
-    **kwargs,
-):
+    sample_radii: jax.Array,
+    sample_thetas: jax.Array,
+    two: dict[str, jax.Array],
+    three: dict[str, jax.Array],
+    state: dict[str, jax.Array],
+    **kwargs: object,
+) -> jax.Array:
     """Compute the timeseries of the emitted light from the planet.
 
     This function does a Monte Carlo estimation of the visible flux emitted by the
     planet at each time step assuming that a) the surface intensity is modeled by a
     von Mises-Fisher distribution and b) the planet is a Lambertian emitter. To save
     on computation, it takes one set of randomly generated samples of a unit disk,
-    then coverts these to points on the planet's visible disk at each timestep. This
+    then converts these to points on the planet's visible disk at each timestep. This
     introduces some bias- be sure to use a large enough sample it is below an
     appropriate threshold. Also, to compute secondary eclipses, samples are zeroed
     out when they fall behind the star.
@@ -1361,7 +1668,9 @@ def emission_phase_curve(
         three["p_yz"] = jnp.ones_like(two["rho_x0"]) * three["p_yz"]
         three["p_zz"] = jnp.ones_like(two["rho_x0"]) * three["p_zz"]
 
-    def scan_func(carry, scan_over):
+    def scan_func(
+        carry: None, scan_over: tuple[jax.Array, ...]
+    ) -> tuple[None, jax.Array]:
         (
             transform_matrix,
             rho_xx,
@@ -1452,7 +1761,9 @@ def emission_phase_curve(
 
 
 @jax.jit
-def stellar_ellipsoidal_variations(true_anomalies, stellar_ellipsoidal_alpha, period):
+def stellar_ellipsoidal_variations(
+    true_anomalies: jax.Array, stellar_ellipsoidal_alpha: float, period: float
+) -> jax.Array:
     """Compute the contributions to a phase curve for a star with ellipsoidal variations.
 
     A simple sinusoid model with minima at primary and secondary eclipse, meant to
@@ -1489,7 +1800,9 @@ def stellar_ellipsoidal_variations(true_anomalies, stellar_ellipsoidal_alpha, pe
 
 
 @jax.jit
-def stellar_doppler_variations(true_anomalies, stellar_doppler_alpha, period):
+def stellar_doppler_variations(
+    true_anomalies: jax.Array, stellar_doppler_alpha: float, period: float
+) -> jax.Array:
     """Compute the contributions to a phase curve for a star with Doppler variations.
 
     A simple sinusoid model with a phase of 90 degrees at primary transit meant to
@@ -1521,7 +1834,16 @@ def stellar_doppler_variations(true_anomalies, stellar_doppler_alpha, period):
 
 
 @jax.jit
-def phase_curve(sample_radii, sample_thetas, two, three, state, x_c, y_c, z_c):
+def phase_curve(
+    sample_radii: jax.Array,
+    sample_thetas: jax.Array,
+    two: dict[str, jax.Array],
+    three: dict[str, jax.Array],
+    state: dict[str, jax.Array],
+    x_c: jax.Array,
+    y_c: jax.Array,
+    z_c: jax.Array,
+) -> tuple[jax.Array, jax.Array]:
     """Compute the reflected and emitted phase curves of the planet.
 
     This is essentially a wrapper for :func:`reflected_phase_curve` and
@@ -1569,7 +1891,9 @@ def phase_curve(sample_radii, sample_thetas, two, three, state, x_c, y_c, z_c):
         three["p_yz"] = jnp.ones_like(x_c) * three["p_yz"]
         three["p_zz"] = jnp.ones_like(x_c) * three["p_zz"]
 
-    def scan_func(carry, scan_over):
+    def scan_func(
+        carry: None, scan_over: tuple[jax.Array, ...]
+    ) -> tuple[None, tuple[jax.Array, jax.Array]]:
         (
             transform_matrix,
             rho_xx,

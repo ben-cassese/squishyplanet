@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "squishyplanet"
-version = "0.3.1"
+version = "0.4.0"
 requires-python = ">=3.10"
 authors = [
   {name = "Ben Cassese", email = "b.c.cassese@columbia.edu"},
@@ -35,13 +35,17 @@ dependencies = [
 [dependency-groups]
 dev = [
     "black>=25.1.0",
+    "codespell>=2.4.2",
     "ipykernel>=6.29.5",
     "pre-commit>=4.2.0",
+    "pytest>=8.3.5",
     "ruff>=0.11.6",
     "uv>=0.6.15",
 ]
 tests = [
     "jaxoplanet",
+    "mpmath>=1.3.0",
+    "nbmake>=1.5.5",
     "pytest>=8.3.5",
     "pytest-cov>=6.1.1",
     "pytest-xdist>=3.6.1",
@@ -63,6 +67,9 @@ include-package-data = true
 where = ["."]
 include = ["squishyplanet", "squishyplanet.*"]
 
+[tool.setuptools.package-data]
+squishyplanet = ["py.typed"]
+
 [tool.black]
 line-length = 88
 
@@ -78,12 +85,16 @@ ignore = [
     "B006", # unsure of this one- right now using {}
     "RUF001", # allow greek characters for the Mathematica translator
 ]
-extend-select = ["W", "I", "B", "SIM", "UP", "RUF"]
+extend-select = ["W", "I", "B", "SIM", "UP", "RUF", "ANN"]
 # extend-select = ["W", "I", "B", "SIM", "UP", "RUF", "D", "ANN"]
 exclude = [
     "docs/*",
 ]
 pydocstyle.convention = "google"
+
+[tool.pytest.ini_options]
+addopts = "--nbmake --ignore=docs/tutorials/fit_oblate_transit.ipynb --ignore=docs/tutorials/lightcurve_compare.ipynb"
+testpaths = ["tests", "docs/tutorials", "docs/quickstart.ipynb"]
 
 [tool.coverage.run]
 source = ["squishyplanet"]
@@ -91,3 +102,7 @@ omit = ["tests/*"]
 
 [tool.uv.sources]
 jaxoplanet = { git = "https://github.com/exoplanet-dev/jaxoplanet.git" }
+
+[tool.codespell]
+ignore-words-list = "Flagg,Leary,Winn,AAS,oint,Wit"
+skip = "*.ipynb"

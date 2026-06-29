@@ -1,22 +1,29 @@
 ci:
   autoupdate_schedule: monthly
-
 repos:
   - repo: https://github.com/psf/black-pre-commit-mirror
     rev: 26.5.1
     hooks:
       - id: black
         language_version: python3.13
-
+        additional_dependencies: ["black[jupyter]"]
+        types_or: [python, jupyter]
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: "v6.0.0"
     hooks:
       - id: trailing-whitespace
       - id: end-of-file-fixer
         exclude_types: [json, binary]
-
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: "v0.15.15"
     hooks:
-      - id: ruff
-        args: [--fix, --exit-non-zero-on-fix]
+      - id: codespell
+        exclude: '\.ipynb$'
+  - repo: local
+    hooks:
+      - id: codespell-notebooks
+        name: codespell notebook markdown cells
+        entry: python tools/codespell_notebook_markdown.py
+        language: python
+        types: [jupyter]
+        additional_dependencies: [codespell]

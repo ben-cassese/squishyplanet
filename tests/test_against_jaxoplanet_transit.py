@@ -16,7 +16,9 @@ TIMES = jnp.linspace(-1, 1, 1728) * ureg.day  # 100s cadence for 48 hours
 POLY_ORDERS = [2, 3, 4]
 
 
-def light_curve_compare(key, poly_limbdark_order, return_lc=False):
+def light_curve_compare(
+    key: jax.Array, poly_limbdark_order: int, return_lc: bool = False
+) -> tuple[object, jax.Array, jax.Array]:
     t = TIMES
 
     key, *rand_key = jax.random.split(key, num=8)
@@ -98,7 +100,7 @@ def light_curve_compare(key, poly_limbdark_order, return_lc=False):
         return state, jaxoplanet_lc, test_lc
 
 
-def spherical_transit_compare(poly_limbdark_order):
+def spherical_transit_compare(poly_limbdark_order: int) -> None:
     max_errs = []
     for i in tqdm(jnp.arange(N_JAXOPLANT_COMPARISONS)):
         key = jax.random.key(i)
@@ -108,6 +110,6 @@ def spherical_transit_compare(poly_limbdark_order):
     assert jnp.all(max_errs < 1e-7)
 
 
-def test_spherical_transit():
+def test_spherical_transit() -> None:
     for p in POLY_ORDERS:
         spherical_transit_compare(p)
