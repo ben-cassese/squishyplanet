@@ -5,7 +5,14 @@ import jax.numpy as jnp
 
 
 @jax.jit
-def poly_to_parametric_helper(rho_xx, rho_xy, rho_x0, rho_yy, rho_y0, rho_00):
+def poly_to_parametric_helper(
+    rho_xx: jax.Array,
+    rho_xy: jax.Array,
+    rho_x0: jax.Array,
+    rho_yy: jax.Array,
+    rho_y0: jax.Array,
+    rho_00: jax.Array,
+) -> tuple[jax.Array, jax.Array, jax.Array, jax.Array, jax.Array, jax.Array]:
     """A helper function for :func:`poly_to_parametric`.
 
     Args:
@@ -125,7 +132,14 @@ def poly_to_parametric_helper(rho_xx, rho_xy, rho_x0, rho_yy, rho_y0, rho_00):
 
 
 @jax.jit
-def poly_to_parametric(rho_xx, rho_xy, rho_x0, rho_yy, rho_y0, rho_00):
+def poly_to_parametric(
+    rho_xx: jax.Array,
+    rho_xy: jax.Array,
+    rho_x0: jax.Array,
+    rho_yy: jax.Array,
+    rho_y0: jax.Array,
+    rho_00: jax.Array,
+) -> dict[str, jax.Array]:
     """Convert between the coefficients that describe an implicit to those
     defining a parametric ellipse.
 
@@ -170,15 +184,15 @@ def poly_to_parametric(rho_xx, rho_xy, rho_x0, rho_yy, rho_y0, rho_00):
 
 @jax.jit
 def cartesian_intersection_to_parametric_angle(
-    xs,
-    ys,
-    c_x1,
-    c_x2,
-    c_x3,
-    c_y1,
-    c_y2,
-    c_y3,
-):
+    xs: jax.Array,
+    ys: jax.Array,
+    c_x1: jax.Array,
+    c_x2: jax.Array,
+    c_x3: jax.Array,
+    c_y1: jax.Array,
+    c_y2: jax.Array,
+    c_y3: jax.Array,
+) -> jax.Array:
     """Given a set of x and y coordinates corresponding to the intersection of the planet
     and star, compute the angle :math:`\\alpha` that corresponds to each point.
 

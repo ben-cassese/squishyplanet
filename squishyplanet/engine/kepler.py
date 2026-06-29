@@ -9,7 +9,7 @@ from jax.interpreters import ad
 
 
 @jax.jit
-def kepler(M, ecc):
+def kepler(M: jax.Array, ecc: jax.Array) -> jax.Array:
     """Solve Kepler's equation to compute the true anomaly.
 
     This implementation is based on that within `jaxoplanet <https://github.com/exoplanet-dev/jaxoplanet/>`_, many thanks to the authors.
@@ -30,7 +30,7 @@ def kepler(M, ecc):
 
 
 @jax.custom_jvp
-def _kepler(M, ecc):
+def _kepler(M: jax.Array, ecc: jax.Array) -> tuple[jax.Array, jax.Array]:
     # Wrap into the right range
     M = M % (2 * jnp.pi)
 
@@ -61,7 +61,9 @@ def _kepler(M, ecc):
 
 
 @_kepler.defjvp
-def _(primals, tangents):
+def _(
+    primals: tuple[jax.Array, jax.Array], tangents: tuple[jax.Array, jax.Array]
+) -> tuple[tuple[jax.Array, jax.Array], tuple[jax.Array, jax.Array]]:
     M, e = primals
     M_dot, e_dot = tangents
     sinf, cosf = _kepler(M, e)
@@ -70,7 +72,7 @@ def _(primals, tangents):
     ecosf = e * cosf
     ome2 = 1 - e**2
 
-    def make_zero(tan):
+    def make_zero(tan: object) -> object:
         if type(tan) is ad.Zero:
             return ad.zeros_like_aval(tan.aval)
         else:
@@ -83,7 +85,7 @@ def _(primals, tangents):
     return (sinf, cosf), (cosf * f_dot, -sinf * f_dot)
 
 
-def _starter(M, ecc, ome):
+def _starter(M: jax.Array, ecc: jax.Array, ome: jax.Array) -> jax.Array:
     M2 = jnp.square(M)
     alpha = 3 * jnp.pi / (jnp.pi - 6 / jnp.pi)
     alpha += 1.6 / (jnp.pi - 6 / jnp.pi) * (jnp.pi - M) / (1 + ecc)
@@ -96,7 +98,7 @@ def _starter(M, ecc, ome):
     return (2 * r * w / (jnp.square(w) + w * q + q2) + M) / d
 
 
-def _refine(M, ecc, ome, E):
+def _refine(M: jax.Array, ecc: jax.Array, ome: jax.Array, E: jax.Array) -> jax.Array:
     sE = E - jnp.sin(E)
     cE = 1 - jnp.cos(E)
 
@@ -112,7 +114,14 @@ def _refine(M, ecc, ome, E):
     return E + dE
 
 
-def _x(a, e, f, Omega, i, omega):
+def _x(
+    a: jax.Array,
+    e: jax.Array,
+    f: jax.Array,
+    Omega: jax.Array,
+    i: jax.Array,
+    omega: jax.Array,
+) -> jax.Array:
     return (
         a
         * (-1 + e**2)
@@ -131,7 +140,14 @@ def _x(a, e, f, Omega, i, omega):
     ) / (1 + e * jnp.cos(f))
 
 
-def _y(a, e, f, Omega, i, omega):
+def _y(
+    a: jax.Array,
+    e: jax.Array,
+    f: jax.Array,
+    Omega: jax.Array,
+    i: jax.Array,
+    omega: jax.Array,
+) -> jax.Array:
     return -(
         (
             a
@@ -145,12 +161,27 @@ def _y(a, e, f, Omega, i, omega):
     )
 
 
-def _z(a, e, f, Omega, i, omega):
+def _z(
+    a: jax.Array,
+    e: jax.Array,
+    f: jax.Array,
+    Omega: jax.Array,
+    i: jax.Array,
+    omega: jax.Array,
+) -> jax.Array:
     return -((a * (-1 + e**2) * jnp.sin(i) * jnp.sin(f + omega)) / (1 + e * jnp.cos(f)))
 
 
 @jax.jit
-def skypos(a, e, f, Omega, i, omega, **kwargs):
+def skypos(
+    a: jax.Array,
+    e: jax.Array,
+    f: jax.Array,
+    Omega: jax.Array,
+    i: jax.Array,
+    omega: jax.Array,
+    **kwargs: object,
+) -> jax.Array:
     """Compute the cartesian coordinates of the center of the planet in the sky frame
     given its orbital elements.
 
@@ -180,7 +211,9 @@ def skypos(a, e, f, Omega, i, omega, **kwargs):
     )
 
 
-def true_anomaly_at_transit_center(e, i, omega):
+def true_anomaly_at_transit_center(
+    e: jax.Array, i: jax.Array, omega: jax.Array
+) -> jax.Array:
     """Computes the true anomaly at the instant of minimum star/planet separation.
 
     Uses equations 4.12-4.18 of
@@ -239,7 +272,14 @@ def true_anomaly_at_transit_center(e, i, omega):
     return jnp.pi / 2 - omega - eta_1 - eta_2 - eta_3 - eta_4 - eta_5 - eta_6
 
 
-def t0_to_t_peri(e, i, omega, period, t0, **kwargs):
+def t0_to_t_peri(
+    e: jax.Array,
+    i: jax.Array,
+    omega: jax.Array,
+    period: jax.Array,
+    t0: jax.Array,
+    **kwargs: object,
+) -> jax.Array:
     f = true_anomaly_at_transit_center(e, i, omega)
 
     eccentric_anomaly = jnp.arctan2(jnp.sqrt(1 - e**2) * jnp.sin(f), e + jnp.cos(f))

@@ -6,18 +6,18 @@ import jax
 
 jax.config.update("jax_enable_x64", True)
 import jax.numpy as jnp
-from sympy import binomial, symbols, zeros
+from sympy import Expr, Matrix, binomial, symbols, zeros
 
 # Define our symbols
 z, n = symbols("z n")
 
 
-def _ptilde(n, z):
+def _ptilde(n: int, z: Expr) -> Expr:
     """Return the n^th term in the polynomial basis."""
     return z**n
 
 
-def _Coefficient(expression, term):
+def _Coefficient(expression: Expr, term: Expr) -> Expr:
     """Return the coefficient multiplying `term` in `expression`."""
     # Get the coefficient
     coeff = expression.coeff(term)
@@ -27,7 +27,7 @@ def _Coefficient(expression, term):
     return coeff
 
 
-def _A1(N):
+def _A1(N: int) -> Matrix:
     """Return the change of basis matrix A1."""
     res = zeros(N + 1, N + 1)
     for i in range(N + 1):
@@ -36,7 +36,7 @@ def _A1(N):
     return res
 
 
-def _gtilde(n, z):
+def _gtilde(n: int, z: Expr) -> Expr:
     """Return the n^th term in the Green's basis."""
     if n == 0:
         return 1 + 0 * z
@@ -46,7 +46,7 @@ def _gtilde(n, z):
         return (n + 2) * z**n - n * z ** (n - 2)
 
 
-def _p_G(n, N):
+def _p_G(n: int, N: int) -> list[Expr]:
     """Return the polynomial basis representation of the Green's polynomial `g`."""
     g = _gtilde(n, z)
     res = [g.subs(z, 0)]
@@ -55,7 +55,7 @@ def _p_G(n, N):
     return res
 
 
-def _A2(N):
+def _A2(N: int) -> Matrix:
     """Return the change of basis matrix A2. The columns of the **inverse** of this matrix are given by `p_G`."""
     res = zeros(N + 1, N + 1)
     for n in range(N + 1):
@@ -63,12 +63,12 @@ def _A2(N):
     return res.inv()
 
 
-def _A(N):
+def _A(N: int) -> Matrix:
     """Return the full change of basis matrix."""
     return _A2(N) * _A1(N)
 
 
-def generate_change_of_basis_matrix(N):
+def generate_change_of_basis_matrix(N: int) -> jax.Array:
     """Generate the change of basis matrix to convert limb darking u coefficients to
     Green's basis coefficients.
 

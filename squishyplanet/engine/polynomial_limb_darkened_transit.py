@@ -64,30 +64,71 @@ _TRAP_WEIGHT = 2.0 * jnp.pi / N_TRAP
 _FULL_SPAN = 2.0 * jnp.pi - 1e-9
 
 
-def _t4(rho_xx, rho_xy, rho_x0, rho_yy, rho_y0, rho_00):
+def _t4(
+    rho_xx: jax.Array,
+    rho_xy: jax.Array,
+    rho_x0: jax.Array,
+    rho_yy: jax.Array,
+    rho_y0: jax.Array,
+    rho_00: jax.Array,
+) -> jax.Array:
     return -1 + rho_00 - rho_x0 + rho_xx
 
 
-def _t3(rho_xx, rho_xy, rho_x0, rho_yy, rho_y0, rho_00):
+def _t3(
+    rho_xx: jax.Array,
+    rho_xy: jax.Array,
+    rho_x0: jax.Array,
+    rho_yy: jax.Array,
+    rho_y0: jax.Array,
+    rho_00: jax.Array,
+) -> jax.Array:
     return -2 * rho_xy + 2 * rho_y0
 
 
-def _t2(rho_xx, rho_xy, rho_x0, rho_yy, rho_y0, rho_00):
+def _t2(
+    rho_xx: jax.Array,
+    rho_xy: jax.Array,
+    rho_x0: jax.Array,
+    rho_yy: jax.Array,
+    rho_y0: jax.Array,
+    rho_00: jax.Array,
+) -> jax.Array:
     return -2 + 2 * rho_00 - 2 * rho_xx + 4 * rho_yy
 
 
-def _t1(rho_xx, rho_xy, rho_x0, rho_yy, rho_y0, rho_00):
+def _t1(
+    rho_xx: jax.Array,
+    rho_xy: jax.Array,
+    rho_x0: jax.Array,
+    rho_yy: jax.Array,
+    rho_y0: jax.Array,
+    rho_00: jax.Array,
+) -> jax.Array:
     return 2 * rho_xy + 2 * rho_y0
 
 
-def _t0(rho_xx, rho_xy, rho_x0, rho_yy, rho_y0, rho_00):
+def _t0(
+    rho_xx: jax.Array,
+    rho_xy: jax.Array,
+    rho_x0: jax.Array,
+    rho_yy: jax.Array,
+    rho_y0: jax.Array,
+    rho_00: jax.Array,
+) -> jax.Array:
     return -1 + rho_00 + rho_x0 + rho_xx
 
 
 @jax.jit
 def _single_intersection_points(
-    rho_xx, rho_xy, rho_x0, rho_yy, rho_y0, rho_00, **kwargs
-):
+    rho_xx: jax.Array,
+    rho_xy: jax.Array,
+    rho_x0: jax.Array,
+    rho_yy: jax.Array,
+    rho_y0: jax.Array,
+    rho_00: jax.Array,
+    **kwargs: jax.Array,
+) -> tuple[jax.Array, jax.Array]:
     t4 = _t4(rho_xx, rho_xy, rho_x0, rho_yy, rho_y0, rho_00)
     t3 = _t3(rho_xx, rho_xy, rho_x0, rho_yy, rho_y0, rho_00)
     t2 = _t2(rho_xx, rho_xy, rho_x0, rho_yy, rho_y0, rho_00)
@@ -122,7 +163,13 @@ def _single_intersection_points(
 
 
 @jax.jit
-def parameterize_2d_helper(projected_r, projected_f, projected_theta, xc, yc):
+def parameterize_2d_helper(
+    projected_r: jax.Array,
+    projected_f: jax.Array,
+    projected_theta: jax.Array,
+    xc: jax.Array,
+    yc: jax.Array,
+) -> tuple[dict, dict]:
     """Convert from the alternative sky-projected parameterization to the same format
     used by the 3D parameterization.
 
@@ -236,7 +283,17 @@ def parameterize_2d_helper(projected_r, projected_f, projected_theta, xc, yc):
 
 
 @jax.jit
-def planet_solution_vec(a, b, g_coeffs, c_x1, c_x2, c_x3, c_y1, c_y2, c_y3):
+def planet_solution_vec(
+    a: jax.Array,
+    b: jax.Array,
+    g_coeffs: jax.Array,
+    c_x1: jax.Array,
+    c_x2: jax.Array,
+    c_x3: jax.Array,
+    c_y1: jax.Array,
+    c_y2: jax.Array,
+    c_y3: jax.Array,
+) -> jax.Array:
     """Compute the "solution vector" for a 1D path across the star that lies on the outline
     of the planet.
 
@@ -309,7 +366,7 @@ def planet_solution_vec(a, b, g_coeffs, c_x1, c_x2, c_x3, c_y1, c_y2, c_y3):
     # polynomial orders becomes a vectorized power.
     ns = jnp.arange(g_coeffs.shape[0])[2:]
 
-    def vec_integrand(s):
+    def vec_integrand(s: jax.Array) -> jax.Array:
         cs = jnp.cos(s)
         sn = jnp.sin(s)
         x = cs * c_x1 + sn * c_x2 + c_x3
@@ -346,11 +403,11 @@ def planet_solution_vec(a, b, g_coeffs, c_x1, c_x2, c_x3, c_y1, c_y2, c_y3):
     # Full-circle calls use the periodic trapezoid; partial arcs use the smoothstep
     # reparameterization of [a, b] that regularizes the sqrt endpoint singularity:
     #   s = mid + half * phi(t),  integral = half * sum_k w_k dphi(t_k) f(s_k).
-    def full_circle(_):
+    def full_circle(_: None) -> jax.Array:
         vals = jax.vmap(vec_integrand)(_TRAP_NODES)
         return _TRAP_WEIGHT * jnp.sum(vals, axis=0)
 
-    def partial_arc(_):
+    def partial_arc(_: None) -> jax.Array:
         half = 0.5 * (b - a)
         mid = 0.5 * (a + b)
         vals = jax.vmap(vec_integrand)(mid + half * _GL_PHI)
@@ -365,29 +422,29 @@ _THREE_HALF_PI = 3.0 * jnp.pi / 2.0
 _TWO_PI = 2.0 * jnp.pi
 
 
-def _F0(t):
+def _F0(t: jax.Array) -> jax.Array:
     """Antiderivative of ``cos^2(t)``: ``t/2 + sin(2t)/4``."""
     return t / 2.0 + jnp.sin(2.0 * t) / 4.0
 
 
-def _F_outer(t):
+def _F_outer(t: jax.Array) -> jax.Array:
     """Antiderivative of the ``s1`` outer piece, ``(pi/12)(4 sin t - sin^3 t)``."""
     s = jnp.sin(t)
     return (jnp.pi / 12.0) * (4.0 * s - s**3)
 
 
-def _F_inner(t):
+def _F_inner(t: jax.Array) -> jax.Array:
     """Antiderivative of the ``s1`` inner piece, ``(pi/12)(-2 sin t + sin^3 t)``."""
     s = jnp.sin(t)
     return (jnp.pi / 12.0) * (-2.0 * s + s**3)
 
 
-def _s0_definite(lo, hi):
+def _s0_definite(lo: jax.Array, hi: jax.Array) -> jax.Array:
     """Closed-form ``integral_{lo}^{hi} cos^2(t) dt``."""
     return _F0(hi) - _F0(lo)
 
 
-def _s1_definite(lo, hi):
+def _s1_definite(lo: jax.Array, hi: jax.Array) -> jax.Array:
     """Closed-form ``integral_{lo}^{hi} s1_integrand(t) dt`` for ``0 <= lo <= hi <= 2 pi``.
 
     Splits the interval at ``pi/2`` and ``3 pi/2`` by clamping the limits into each
@@ -410,7 +467,17 @@ def _s1_definite(lo, hi):
 
 
 @jax.jit
-def star_solution_vec(a, b, g_coeffs, c_x1, c_x2, c_x3, c_y1, c_y2, c_y3):
+def star_solution_vec(
+    a: jax.Array,
+    b: jax.Array,
+    g_coeffs: jax.Array,
+    c_x1: jax.Array,
+    c_x2: jax.Array,
+    c_x3: jax.Array,
+    c_y1: jax.Array,
+    c_y2: jax.Array,
+    c_y3: jax.Array,
+) -> jax.Array:
     """Compute the "solution vector" for a 1D path across the star that lies on the edge
     of the star itself.
 
@@ -474,10 +541,10 @@ def star_solution_vec(a, b, g_coeffs, c_x1, c_x2, c_x3, c_y1, c_y2, c_y3):
 
     delta = theta2 - theta1
 
-    def no_wrap(delta):
+    def no_wrap(delta: jax.Array) -> tuple[jax.Array, jax.Array]:
         return _s0_definite(theta1, theta2), _s1_definite(theta1, theta2)
 
-    def wrap(delta):
+    def wrap(delta: jax.Array) -> tuple[jax.Array, jax.Array]:
         s0 = _s0_definite(theta2, 2 * jnp.pi) + _s0_definite(0.0, theta1)
         s1 = _s1_definite(theta2, 2 * jnp.pi) + _s1_definite(0.0, theta1)
         return s0, s1
@@ -490,7 +557,7 @@ def star_solution_vec(a, b, g_coeffs, c_x1, c_x2, c_x3, c_y1, c_y2, c_y3):
     return solution_vec
 
 
-def _rot(angle, axis):
+def _rot(angle: jax.Array, axis: str) -> jax.Array:
     """Batched rotation matrix about ``axis`` ('x', 'y', or 'z').
 
     Args:
@@ -513,7 +580,7 @@ def _rot(angle, axis):
     return jnp.stack([jnp.stack(row, -1) for row in rows], -2)
 
 
-def outline_prelude(state):
+def outline_prelude(state: dict) -> tuple[dict, dict]:
     """Direct construction of the planet's projected outline from orbital elements.
 
     Drop-in replacement for the ``planet_3d_coeffs -> planet_2d_coeffs ->
@@ -622,7 +689,14 @@ def outline_prelude(state):
     return two, para
 
 
-def ellipse_bound(c_x1, c_x2, c_x3, c_y1, c_y2, c_y3):
+def ellipse_bound(
+    c_x1: jax.Array,
+    c_x2: jax.Array,
+    c_x3: jax.Array,
+    c_y1: jax.Array,
+    c_y2: jax.Array,
+    c_y3: jax.Array,
+) -> jax.Array:
     """Decide whether a step straddles the star edge (and so needs the quartic solve).
 
     The outline center is ``(c_x3, c_y3)`` and a safe upper bound on the distance of any
@@ -651,7 +725,7 @@ def ellipse_bound(c_x1, c_x2, c_x3, c_y1, c_y2, c_y3):
 
 
 @partial(jax.jit, static_argnames=("parameterize_with_projected_ellipse",))
-def lightcurve(state, parameterize_with_projected_ellipse):
+def lightcurve(state: dict, parameterize_with_projected_ellipse: bool) -> jax.Array:
     """The main function for computing a transit light curve.
 
     This function will return a 1-D array representing the flux received from the star,
@@ -743,10 +817,10 @@ def lightcurve(state, parameterize_with_projected_ellipse):
         positions[0, :] ** 2 + positions[1, :] ** 2 <= (1.0 + largest_r * 1.1) ** 2
     ) * (positions[2, :] > 0)
 
-    def not_on_limb(X):
+    def not_on_limb(X: tuple) -> jax.Array:
         para, _, _ = X
 
-        def fully_transiting(para):
+        def fully_transiting(para: dict) -> jax.Array:
             solution_vectors = planet_solution_vec(
                 a=0.0, b=2 * jnp.pi, g_coeffs=g_coeffs, **para
             )
@@ -756,7 +830,7 @@ def lightcurve(state, parameterize_with_projected_ellipse):
 
             return blocked_flux
 
-        def not_transiting(para):
+        def not_transiting(para: dict) -> float:
             return 0.0
 
         return jax.lax.cond(
@@ -766,7 +840,7 @@ def lightcurve(state, parameterize_with_projected_ellipse):
             para,
         )
 
-    def partially_transiting(X):
+    def partially_transiting(X: tuple) -> jax.Array:
         para, xs, ys = X
 
         alphas = cartesian_intersection_to_parametric_angle(xs, ys, **para)
@@ -790,7 +864,7 @@ def lightcurve(state, parameterize_with_projected_ellipse):
         )
         test_val = jnp.sqrt(_x**2 + _y**2)
 
-        def testval_inside_star(_):
+        def testval_inside_star(_: tuple) -> jax.Array:
             solution_vectors = planet_solution_vec(
                 alphas[0], alphas[1], g_coeffs, **para
             )
@@ -799,7 +873,7 @@ def lightcurve(state, parameterize_with_projected_ellipse):
             )
             return planet_contribution
 
-        def testval_outside_star(_):
+        def testval_outside_star(_: tuple) -> jax.Array:
             leg1_solution_vec = planet_solution_vec(
                 alphas[1], 2 * jnp.pi, g_coeffs, **para
             )
@@ -824,7 +898,7 @@ def lightcurve(state, parameterize_with_projected_ellipse):
 
         return total_blocked
 
-    def transiting(X):
+    def transiting(X: tuple) -> jax.Array:
         indv_para, indv_two = X
 
         # conservative bounding pre-test: only steps whose outline straddles the star
@@ -832,7 +906,7 @@ def lightcurve(state, parameterize_with_projected_ellipse):
         # center-inside test in not_on_limb, bit-identically to the eig path.
         straddling = ellipse_bound(**indv_para)
 
-        def run_roots(args):
+        def run_roots(args: tuple) -> jax.Array:
             indv_para, indv_two = args
             xs, ys = _single_intersection_points(**indv_two)
             on_limb = jnp.sum(xs) != 999 * 4
@@ -843,17 +917,17 @@ def lightcurve(state, parameterize_with_projected_ellipse):
                 (indv_para, xs, ys),
             )
 
-        def skip_roots(args):
+        def skip_roots(args: tuple) -> jax.Array:
             indv_para, _ = args
             dummy = jnp.full(4, 999.0)
             return not_on_limb((indv_para, dummy, dummy))
 
         return jax.lax.cond(straddling, run_roots, skip_roots, (indv_para, indv_two))
 
-    def not_transiting(X):
+    def not_transiting(X: tuple) -> float:
         return 0.0
 
-    def scan_func(carry, scan_over):
+    def scan_func(carry: None, scan_over: tuple) -> tuple[None, jax.Array]:
         indv_para, indv_two, mask = scan_over
         return None, jax.lax.cond(
             mask, transiting, not_transiting, (indv_para, indv_two)
