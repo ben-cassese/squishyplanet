@@ -67,6 +67,9 @@ include-package-data = true
 where = ["."]
 include = ["squishyplanet", "squishyplanet.*"]
 
+[tool.setuptools.package-data]
+squishyplanet = ["py.typed"]
+
 [tool.black]
 line-length = 88
 
@@ -82,7 +85,7 @@ ignore = [
     "B006", # unsure of this one- right now using {}
     "RUF001", # allow greek characters for the Mathematica translator
 ]
-extend-select = ["W", "I", "B", "SIM", "UP", "RUF"]
+extend-select = ["W", "I", "B", "SIM", "UP", "RUF", "ANN"]
 # extend-select = ["W", "I", "B", "SIM", "UP", "RUF", "D", "ANN"]
 exclude = [
     "docs/*",

@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 from squishyplanet import OblateSystem
 
 
-def test_limb_darkening_profile_helper():
+def test_limb_darkening_profile_helper() -> None:
     key = jax.random.PRNGKey(0)
     for _i in range(1_000):
         key, *subkeys = jax.random.split(key, (3,))
@@ -31,7 +31,7 @@ def test_limb_darkening_profile_helper():
         assert jnp.allclose(val, 1.0)
 
 
-def test_illustrations():
+def test_illustrations() -> None:
     state = {
         "t_peri": 0.0,
         "times": jnp.linspace(0.0, 5, 400),
@@ -126,7 +126,7 @@ def test_illustrations():
     plt.close()
 
 
-def test_lightcurve():
+def test_lightcurve() -> None:
     state = {
         "times": jnp.linspace(-1, 1, 10),
         "tidally_locked": False,

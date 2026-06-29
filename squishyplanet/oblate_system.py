@@ -3,6 +3,7 @@ import jax
 jax.config.update("jax_enable_x64", True)
 import copy
 import pprint
+from collections.abc import Callable
 from functools import partial
 
 import jax.numpy as jnp
@@ -155,31 +156,30 @@ class OblateSystem:
 
     def __init__(
         self,
-        times=None,
-        t_peri=None,
-        t0=None,
-        period=None,
-        a=None,
-        tidally_locked=None,
-        e=0.0,
-        i=jnp.pi / 2,
-        Omega=jnp.pi,
-        omega=0.0,
-        obliq=0.0,
-        prec=0.0,
-        r=None,
-        f1=0.0,
-        f2=0.0,
-        ld_u_coeffs=jnp.array([0.0, 0.0]),
-        projected_effective_r=0.0,
-        projected_f=0.0,
-        projected_theta=0.0,
-        parameterize_with_projected_ellipse=False,
-        exposure_time=0.0,
-        oversample=1,
-        oversample_correction_order=2,
-    ):
-
+        times: jax.Array | None = None,
+        t_peri: float | None = None,
+        t0: float | None = None,
+        period: float | None = None,
+        a: float | None = None,
+        tidally_locked: bool | None = None,
+        e: float = 0.0,
+        i: float = jnp.pi / 2,
+        Omega: float = jnp.pi,
+        omega: float = 0.0,
+        obliq: float = 0.0,
+        prec: float = 0.0,
+        r: float | None = None,
+        f1: float = 0.0,
+        f2: float = 0.0,
+        ld_u_coeffs: jax.Array = jnp.array([0.0, 0.0]),
+        projected_effective_r: float = 0.0,
+        projected_f: float = 0.0,
+        projected_theta: float = 0.0,
+        parameterize_with_projected_ellipse: bool = False,
+        exposure_time: float = 0.0,
+        oversample: int = 1,
+        oversample_correction_order: int = 2,
+    ) -> None:
         #######################################################################
         # setup
         #######################################################################
@@ -205,7 +205,6 @@ class OblateSystem:
 
         # for oversampling
         if self._state["oversample"] > 1:
-
             self._state["oversample"] += 1 - self._state["oversample"] % 2
             self._state["stencil"] = jnp.ones(self._state["oversample"])
 
@@ -293,12 +292,12 @@ class OblateSystem:
 
         self._lightcurve_fwd_grad_enforced = self._setup_lightcurve_func()
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         s = pprint.pformat(self.state)
         return f"OblateSystem(\n{s}\n)"
 
     @property
-    def state(self):
+    def state(self) -> dict:
         """A dictionary that includes all of the parameters of the system.
 
         This is an immutable property, and will raise an error if you try to set it.
@@ -322,7 +321,7 @@ class OblateSystem:
             ).sum(axis=1)
         return s
 
-    def _validate_inputs(self):
+    def _validate_inputs(self) -> None:
         for key, val in self._state.items():
             if val is None:
                 if (key == "r") & (self._state["parameterize_with_projected_ellipse"]):
@@ -399,8 +398,7 @@ class OblateSystem:
                 self._state["exposure_time"] is not None
             ), "exposure_time must be provided if oversample > 1"
 
-    def _setup_lightcurve_func(self):
-
+    def _setup_lightcurve_func(self) -> Callable:
         constants = {
             "parameterize_with_projected_ellipse": self._state[
                 "parameterize_with_projected_ellipse"
@@ -412,15 +410,15 @@ class OblateSystem:
         frozen = jax.tree_util.Partial(_lightcurve, **constants)
 
         @jax.custom_vjp
-        def lightcurve(params):
+        def lightcurve(params: dict) -> jax.Array:
             return frozen(params)
 
-        def lightcurve_fwd(params):
+        def lightcurve_fwd(params: dict) -> tuple:
             output = frozen(params)
             jac = jax.jacfwd(frozen)(params)
             return output, (jac,)
 
-        def lightcurve_bwd(res, g):
+        def lightcurve_bwd(res: tuple, g: jax.Array) -> tuple:
             jac = res
             val = jax.tree.map(lambda x: x.T @ g, jac)
             return val
@@ -430,8 +428,12 @@ class OblateSystem:
 
         return lightcurve
 
-    def _illustrate_helper(self, times=None, true_anomalies=None, nsamples=50_000):
-
+    def _illustrate_helper(
+        self,
+        times: jax.Array | None = None,
+        true_anomalies: jax.Array | None = None,
+        nsamples: int = 50_000,
+    ) -> dict:
         if (times is not None) & (true_anomalies is not None):
             raise ValueError("Provide either times or true anomalies but not both")
 
@@ -482,7 +484,6 @@ class OblateSystem:
         Ys = []
         Reflection = []
         for i in range(len(true_anomalies)):
-
             # all of these could just be done in one go,
             # but bookkeeping was easier this way
             self._state["f"] = jnp.array([true_anomalies[i]])
@@ -585,16 +586,16 @@ class OblateSystem:
 
     def illustrate(
         self,
-        times=None,
-        true_anomalies=None,
-        orbit=True,
-        reflected=False,
-        star_fill=True,
-        window_size=0.4,
-        star_centered=False,
-        nsamples=50_000,
-        figsize=(8, 8),
-    ):
+        times: jax.Array | None = None,
+        true_anomalies: jax.Array | None = None,
+        orbit: bool = True,
+        reflected: bool = False,
+        star_fill: bool = True,
+        window_size: float = 0.4,
+        star_centered: bool = False,
+        nsamples: int = 50_000,
+        figsize: tuple = (8, 8),
+    ) -> None:
         """Visualize the layout of the system at one or more times.
 
         This method, if run in a jupyter notebook, will display a plot of some
@@ -671,7 +672,7 @@ class OblateSystem:
                 jnp.pi * (g_coeffs[0] + (2 / 3) * g_coeffs[1])
             )
 
-            def _star_radial_profile(r):
+            def _star_radial_profile(r: jax.Array) -> jax.Array:
                 us = jnp.ones(self._state["ld_u_coeffs"].shape[0] + 1) * (-1)
                 us = us.at[1:].set(self._state["ld_u_coeffs"])
                 mu = jnp.sqrt(1 - r**2)
@@ -731,7 +732,12 @@ class OblateSystem:
         return
 
     @staticmethod
-    def fit_limb_darkening_profile(intensities, order=None, mus=None, rs=None):
+    def fit_limb_darkening_profile(
+        intensities: jax.Array,
+        order: int | None = None,
+        mus: jax.Array | None = None,
+        rs: jax.Array | None = None,
+    ) -> jax.Array:
         """Convert a stellar limb darkening profile to a polynomial representation.
 
         Given a set of stellar parameters, one can use a grid of stellar models to compute
@@ -770,7 +776,11 @@ class OblateSystem:
         )
 
     @staticmethod
-    def limb_darkening_profile(ld_u_coeffs=None, r=None, mu=None):
+    def limb_darkening_profile(
+        ld_u_coeffs: jax.Array | None = None,
+        r: jax.Array | float | None = None,
+        mu: jax.Array | float | None = None,
+    ) -> jax.Array:
         """Compute the limb darkening profile of the star at a given radius.
 
         Meant as a helper function for sanity checks and plotting, especially if you're
@@ -808,7 +818,7 @@ class OblateSystem:
         # total flux from the star. 1/eq. 28 in Agol, Luger, and Foreman-Mackey 2020
         normalization_constant = 1 / (jnp.pi * (g_coeffs[0] + (2 / 3) * g_coeffs[1]))
 
-        def inner(r):
+        def inner(r: jax.Array) -> jax.Array:
             us = jnp.ones(ld_u_coeffs.shape[0] + 1) * (-1)
             us = us.at[1:].set(ld_u_coeffs)
             mu = jnp.sqrt(1 - r**2)
@@ -820,7 +830,7 @@ class OblateSystem:
         else:
             return jax.vmap(inner)(r)
 
-    def lightcurve(self, params={}):
+    def lightcurve(self, params: dict = {}) -> jax.Array:
         """Compute the light curve of the system.
 
         This method will return the light curve of the system at the times specified
@@ -850,11 +860,11 @@ class OblateSystem:
 
 @partial(jax.jit, static_argnums=(1, 2))
 def _lightcurve(
-    params,
-    parameterize_with_projected_ellipse,
-    oversample,
-    state,
-):
+    params: dict,
+    parameterize_with_projected_ellipse: bool,
+    oversample: int,
+    state: dict,
+) -> jax.Array:
     for key in params:
         state[key] = params[key]
     transit = poly_lightcurve(state, parameterize_with_projected_ellipse)
@@ -866,7 +876,12 @@ def _lightcurve(
 
 
 @partial(jax.jit, static_argnums=(1,))
-def _fit_limb_darkening_profile(intensities, order=None, mus=None, rs=None):
+def _fit_limb_darkening_profile(
+    intensities: jax.Array,
+    order: int | None = None,
+    mus: jax.Array | None = None,
+    rs: jax.Array | None = None,
+) -> jax.Array:
     """Convert a stellar limb darkening profile to a polynomial representation.
 
     Given a set of stellar parameters, one can use a grid of stellar models to compute

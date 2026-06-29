@@ -36,7 +36,7 @@ mp.mp.dps = 50
 # ---------------------------------------------------------------------------
 # star_solution_vec vs mpmath star-arc integrals
 # ---------------------------------------------------------------------------
-def _thetas(a, b, c):
+def _thetas(a: float, b: float, c: list[float]) -> tuple[float, float]:
     """Replicate the function's (a, b) -> (theta1, theta2) conversion in numpy."""
     cx1, cx2, cx3, cy1, cy2, cy3 = c
     x1 = cx1 * np.cos(a) + cx2 * np.sin(a) + cx3
@@ -50,17 +50,17 @@ def _thetas(a, b, c):
     return (t1, t2) if t1 < t2 else (t2, t1)
 
 
-def _mp_s0(t):
+def _mp_s0(t: object) -> object:
     return mp.cos(t) ** 2
 
 
-def _mp_s1(t):
+def _mp_s1(t: object) -> object:
     if (t < mp.pi / 2) or (t > 3 * mp.pi / 2):
         return (mp.pi * mp.cos(t) * (5 + 3 * mp.cos(2 * t))) / 24
     return -(mp.pi * mp.cos(t) * (1 + 3 * mp.cos(2 * t))) / 24
 
 
-def _mp_int(f, lo, hi):
+def _mp_int(f: object, lo: object, hi: object) -> object:
     """Integrate ``f`` over ``[lo, hi]``, splitting at the s1 breakpoints."""
     pts = [mp.mpf(lo)]
     for bp in (mp.pi / 2, 3 * mp.pi / 2):
@@ -70,7 +70,7 @@ def _mp_int(f, lo, hi):
     return sum(mp.quad(f, [pts[i], pts[i + 1]]) for i in range(len(pts) - 1))
 
 
-def _mp_star_reference(a, b, c):
+def _mp_star_reference(a: float, b: float, c: list[float]) -> tuple[float, float]:
     """High-precision s0, s1 for the given arc, matching star_solution_vec's logic."""
     t1, t2 = _thetas(a, b, c)
     if (t2 - t1) < np.pi:
@@ -82,7 +82,7 @@ def _mp_star_reference(a, b, c):
     return float(s0), float(s1)
 
 
-def test_star_solution_vec_matches_mpmath():
+def test_star_solution_vec_matches_mpmath() -> None:
     """Closed-form star_solution_vec equals the ~50-digit reference (s0, s1).
 
     Cases are chosen to exercise the no-wrap and wrap branches and arcs crossing the
@@ -116,31 +116,31 @@ def test_star_solution_vec_matches_mpmath():
 # ---------------------------------------------------------------------------
 # planet_solution_vec vs mpmath Green's-theorem integrals (s0, s1, s2)
 # ---------------------------------------------------------------------------
-def _mp_planet_reference(para):
+def _mp_planet_reference(para: dict[str, float]) -> np.ndarray:
     """High-precision (s0, s1, s2) for a fully-inside outline (quadratic LD)."""
     cx1, cx2, cx3 = (mp.mpf(para[k]) for k in ("c_x1", "c_x2", "c_x3"))
     cy1, cy2, cy3 = (mp.mpf(para[k]) for k in ("c_y1", "c_y2", "c_y3"))
 
-    def x_of(s):
+    def x_of(s: object) -> object:
         return mp.cos(s) * cx1 + mp.sin(s) * cx2 + cx3
 
-    def y_of(s):
+    def y_of(s: object) -> object:
         return mp.cos(s) * cy1 + mp.sin(s) * cy2 + cy3
 
-    def dyds(s):
+    def dyds(s: object) -> object:
         return -mp.sin(s) * cy1 + mp.cos(s) * cy2
 
-    def i0(s):
+    def i0(s: object) -> object:
         return x_of(s) * dyds(s)
 
-    def i1(s):
+    def i1(s: object) -> object:
         x, y = x_of(s), y_of(s)
         root = mp.sqrt(1 - x**2 - y**2)
         return (
             dyds(s) * (mp.pi + 6 * x * root - 6 * mp.atan(x / root) * (-1 + y**2)) / 12
         )
 
-    def i2(s):
+    def i2(s: object) -> object:
         common = -(
             cx3 * (mp.sin(s) * cy1 - mp.cos(s) * cy2)
             + cx2 * (cy1 + mp.cos(s) * cy3)
@@ -157,7 +157,7 @@ def _mp_planet_reference(para):
     )
 
 
-def test_planet_solution_vec_matches_mpmath():
+def test_planet_solution_vec_matches_mpmath() -> None:
     """Fused planet_solution_vec matches the ~50-digit reference over a full loop.
 
     Uses a near-grazing fully-inside ellipse (so the integrand's sqrt(1 - x^2 - y^2)
@@ -185,19 +185,19 @@ def test_planet_solution_vec_matches_mpmath():
 # ---------------------------------------------------------------------------
 # outline_prelude vs mpmath direct outline points
 # ---------------------------------------------------------------------------
-def _Rz(t):
+def _Rz(t: object) -> object:
     return mp.matrix([[mp.cos(t), -mp.sin(t), 0], [mp.sin(t), mp.cos(t), 0], [0, 0, 1]])
 
 
-def _Rx(t):
+def _Rx(t: object) -> object:
     return mp.matrix([[1, 0, 0], [0, mp.cos(t), -mp.sin(t)], [0, mp.sin(t), mp.cos(t)]])
 
 
-def _Ry(t):
+def _Ry(t: object) -> object:
     return mp.matrix([[mp.cos(t), 0, mp.sin(t)], [0, 1, 0], [-mp.sin(t), 0, mp.cos(t)]])
 
 
-def _mp_outline_point(p, alpha):
+def _mp_outline_point(p: dict[str, float], alpha: float) -> tuple[float, float]:
     """High-precision (x, y) of the outline at one alpha (same convention)."""
     R = _Rz(p["Omega"]) * _Rx(p["i"]) * _Rz(p["omega"] + p["prec"]) * _Ry(p["obliq"])
     r = mp.mpf(p["r"])
@@ -254,7 +254,7 @@ def _mp_outline_point(p, alpha):
     return float(x), float(y)
 
 
-def test_outline_prelude_matches_mpmath():
+def test_outline_prelude_matches_mpmath() -> None:
     """Direct outline_prelude reproduces the ~50-digit reference outline points."""
     rng = np.random.default_rng(7)
     tp = 2 * np.pi
@@ -296,7 +296,7 @@ def test_outline_prelude_matches_mpmath():
 # ---------------------------------------------------------------------------
 # scheme handoff continuity (smoothstep-GL partial arc <-> trapezoid full circle)
 # ---------------------------------------------------------------------------
-def _gold_lightcurve(state):
+def _gold_lightcurve(state: dict[str, object]) -> np.ndarray:
     """Recompute the light curve with both quadrature rules cranked to ~machine
     precision, giving the (physically continuous) truth to compare against.
 
@@ -319,7 +319,7 @@ def _gold_lightcurve(state):
         jax.clear_caches()
 
 
-def test_scheme_handoff_is_continuous():
+def test_scheme_handoff_is_continuous() -> None:
     """No flux discontinuity where the two quadrature schemes meet.
 
     ``planet_solution_vec`` integrates partial-transit arcs with a smoothstep

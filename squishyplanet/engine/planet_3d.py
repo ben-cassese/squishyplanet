@@ -6,7 +6,19 @@ import jax.numpy as jnp
 from squishyplanet.engine.kepler import skypos
 
 
-def _p_xx(a, e, f, Omega, i, omega, r, obliq, prec, f1, f2):
+def _p_xx(
+    a: jax.Array,
+    e: jax.Array,
+    f: jax.Array,
+    Omega: jax.Array,
+    i: jax.Array,
+    omega: jax.Array,
+    r: jax.Array,
+    obliq: jax.Array,
+    prec: jax.Array,
+    f1: jax.Array,
+    f2: jax.Array,
+) -> jax.Array:
     return (
         (
             jnp.cos(omega)
@@ -57,7 +69,19 @@ def _p_xx(a, e, f, Omega, i, omega, r, obliq, prec, f1, f2):
     ) / r**2
 
 
-def _p_xy(a, e, f, Omega, i, omega, r, obliq, prec, f1, f2):
+def _p_xy(
+    a: jax.Array,
+    e: jax.Array,
+    f: jax.Array,
+    Omega: jax.Array,
+    i: jax.Array,
+    omega: jax.Array,
+    r: jax.Array,
+    obliq: jax.Array,
+    prec: jax.Array,
+    f1: jax.Array,
+    f2: jax.Array,
+) -> jax.Array:
     return (
         (
             16
@@ -199,7 +223,19 @@ def _p_xy(a, e, f, Omega, i, omega, r, obliq, prec, f1, f2):
     ) / (16.0 * r**2)
 
 
-def _p_xz(a, e, f, Omega, i, omega, r, obliq, prec, f1, f2):
+def _p_xz(
+    a: jax.Array,
+    e: jax.Array,
+    f: jax.Array,
+    Omega: jax.Array,
+    i: jax.Array,
+    omega: jax.Array,
+    r: jax.Array,
+    obliq: jax.Array,
+    prec: jax.Array,
+    f1: jax.Array,
+    f2: jax.Array,
+) -> jax.Array:
     return (
         2
         * (
@@ -266,7 +302,19 @@ def _p_xz(a, e, f, Omega, i, omega, r, obliq, prec, f1, f2):
     ) / r**2
 
 
-def _p_x0(a, e, f, Omega, i, omega, r, obliq, prec, f1, f2):
+def _p_x0(
+    a: jax.Array,
+    e: jax.Array,
+    f: jax.Array,
+    Omega: jax.Array,
+    i: jax.Array,
+    omega: jax.Array,
+    r: jax.Array,
+    obliq: jax.Array,
+    prec: jax.Array,
+    f1: jax.Array,
+    f2: jax.Array,
+) -> jax.Array:
     return (
         2
         * a
@@ -328,7 +376,19 @@ def _p_x0(a, e, f, Omega, i, omega, r, obliq, prec, f1, f2):
     ) / (r**2 * (1 + e * jnp.cos(f)))
 
 
-def _p_yy(a, e, f, Omega, i, omega, r, obliq, prec, f1, f2):
+def _p_yy(
+    a: jax.Array,
+    e: jax.Array,
+    f: jax.Array,
+    Omega: jax.Array,
+    i: jax.Array,
+    omega: jax.Array,
+    r: jax.Array,
+    obliq: jax.Array,
+    prec: jax.Array,
+    f1: jax.Array,
+    f2: jax.Array,
+) -> jax.Array:
     return (
         (
             jnp.cos(Omega)
@@ -358,7 +418,19 @@ def _p_yy(a, e, f, Omega, i, omega, r, obliq, prec, f1, f2):
     ) / r**2
 
 
-def _p_yz(a, e, f, Omega, i, omega, r, obliq, prec, f1, f2):
+def _p_yz(
+    a: jax.Array,
+    e: jax.Array,
+    f: jax.Array,
+    Omega: jax.Array,
+    i: jax.Array,
+    omega: jax.Array,
+    r: jax.Array,
+    obliq: jax.Array,
+    prec: jax.Array,
+    f1: jax.Array,
+    f2: jax.Array,
+) -> jax.Array:
     return (
         2
         * (
@@ -404,7 +476,19 @@ def _p_yz(a, e, f, Omega, i, omega, r, obliq, prec, f1, f2):
     ) / r**2
 
 
-def _p_y0(a, e, f, Omega, i, omega, r, obliq, prec, f1, f2):
+def _p_y0(
+    a: jax.Array,
+    e: jax.Array,
+    f: jax.Array,
+    Omega: jax.Array,
+    i: jax.Array,
+    omega: jax.Array,
+    r: jax.Array,
+    obliq: jax.Array,
+    prec: jax.Array,
+    f1: jax.Array,
+    f2: jax.Array,
+) -> jax.Array:
     return (
         2
         * a
@@ -445,7 +529,19 @@ def _p_y0(a, e, f, Omega, i, omega, r, obliq, prec, f1, f2):
     ) / (r**2 * (1 + e * jnp.cos(f)))
 
 
-def _p_zz(a, e, f, Omega, i, omega, r, obliq, prec, f1, f2):
+def _p_zz(
+    a: jax.Array,
+    e: jax.Array,
+    f: jax.Array,
+    Omega: jax.Array,
+    i: jax.Array,
+    omega: jax.Array,
+    r: jax.Array,
+    obliq: jax.Array,
+    prec: jax.Array,
+    f1: jax.Array,
+    f2: jax.Array,
+) -> jax.Array:
     return (
         (jnp.cos(prec + omega) ** 2 * jnp.sin(i) ** 2) / (-1 + f2) ** 2
         + (
@@ -462,7 +558,19 @@ def _p_zz(a, e, f, Omega, i, omega, r, obliq, prec, f1, f2):
     ) / r**2
 
 
-def _p_z0(a, e, f, Omega, i, omega, r, obliq, prec, f1, f2):
+def _p_z0(
+    a: jax.Array,
+    e: jax.Array,
+    f: jax.Array,
+    Omega: jax.Array,
+    i: jax.Array,
+    omega: jax.Array,
+    r: jax.Array,
+    obliq: jax.Array,
+    prec: jax.Array,
+    f1: jax.Array,
+    f2: jax.Array,
+) -> jax.Array:
     return (
         2
         * a
@@ -483,7 +591,19 @@ def _p_z0(a, e, f, Omega, i, omega, r, obliq, prec, f1, f2):
     ) / (r**2 * (1 + e * jnp.cos(f)))
 
 
-def _p_00(a, e, f, Omega, i, omega, r, obliq, prec, f1, f2):
+def _p_00(
+    a: jax.Array,
+    e: jax.Array,
+    f: jax.Array,
+    Omega: jax.Array,
+    i: jax.Array,
+    omega: jax.Array,
+    r: jax.Array,
+    obliq: jax.Array,
+    prec: jax.Array,
+    f1: jax.Array,
+    f2: jax.Array,
+) -> jax.Array:
     return (
         a**2
         * (-1 + e**2) ** 2
@@ -499,7 +619,20 @@ def _p_00(a, e, f, Omega, i, omega, r, obliq, prec, f1, f2):
 
 
 @jax.jit
-def planet_3d_coeffs(a, e, f, Omega, i, omega, r, obliq, prec, f1, f2, **kwargs):
+def planet_3d_coeffs(
+    a: jax.Array,
+    e: jax.Array,
+    f: jax.Array,
+    Omega: jax.Array,
+    i: jax.Array,
+    omega: jax.Array,
+    r: jax.Array,
+    obliq: jax.Array,
+    prec: jax.Array,
+    f1: jax.Array,
+    f2: jax.Array,
+    **kwargs: object,
+) -> dict[str, jax.Array]:
     """Calculate and return the coefficients that describe the planet as an implicit
     surface in 3D space as a function of its orbital state.
 
@@ -571,8 +704,15 @@ def planet_3d_coeffs(a, e, f, Omega, i, omega, r, obliq, prec, f1, f2, **kwargs)
 
 
 def extended_illumination_offsets(
-    a, e, f, Omega, i, omega, extended_illumination_points, **kwargs
-):
+    a: jax.Array,
+    e: jax.Array,
+    f: jax.Array,
+    Omega: jax.Array,
+    i: jax.Array,
+    omega: jax.Array,
+    extended_illumination_points: jax.Array,
+    **kwargs: object,
+) -> jax.Array:
     """Generate a set of points uniformly distributed on the portion of the star visible
     from the planet.
 
@@ -637,7 +777,7 @@ def extended_illumination_offsets(
     thetas = jnp.arccos(x[-1])
     phis = jnp.arctan2(x[0], x[1])
 
-    def rot_x(theta):
+    def rot_x(theta: jax.Array) -> jax.Array:
         return jnp.array(
             [
                 [1, 0, 0],
@@ -646,7 +786,7 @@ def extended_illumination_offsets(
             ]
         )
 
-    def rot_z(phi):
+    def rot_z(phi: jax.Array) -> jax.Array:
         return jnp.array(
             [
                 [jnp.cos(phi), -jnp.sin(phi), 0],
@@ -655,10 +795,10 @@ def extended_illumination_offsets(
             ]
         )
 
-    def rotate_pt(theta, phi, pt):
+    def rotate_pt(theta: jax.Array, phi: jax.Array, pt: jax.Array) -> jax.Array:
         return jnp.dot(rot_z(phi), jnp.dot(rot_x(theta), pt))
 
-    def func(pt):
+    def func(pt: jax.Array) -> jax.Array:
         return jax.vmap(rotate_pt, in_axes=(0, 0, None))(thetas, phis, pt)
 
     pts = jax.vmap(func)(extended_illumination_points)
@@ -667,20 +807,20 @@ def extended_illumination_offsets(
 
 @jax.jit
 def planet_3d_coeffs_extended_illumination(
-    a,
-    e,
-    f,
-    Omega,
-    i,
-    omega,
-    r,
-    obliq,
-    prec,
-    f1,
-    f2,
-    offsets,
-    **kwargs,
-):
+    a: jax.Array,
+    e: jax.Array,
+    f: jax.Array,
+    Omega: jax.Array,
+    i: jax.Array,
+    omega: jax.Array,
+    r: jax.Array,
+    obliq: jax.Array,
+    prec: jax.Array,
+    f1: jax.Array,
+    f2: jax.Array,
+    offsets: jax.Array,
+    **kwargs: object,
+) -> dict[str, jax.Array]:
     """Generate many sets of p coefficients that describe same planet offset from its
     true position by different amounts.
 
