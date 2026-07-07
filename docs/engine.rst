@@ -42,6 +42,16 @@ basis transformation used to convert 2D surface integrals to 1D line integrals.
     :undoc-members:
     :show-inheritance:
 
+.. automodule:: rings
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+.. automodule:: ringed_transit
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
 .. automodule:: kepler
     :members:
     :undoc-members:

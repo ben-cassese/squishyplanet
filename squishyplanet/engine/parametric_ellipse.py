@@ -183,6 +183,123 @@ def poly_to_parametric(
 
 
 @jax.jit
+def parametric_to_poly(
+    c_x1: jax.Array,
+    c_x2: jax.Array,
+    c_x3: jax.Array,
+    c_y1: jax.Array,
+    c_y2: jax.Array,
+    c_y3: jax.Array,
+) -> dict[str, jax.Array]:
+    """Convert the coefficients of a parametric ellipse to those of an implicit one.
+
+    This is the inverse of :func:`poly_to_parametric`. The input coefficients describe
+    the ellipse as a parametric curve for parameter :math:`\\alpha`:
+
+    .. math::
+        x = c_{x1} * \\cos(\\alpha) + c_{x2} * \\sin(\\alpha) + c_{x3}
+        y = c_{y1} * \\cos(\\alpha) + c_{y2} * \\sin(\\alpha) + c_{y3}
+
+    Note that the returned coefficients involve division by the squared determinant
+    of the parametric coefficient matrix, so they blow up for nearly-degenerate
+    (nearly zero-area) ellipses. Prefer keeping such curves in parametric form.
+
+    Args:
+        c_x1 (Array [Rstar]): Coefficient in the parametric equation
+        c_x2 (Array [Rstar]): Coefficient in the parametric equation
+        c_x3 (Array [Rstar]): Coefficient in the parametric equation
+        c_y1 (Array [Rstar]): Coefficient in the parametric equation
+        c_y2 (Array [Rstar]): Coefficient in the parametric equation
+        c_y3 (Array [Rstar]): Coefficient in the parametric equation
+
+    Returns:
+        dict:
+            Dictionary of coefficients for the implicit ellipse equation:
+
+            .. math::
+                \\rho_{xx} x^2 + \\rho_{xy} xy + \\rho_{x0} x + \\rho_{yy} y^2 + \\rho_{y0} y + \\rho_{00} = 1
+
+    """
+    rho_xx = (c_y1**2 + c_y2**2) / (c_x2 * c_y1 - c_x1 * c_y2) ** 2
+    rho_xy = (-2 * (c_x1 * c_y1 + c_x2 * c_y2)) / (c_x2 * c_y1 - c_x1 * c_y2) ** 2
+    rho_x0 = (
+        -2 * c_x3 * (c_y1**2 + c_y2**2) + 2 * (c_x1 * c_y1 + c_x2 * c_y2) * c_y3
+    ) / (c_x2 * c_y1 - c_x1 * c_y2) ** 2
+    rho_yy = (c_x1**2 + c_x2**2) / (c_x2 * c_y1 - c_x1 * c_y2) ** 2
+    rho_y0 = (
+        2 * c_x3 * (c_x1 * c_y1 + c_x2 * c_y2) - 2 * (c_x1**2 + c_x2**2) * c_y3
+    ) / (c_x2 * c_y1 - c_x1 * c_y2) ** 2
+    rho_00 = (
+        c_x3**2 * (c_y1**2 + c_y2**2)
+        - 2 * c_x3 * (c_x1 * c_y1 + c_x2 * c_y2) * c_y3
+        + (c_x1**2 + c_x2**2) * c_y3**2
+    ) / (c_x2 * c_y1 - c_x1 * c_y2) ** 2
+
+    coeffs = {
+        "rho_xx": rho_xx,
+        "rho_xy": rho_xy,
+        "rho_x0": rho_x0,
+        "rho_yy": rho_yy,
+        "rho_y0": rho_y0,
+        "rho_00": rho_00,
+    }
+
+    # rho_xx, rho_xy, and rho_yy don't involve c_x3 or c_y3 and can end up as scalars
+    # even when the center coordinates carry a time axis
+    if coeffs["rho_xx"].shape != coeffs["rho_x0"].shape:
+        coeffs["rho_xx"] = jnp.ones_like(coeffs["rho_x0"]) * coeffs["rho_xx"]
+        coeffs["rho_xy"] = jnp.ones_like(coeffs["rho_x0"]) * coeffs["rho_xy"]
+        coeffs["rho_yy"] = jnp.ones_like(coeffs["rho_x0"]) * coeffs["rho_yy"]
+
+    return coeffs
+
+
+@jax.jit
+def point_in_ellipse(
+    x: jax.Array,
+    y: jax.Array,
+    c_x1: jax.Array,
+    c_x2: jax.Array,
+    c_x3: jax.Array,
+    c_y1: jax.Array,
+    c_y2: jax.Array,
+    c_y3: jax.Array,
+) -> jax.Array:
+    """Test whether a point is strictly inside a parametrically-defined ellipse.
+
+    Solves the 2x2 linear system for :math:`(\\cos\\alpha, \\sin\\alpha)` via the
+    adjugate, so the test involves no division and remains well-conditioned even for
+    very thin ellipses (unlike evaluating the implicit form, whose coefficients scale
+    as the inverse squared semi-minor axis). A degenerate (zero-area) ellipse has an
+    empty interior and always returns False.
+
+    Args:
+        x (Array [Rstar]): x-coordinate(s) of the point(s) to test
+        y (Array [Rstar]): y-coordinate(s) of the point(s) to test
+        c_x1 (Array [Rstar]): Coefficient in the parametric equation
+        c_x2 (Array [Rstar]): Coefficient in the parametric equation
+        c_x3 (Array [Rstar]): Coefficient in the parametric equation
+        c_y1 (Array [Rstar]): Coefficient in the parametric equation
+        c_y2 (Array [Rstar]): Coefficient in the parametric equation
+        c_y3 (Array [Rstar]): Coefficient in the parametric equation
+
+    Returns:
+        Array [Dimensionless]: Boolean array, True where the point is inside the
+        ellipse.
+
+    """
+    det = c_x1 * c_y2 - c_x2 * c_y1
+    dx = x - c_x3
+    dy = y - c_y3
+    # adjugate solve: cos(alpha) = (c_y2*dx - c_x2*dy)/det,
+    # sin(alpha) = (c_x1*dy - c_y1*dx)/det; inside iff cos^2 + sin^2 < 1,
+    # multiplied through by det^2 to avoid the division entirely
+    cos_term = c_y2 * dx - c_x2 * dy
+    sin_term = c_x1 * dy - c_y1 * dx
+    return cos_term**2 + sin_term**2 < det**2
+
+
+@jax.jit
 def cartesian_intersection_to_parametric_angle(
     xs: jax.Array,
     ys: jax.Array,

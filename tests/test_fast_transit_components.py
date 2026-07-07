@@ -5,7 +5,7 @@ These pin the three pieces wired into
 references (independent ground truth, not a comparison against the previous
 implementation):
 
-- ``star_solution_vec``      -- closed-form star-arc integrals (s0, s1).
+- ``star_arc_solution_vec``  -- closed-form star-arc integrals (s0, s1).
 - ``planet_solution_vec``    -- fused Green's-theorem integrals (s0, s1, s2).
 - ``outline_prelude``        -- direct orbital-elements -> projected-ellipse outline.
 
@@ -27,29 +27,15 @@ from squishyplanet.engine.polynomial_limb_darkened_transit import (
     lightcurve,
     outline_prelude,
     planet_solution_vec,
-    star_solution_vec,
+    star_arc_solution_vec,
 )
 
 mp.mp.dps = 50
 
 
 # ---------------------------------------------------------------------------
-# star_solution_vec vs mpmath star-arc integrals
+# star_arc_solution_vec vs mpmath star-arc integrals
 # ---------------------------------------------------------------------------
-def _thetas(a: float, b: float, c: list[float]) -> tuple[float, float]:
-    """Replicate the function's (a, b) -> (theta1, theta2) conversion in numpy."""
-    cx1, cx2, cx3, cy1, cy2, cy3 = c
-    x1 = cx1 * np.cos(a) + cx2 * np.sin(a) + cx3
-    y1 = cy1 * np.cos(a) + cy2 * np.sin(a) + cy3
-    t1 = np.arctan2(y1, x1)
-    t1 = t1 + 2 * np.pi if t1 < 0 else t1
-    x2 = cx1 * np.cos(b) + cx2 * np.sin(b) + cx3
-    y2 = cy1 * np.cos(b) + cy2 * np.sin(b) + cy3
-    t2 = np.arctan2(y2, x2)
-    t2 = t2 + 2 * np.pi if t2 < 0 else t2
-    return (t1, t2) if t1 < t2 else (t2, t1)
-
-
 def _mp_s0(t: object) -> object:
     return mp.cos(t) ** 2
 
@@ -70,47 +56,33 @@ def _mp_int(f: object, lo: object, hi: object) -> object:
     return sum(mp.quad(f, [pts[i], pts[i + 1]]) for i in range(len(pts) - 1))
 
 
-def _mp_star_reference(a: float, b: float, c: list[float]) -> tuple[float, float]:
-    """High-precision s0, s1 for the given arc, matching star_solution_vec's logic."""
-    t1, t2 = _thetas(a, b, c)
-    if (t2 - t1) < np.pi:
-        s0 = _mp_int(_mp_s0, t1, t2)
-        s1 = _mp_int(_mp_s1, t1, t2)
-    else:
-        s0 = _mp_int(_mp_s0, t2, 2 * mp.pi) + _mp_int(_mp_s0, 0.0, t1)
-        s1 = _mp_int(_mp_s1, t2, 2 * mp.pi) + _mp_int(_mp_s1, 0.0, t1)
+def _mp_star_reference(lo: float, hi: float) -> tuple[float, float]:
+    """High-precision s0, s1 for the star arc [lo, hi] in polar angle."""
+    s0 = _mp_int(_mp_s0, lo, hi)
+    s1 = _mp_int(_mp_s1, lo, hi)
     return float(s0), float(s1)
 
 
-def test_star_solution_vec_matches_mpmath() -> None:
-    """Closed-form star_solution_vec equals the ~50-digit reference (s0, s1).
+def test_star_arc_solution_vec_matches_mpmath() -> None:
+    """Closed-form star_arc_solution_vec equals the ~50-digit reference (s0, s1).
 
-    Cases are chosen to exercise the no-wrap and wrap branches and arcs crossing the
-    pi/2 and 3*pi/2 breakpoints of the s1 integrand.
+    Cases are chosen to exercise arcs crossing the pi/2 and 3*pi/2 breakpoints of the
+    s1 integrand, plus the degenerate zero-length and full-circle arcs.
     """
     rng = np.random.default_rng(0)
     g = jnp.zeros(3)
     worst = 0.0
+    lows = [0.0, 2 * np.pi]
+    highs = [0.0, 2 * np.pi]
     for _ in range(40):
-        a = float(rng.uniform(0, 2 * np.pi))
-        b = float(rng.uniform(0, 2 * np.pi))
-        # near-limb outline (partial-transit-like), spanning the breakpoints
-        d = float(rng.uniform(0.85, 1.15))
-        ang = float(rng.uniform(0, 2 * np.pi))
-        r1, r2 = float(rng.uniform(0.05, 0.3)), float(rng.uniform(0.05, 0.3))
-        phi = float(rng.uniform(0, np.pi))
-        c = [
-            r1 * np.cos(phi),
-            -r2 * np.sin(phi),
-            d * np.cos(ang),
-            r1 * np.sin(phi),
-            r2 * np.cos(phi),
-            d * np.sin(ang),
-        ]
-        got = np.asarray(star_solution_vec(a, b, g, *c))[:2]
-        ref = np.array(_mp_star_reference(a, b, c))
+        t1, t2 = sorted(rng.uniform(0, 2 * np.pi, size=2))
+        lows.append(float(t1))
+        highs.append(float(t2))
+    for lo, hi in zip(lows, highs, strict=True):
+        got = np.asarray(star_arc_solution_vec(lo, hi, g))[:2]
+        ref = np.array(_mp_star_reference(lo, hi))
         worst = max(worst, float(np.max(np.abs(got - ref))))
-    assert worst < 1e-9, f"star_solution_vec vs mpmath worst = {worst:.2e}"
+    assert worst < 1e-9, f"star_arc_solution_vec vs mpmath worst = {worst:.2e}"
 
 
 # ---------------------------------------------------------------------------

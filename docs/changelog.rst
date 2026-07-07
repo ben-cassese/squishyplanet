@@ -3,6 +3,18 @@ Changelog
 
 .. next release
 **(next release)**
+- Added ``RingedSystem``, a subclass of ``OblateSystem`` for planets hosting an
+  opaque, flat, circular ring bounded by an inner and outer radius, by default lying
+  in the planet's equatorial plane. The blocked flux is computed via an exact
+  inclusion-exclusion decomposition into intersections of convex regions, each
+  evaluated with the same Green's-theorem boundary integrals as the planet-only model
+  (see ``engine.ringed_transit``). ``RingedSystem.illustrate`` overlays the projected
+  ring edges and a filled annulus.
+- Generalized the transit engine's limb-crossing logic (``ellipse_star_term``): the
+  outline and the stellar limb are now split into arcs at *all* crossings instead of
+  assuming exactly two. This fixes incorrect light curves for long, thin projected
+  ellipses that cross the stellar limb four times ("skewering" the star), which
+  matter for nearly edge-on rings and extreme projected-ellipse parameterizations.
 - Dropped support for Python 3.9, keeping up with jaxoplanet for testing.
 - Added pre-commit requirements, most notably the ruff linter to check for common
 python code style issues. Many flags still not checked, especially those related to docstrings.
