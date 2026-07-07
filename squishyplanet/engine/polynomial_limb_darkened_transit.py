@@ -9,6 +9,7 @@ import numpy as np
 from squishyplanet.engine.kepler import kepler, skypos, t0_to_t_peri
 from squishyplanet.engine.parametric_ellipse import (
     cartesian_intersection_to_parametric_angle,
+    point_in_ellipse,
     poly_to_parametric,
 )
 
@@ -467,19 +468,12 @@ def _s1_definite(lo: jax.Array, hi: jax.Array) -> jax.Array:
 
 
 @jax.jit
-def star_solution_vec(
-    a: jax.Array,
-    b: jax.Array,
+def star_arc_solution_vec(
+    theta_lo: jax.Array,
+    theta_hi: jax.Array,
     g_coeffs: jax.Array,
-    c_x1: jax.Array,
-    c_x2: jax.Array,
-    c_x3: jax.Array,
-    c_y1: jax.Array,
-    c_y2: jax.Array,
-    c_y3: jax.Array,
 ) -> jax.Array:
-    """Compute the "solution vector" for a 1D path across the star that lies on the edge
-    of the star itself.
+    """Compute the "solution vector" for a 1D path that lies on the edge of the star.
 
     This is equivalent to :func:`planet_solution_vec`, but instead of integrating over
     paths that lie on the planet's outline, we integrate over paths that lie on the edge
@@ -493,67 +487,35 @@ def star_solution_vec(
     evaluate the required integrals in closed form via their exact antiderivatives
     rather than numerically.
 
+    Unlike its predecessor ``star_solution_vec``, this function takes the polar angles
+    of the arc endpoints on the star directly (not the parametric angles of another
+    curve's outline), and it makes no assumption about which of the arcs bounded by two
+    intersection points is wanted: the caller chooses by passing the endpoints in
+    counterclockwise order. This matters once more than one curve can cut the stellar
+    limb into several arcs.
+
     Args:
-        a (float):
-            The starting parameter for the path along the star's outline,
-            :math:`\\alpha_0`. Note: here :math:`\\alpha` is the angle parameterizing
-            the path on the *planet's* outline, not the star's, even though the path
-            we will integrate over is on the star. We convert to the relevant parameters
-            internally.
-        b (float):
-            The ending parameter for the path along the star's outline,
-            :math:`\\alpha_1`.
+        theta_lo (float):
+            The starting polar angle of the arc on the star, in ``[0, 2 pi]``.
+        theta_hi (float):
+            The ending polar angle of the arc on the star. Must satisfy
+            ``theta_lo <= theta_hi <= 2 pi``; the arc is traversed counterclockwise
+            from ``theta_lo`` to ``theta_hi``. Arcs crossing the ``0 = 2 pi`` seam
+            should be passed as two separate sub-arcs.
         g_coeffs (Array):
             The system-specific limb darkening coefficients in the Green's basis.
             Computed by multiplying the u coefficients with the change of basis matrix
             from :func:`greens_basis_transform.generate_change_of_basis_matrix`.
-        c_x1 (float):
-            The first coefficient of the parametric 2D outline of the planet.
-        c_x2 (float):
-            The second coefficient of the parametric 2D outline of the planet.
-        c_x3 (float):
-            The third coefficient of the parametric 2D outline of the planet.
-        c_y1 (float):
-            The fourth coefficient of the parametric 2D outline of the planet.
-        c_y2 (float):
-            The fifth coefficient of the parametric 2D outline of the planet.
-        c_y3 (float):
-            The sixth coefficient of the parametric 2D outline of the planet.
 
     Returns:
         Array:
-            The solution vector for the path along the planet's outline. The shape will
+            The solution vector for the path along the star's edge. The shape will
             match that of the input ``g_coeffs``.
 
     """
-    x1 = c_x1 * jnp.cos(a) + c_x2 * jnp.sin(a) + c_x3
-    y1 = c_y1 * jnp.cos(a) + c_y2 * jnp.sin(a) + c_y3
-    _theta1 = jnp.arctan2(y1, x1)
-    _theta1 = jnp.where(_theta1 < 0, _theta1 + 2 * jnp.pi, _theta1)
-
-    x2 = c_x1 * jnp.cos(b) + c_x2 * jnp.sin(b) + c_x3
-    y2 = c_y1 * jnp.cos(b) + c_y2 * jnp.sin(b) + c_y3
-    _theta2 = jnp.arctan2(y2, x2)
-    _theta2 = jnp.where(_theta2 < 0, _theta2 + 2 * jnp.pi, _theta2)
-
-    theta1 = jnp.where(_theta1 < _theta2, _theta1, _theta2)
-    theta2 = jnp.where(_theta1 < _theta2, _theta2, _theta1)
-
-    delta = theta2 - theta1
-
-    def no_wrap(delta: jax.Array) -> tuple[jax.Array, jax.Array]:
-        return _s0_definite(theta1, theta2), _s1_definite(theta1, theta2)
-
-    def wrap(delta: jax.Array) -> tuple[jax.Array, jax.Array]:
-        s0 = _s0_definite(theta2, 2 * jnp.pi) + _s0_definite(0.0, theta1)
-        s1 = _s1_definite(theta2, 2 * jnp.pi) + _s1_definite(0.0, theta1)
-        return s0, s1
-
-    s0, s1 = jax.lax.cond(delta < jnp.pi, no_wrap, wrap, delta)
-
     solution_vec = jnp.zeros(g_coeffs.shape[0])
-    solution_vec = solution_vec.at[0].set(s0)
-    solution_vec = solution_vec.at[1].set(s1)
+    solution_vec = solution_vec.at[0].set(_s0_definite(theta_lo, theta_hi))
+    solution_vec = solution_vec.at[1].set(_s1_definite(theta_lo, theta_hi))
     return solution_vec
 
 
@@ -724,6 +686,241 @@ def ellipse_bound(
     return (d + bound >= 1.0) & (d - bound <= 1.0)
 
 
+def _arcs_from_angles(angles: jax.Array) -> tuple[jax.Array, jax.Array, jax.Array]:
+    """Split ``[0, 2 pi]`` into consecutive arcs at the given angles.
+
+    This is the "bookend" scheme: the (sentinel-padded) angles are sorted and the fixed
+    endpoints 0 and 2 pi are prepended/appended, so ``n`` input slots always produce
+    ``n + 1`` arc slots of static shape. Callers should map sentinel entries (no
+    intersection) to 2 pi beforehand; those slots become zero-length arcs
+    ``[2 pi, 2 pi]`` that integrate to zero. A boundary crossing the parameterization
+    seam is represented as two sub-arcs, ``[a_last, 2 pi]`` and ``[0, a_first]``, whose
+    contributions add, so no arc ever wraps. With no genuine angles at all, the single
+    arc ``[0, 2 pi]`` survives and its midpoint doubles as a containment test point for
+    the whole curve.
+
+    Args:
+        angles (Array): Angles in ``[0, 2 pi]``, sentinel slots mapped to 2 pi.
+
+    Returns:
+        Tuple:
+            Three arrays of length ``len(angles) + 1``: the arc lower bounds, upper
+            bounds, and midpoints.
+
+    """
+    angles = jnp.sort(angles)
+    lo = jnp.concatenate((jnp.zeros(1), angles))
+    hi = jnp.concatenate((angles, jnp.full(1, 2 * jnp.pi)))
+    mid = 0.5 * (lo + hi)
+    return lo, hi, mid
+
+
+def ellipse_star_term(para: dict, two: dict, g_coeffs: jax.Array) -> jax.Array:
+    """The Green's-theorem boundary integral of the blocked flux over one ellipse.
+
+    Computes :math:`F(E \\cap S)`, the flux blocked by the intersection of a single
+    opaque ellipse :math:`E` (a planet outline or a ring edge) with the stellar disk
+    :math:`S`, dotted with the Green's-basis limb-darkening coefficients. The caller is
+    responsible for multiplying by the overall normalization constant.
+
+    Rather than assuming a fixed number of ellipse-star intersections, this takes an
+    "exploratory" approach that handles 0 through 4 crossings (and containment in
+    either direction) with one code path: find all crossings, split both the ellipse
+    outline and the stellar limb into arcs at those crossings, keep each arc if its
+    midpoint lies inside the other region (its inside/outside status is constant along
+    the arc, since arcs are split at every crossing), and sum the kept arcs'
+    contributions. Because the boundary of the intersection of convex regions is
+    exactly the set of arcs of each curve that lie inside the other, and both curves
+    are traversed counterclockwise, Green's theorem makes the summation order
+    irrelevant -- no case enumeration or boundary stitching is needed.
+
+    Args:
+        para (dict):
+            The parametric coefficients ``c_x1 ... c_y3`` of the ellipse outline for a
+            single timestep. Must trace the outline counterclockwise (true of
+            everything produced by :func:`poly_to_parametric`,
+            :func:`outline_prelude`, and :func:`rings.ring_para_coeffs`).
+        two (dict):
+            The implicit-conic coefficients ``rho_xx ... rho_00`` of the same ellipse.
+        g_coeffs (Array):
+            The system-specific limb darkening coefficients in the Green's basis.
+
+    Returns:
+        Array:
+            Scalar: the blocked flux from this ellipse, before normalization.
+
+    """
+
+    def straddling_case(X: tuple) -> jax.Array:
+        para, two = X
+        xs, ys = _single_intersection_points(**two)
+
+        # arcs of the ellipse outline, split at the crossings; keep those inside the
+        # star (zero-length sentinel arcs are skipped to save their quadrature calls)
+        alphas = cartesian_intersection_to_parametric_angle(xs, ys, **para)
+        alphas = jnp.where(xs != 999, alphas, 2 * jnp.pi)
+        alphas = jnp.where(alphas < 0, alphas + 2 * jnp.pi, alphas)
+        alphas = jnp.where(alphas > 2 * jnp.pi, alphas - 2 * jnp.pi, alphas)
+        lo, hi, mid = _arcs_from_angles(alphas)
+        mx = para["c_x1"] * jnp.cos(mid) + para["c_x2"] * jnp.sin(mid) + para["c_x3"]
+        my = para["c_y1"] * jnp.cos(mid) + para["c_y2"] * jnp.sin(mid) + para["c_y3"]
+        keep = (mx**2 + my**2 < 1.0) & (hi > lo)
+
+        def ellipse_arc(carry: jax.Array, arc: tuple) -> tuple[jax.Array, None]:
+            arc_lo, arc_hi, arc_keep = arc
+            val = jax.lax.cond(
+                arc_keep,
+                lambda _: jnp.matmul(
+                    planet_solution_vec(arc_lo, arc_hi, g_coeffs, **para), g_coeffs
+                ),
+                lambda _: 0.0,
+                None,
+            )
+            return carry + val, None
+
+        ellipse_contribution = jax.lax.scan(ellipse_arc, 0.0, (lo, hi, keep))[0]
+
+        # arcs of the stellar limb, split at the same crossings (now in polar angle);
+        # keep those inside the ellipse. These are closed-form and cheap, so no
+        # cond-gating is needed
+        thetas = jnp.where(xs != 999, jnp.arctan2(ys, xs), 2 * jnp.pi)
+        thetas = jnp.where(thetas < 0, thetas + 2 * jnp.pi, thetas)
+        star_lo, star_hi, star_mid = _arcs_from_angles(thetas)
+        keep_star = point_in_ellipse(jnp.cos(star_mid), jnp.sin(star_mid), **para) & (
+            star_hi > star_lo
+        )
+        s0 = _s0_definite(star_lo, star_hi)
+        s1 = _s1_definite(star_lo, star_hi)
+        star_contribution = jnp.sum(
+            jnp.where(keep_star, g_coeffs[0] * s0 + g_coeffs[1] * s1, 0.0)
+        )
+
+        return ellipse_contribution + star_contribution
+
+    def not_straddling_case(X: tuple) -> jax.Array:
+        para, _ = X
+
+        def fully_transiting(para: dict) -> jax.Array:
+            return jnp.matmul(
+                planet_solution_vec(a=0.0, b=2 * jnp.pi, g_coeffs=g_coeffs, **para),
+                g_coeffs,
+            )
+
+        def not_transiting(para: dict) -> float:
+            return 0.0
+
+        return jax.lax.cond(
+            para["c_x3"] ** 2 + para["c_y3"] ** 2 <= 1,
+            fully_transiting,
+            not_transiting,
+            para,
+        )
+
+    # conservative bounding pre-test: only outlines that straddle the star edge need
+    # the quartic solve. Note an ellipse that contains the whole star always classifies
+    # as straddling, and is handled by the crossing-free containment logic above.
+    return jax.lax.cond(
+        ellipse_bound(**para), straddling_case, not_straddling_case, (para, two)
+    )
+
+
+def _lightcurve_setup(state: dict, parameterize_with_projected_ellipse: bool) -> dict:
+    """Shared vectorized setup for the transit drivers.
+
+    Everything in :func:`lightcurve` that happens before the per-timestep
+    ``jax.lax.scan``: solving Kepler's equation for the true anomalies, converting the
+    limb-darkening ``u`` coefficients to the Green's basis, and building the
+    per-timestep implicit and parametric outline coefficients. Split out so that a
+    ringed system can compute this once and reuse it across the planet and ring-edge
+    integrations.
+
+    Note that this also stores the true anomalies in ``state["f"]`` (and
+    ``state["t_peri"]`` if ``t0`` was provided) as a side effect, matching the previous
+    inline behavior.
+
+    Args:
+        state (dict):
+            A dictionary containing all of the keys that are included in an
+            :func:`OblateSystem` ``state`` attribute.
+        parameterize_with_projected_ellipse (bool):
+            See :func:`lightcurve`.
+
+    Returns:
+        dict:
+            Keys: ``fluxes`` (all ones, shape of ``times``), ``g_coeffs``,
+            ``normalization_constant``, ``positions`` (from :func:`kepler.skypos`),
+            ``two`` and ``para`` (per-timestep outline coefficient dicts), and
+            ``largest_r`` (a bound on the planet's projected radius for the
+            possibly-in-transit mask).
+
+    """
+    fluxes = jnp.ones_like(state["times"])
+
+    if state["t0"] is not None:
+        state["t_peri"] = t0_to_t_peri(**state)
+
+    time_deltas = state["times"] - state["t_peri"]
+    mean_anomalies = 2 * jnp.pi * time_deltas / state["period"]
+    true_anomalies = kepler(mean_anomalies, state["e"])
+    state["f"] = true_anomalies
+
+    # convert the u coefficients to g coefficients
+    u_coeffs = jnp.ones(state["ld_u_coeffs"].shape[0] + 1) * (-1)
+    u_coeffs = u_coeffs.at[1:].set(state["ld_u_coeffs"])
+    g_coeffs = jnp.matmul(state["greens_basis_transform"], u_coeffs)
+
+    # total flux from the star. 1/eq. 28 in Agol, Luger, and Foreman-Mackey 2020
+    # note, multiply, don't divide
+    normalization_constant = 1 / (jnp.pi * (g_coeffs[0] + (2 / 3) * g_coeffs[1]))
+
+    # cartesian position of the planet at each timestep
+    positions = skypos(**state)
+
+    if parameterize_with_projected_ellipse:
+        area = jnp.pi * state["projected_effective_r"] ** 2
+        r1 = jnp.sqrt(area / ((1 - state["projected_f"]) * jnp.pi))
+        r2 = r1 * (1 - state["projected_f"])
+        two, para = parameterize_2d_helper(
+            r1,
+            state["projected_f"],
+            state["projected_theta"],
+            positions[0, :],
+            positions[1, :],
+        )
+        # force the shapes to match: if user inputs a scaler for one value but the
+        # others are still (1,) there'd be a problem. all is fine if they're all
+        # scalars or all arrays though
+        r1 = jnp.ones_like(r2) * r1
+        largest_r = jnp.max(jnp.array([r1, r2]))
+
+        # if prec isn't the same length as f, parameterize_2d_helper left the
+        # orientation-only quadratic terms as scalars while the centers are length-n.
+        # Broadcast them to match for the downstream lax.scan.
+        if state["prec"].shape != true_anomalies.shape:
+            two["rho_xx"] = jnp.ones_like(state["f"]) * two["rho_xx"]
+            two["rho_xy"] = jnp.ones_like(state["f"]) * two["rho_xy"]
+            two["rho_yy"] = jnp.ones_like(state["f"]) * two["rho_yy"]
+
+    else:
+        # direct orbital-elements -> outline construction (M = R D R^T + Schur),
+        # replacing the planet_3d_coeffs -> planet_2d_coeffs -> poly_to_parametric
+        # chain. It applies the tidally-locked prec override and broadcasts every leaf
+        # to the time axis internally.
+        two, para = outline_prelude(state)
+
+        largest_r = state["r"]
+
+    return {
+        "fluxes": fluxes,
+        "g_coeffs": g_coeffs,
+        "normalization_constant": normalization_constant,
+        "positions": positions,
+        "two": two,
+        "para": para,
+        "largest_r": largest_r,
+    }
+
+
 @partial(jax.jit, static_argnames=("parameterize_with_projected_ellipse",))
 def lightcurve(state: dict, parameterize_with_projected_ellipse: bool) -> jax.Array:
     """The main function for computing a transit light curve.
@@ -764,165 +961,19 @@ def lightcurve(state: dict, parameterize_with_projected_ellipse: bool) -> jax.Ar
             ``state["times"]``.
 
     """
-    # array we'll modify if the planet is in transit
-    fluxes = jnp.ones_like(state["times"])
-
-    if state["t0"] is not None:
-        state["t_peri"] = t0_to_t_peri(**state)
-
-    time_deltas = state["times"] - state["t_peri"]
-    mean_anomalies = 2 * jnp.pi * time_deltas / state["period"]
-    true_anomalies = kepler(mean_anomalies, state["e"])
-    state["f"] = true_anomalies
-
-    # convert the u coefficients to g coefficients
-    u_coeffs = jnp.ones(state["ld_u_coeffs"].shape[0] + 1) * (-1)
-    u_coeffs = u_coeffs.at[1:].set(state["ld_u_coeffs"])
-    g_coeffs = jnp.matmul(state["greens_basis_transform"], u_coeffs)
-
-    # total flux from the star. 1/eq. 28 in Agol, Luger, and Foreman-Mackey 2020
-    # note, multiply, don't divide
-    normalization_constant = 1 / (jnp.pi * (g_coeffs[0] + (2 / 3) * g_coeffs[1]))
-
-    # cartesian position of the planet at each timestep
-    positions = skypos(**state)
-
-    if parameterize_with_projected_ellipse:
-        area = jnp.pi * state["projected_effective_r"] ** 2
-        r1 = jnp.sqrt(area / ((1 - state["projected_f"]) * jnp.pi))
-        r2 = r1 * (1 - state["projected_f"])
-        two, para = parameterize_2d_helper(
-            r1,
-            state["projected_f"],
-            state["projected_theta"],
-            positions[0, :],
-            positions[1, :],
-        )
-        # force the shapes to match: if user inputs a scaler for one value but the
-        # others are still (1,) there'd be a problem. all is fine if they're all
-        # scalars or all arrays though
-        r1 = jnp.ones_like(r2) * r1
-        largest_r = jnp.max(jnp.array([r1, r2]))
-
-    else:
-        # direct orbital-elements -> outline construction (M = R D R^T + Schur),
-        # replacing the planet_3d_coeffs -> planet_2d_coeffs -> poly_to_parametric
-        # chain. It applies the tidally-locked prec override and broadcasts every leaf
-        # to the time axis internally.
-        two, para = outline_prelude(state)
-
-        largest_r = state["r"]
+    setup = _lightcurve_setup(state, parameterize_with_projected_ellipse)
+    g_coeffs = setup["g_coeffs"]
+    normalization_constant = setup["normalization_constant"]
+    positions = setup["positions"]
 
     possibly_in_transit = (
-        positions[0, :] ** 2 + positions[1, :] ** 2 <= (1.0 + largest_r * 1.1) ** 2
+        positions[0, :] ** 2 + positions[1, :] ** 2
+        <= (1.0 + setup["largest_r"] * 1.1) ** 2
     ) * (positions[2, :] > 0)
-
-    def not_on_limb(X: tuple) -> jax.Array:
-        para, _, _ = X
-
-        def fully_transiting(para: dict) -> jax.Array:
-            solution_vectors = planet_solution_vec(
-                a=0.0, b=2 * jnp.pi, g_coeffs=g_coeffs, **para
-            )
-            blocked_flux = (
-                jnp.matmul(g_coeffs, solution_vectors) * normalization_constant
-            )
-
-            return blocked_flux
-
-        def not_transiting(para: dict) -> float:
-            return 0.0
-
-        return jax.lax.cond(
-            para["c_x3"] ** 2 + para["c_y3"] ** 2 <= 1,
-            fully_transiting,
-            not_transiting,
-            para,
-        )
-
-    def partially_transiting(X: tuple) -> jax.Array:
-        para, xs, ys = X
-
-        alphas = cartesian_intersection_to_parametric_angle(xs, ys, **para)
-        alphas = jnp.where(xs != 999, alphas, 2 * jnp.pi)
-        alphas = jnp.where(alphas < 0, alphas + 2 * jnp.pi, alphas)
-        alphas = jnp.where(alphas > 2 * jnp.pi, alphas - 2 * jnp.pi, alphas)
-        alphas = jnp.sort(alphas)
-
-        test_ang = alphas[0] + (alphas[1] - alphas[0]) / 2
-        test_ang = jnp.where(test_ang > 2 * jnp.pi, test_ang - 2 * jnp.pi, test_ang)
-
-        _x = (
-            para["c_x1"] * jnp.cos(test_ang)
-            + para["c_x2"] * jnp.sin(test_ang)
-            + para["c_x3"]
-        )
-        _y = (
-            para["c_y1"] * jnp.cos(test_ang)
-            + para["c_y2"] * jnp.sin(test_ang)
-            + para["c_y3"]
-        )
-        test_val = jnp.sqrt(_x**2 + _y**2)
-
-        def testval_inside_star(_: tuple) -> jax.Array:
-            solution_vectors = planet_solution_vec(
-                alphas[0], alphas[1], g_coeffs, **para
-            )
-            planet_contribution = (
-                jnp.matmul(solution_vectors, g_coeffs) * normalization_constant
-            )
-            return planet_contribution
-
-        def testval_outside_star(_: tuple) -> jax.Array:
-            leg1_solution_vec = planet_solution_vec(
-                alphas[1], 2 * jnp.pi, g_coeffs, **para
-            )
-            leg1 = jnp.matmul(leg1_solution_vec, g_coeffs)
-            leg2_solution_vec = planet_solution_vec(0.0, alphas[0], g_coeffs, **para)
-            leg2 = jnp.matmul(leg2_solution_vec, g_coeffs)
-            planet_contribution = (leg1 + leg2) * normalization_constant
-            return planet_contribution
-
-        planet_contribution = jax.lax.cond(
-            test_val > 1, testval_outside_star, testval_inside_star, ()
-        )
-
-        star_solution_vectors = star_solution_vec(
-            alphas[0], alphas[1], g_coeffs, **para
-        )
-        star_contribution = (
-            jnp.matmul(star_solution_vectors, g_coeffs) * normalization_constant
-        )
-
-        total_blocked = planet_contribution + star_contribution
-
-        return total_blocked
 
     def transiting(X: tuple) -> jax.Array:
         indv_para, indv_two = X
-
-        # conservative bounding pre-test: only steps whose outline straddles the star
-        # edge need the quartic solve. Fully inside/outside steps are resolved by the
-        # center-inside test in not_on_limb, bit-identically to the eig path.
-        straddling = ellipse_bound(**indv_para)
-
-        def run_roots(args: tuple) -> jax.Array:
-            indv_para, indv_two = args
-            xs, ys = _single_intersection_points(**indv_two)
-            on_limb = jnp.sum(xs) != 999 * 4
-            return jax.lax.cond(
-                on_limb,
-                partially_transiting,
-                not_on_limb,
-                (indv_para, xs, ys),
-            )
-
-        def skip_roots(args: tuple) -> jax.Array:
-            indv_para, _ = args
-            dummy = jnp.full(4, 999.0)
-            return not_on_limb((indv_para, dummy, dummy))
-
-        return jax.lax.cond(straddling, run_roots, skip_roots, (indv_para, indv_two))
+        return ellipse_star_term(indv_para, indv_two, g_coeffs) * normalization_constant
 
     def not_transiting(X: tuple) -> float:
         return 0.0
@@ -933,19 +984,8 @@ def lightcurve(state: dict, parameterize_with_projected_ellipse: bool) -> jax.Ar
             mask, transiting, not_transiting, (indv_para, indv_two)
         )
 
-    # The 3D branch's outline_prelude already broadcasts every leaf to the time axis,
-    # so this fixup is only needed for the projected-ellipse branch: if prec isn't the
-    # same length as f, parameterize_2d_helper left the orientation-only quadratic
-    # terms as scalars while the centers are length-n. Broadcast them to match.
-    if parameterize_with_projected_ellipse and (
-        state["prec"].shape != true_anomalies.shape
-    ):
-        two["rho_xx"] = jnp.ones_like(state["f"]) * two["rho_xx"]
-        two["rho_xy"] = jnp.ones_like(state["f"]) * two["rho_xy"]
-        two["rho_yy"] = jnp.ones_like(state["f"]) * two["rho_yy"]
-
     transit_fluxes = jax.lax.scan(
-        scan_func, None, (para, two, possibly_in_transit), None
+        scan_func, None, (setup["para"], setup["two"], possibly_in_transit), None
     )[1]
 
-    return fluxes - transit_fluxes
+    return setup["fluxes"] - transit_fluxes
