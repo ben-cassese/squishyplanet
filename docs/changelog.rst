@@ -2,7 +2,19 @@ Changelog
 ++++++++++
 
 .. next release
-**(next release)**
+**0.5.0**
+- **Breaking:** Removed ``OblateSystem.loglike``. Likelihood computation is no longer
+  built into the class; users should now compute their own (e.g. Gaussian) likelihood
+  by comparing the output of ``OblateSystem.lightcurve`` against their data. The
+  associated constructor arguments ``data``, ``uncertainties``, ``log_jitter``, and
+  ``systematic_trend_coeffs`` have been removed as well. See the updated
+  "Fit a transit of an oblate planet" tutorial for an example of the new pattern.
+- **Breaking:** Removed the phase-curve, emission, and reflected-light phase-curve
+  machinery, along with the constructor flags that enabled it
+  (``compute_reflected_phase_curve``, ``compute_emitted_phase_curve``,
+  ``compute_stellar_ellipsoidal_variations``, ``compute_stellar_doppler_variations``,
+  ``phase_curve_nsamples``, ``extended_illumination_npts``, and ``random_seed``).
+  ``OblateSystem.illustrate`` keeps its ``reflected`` option for visualization.
 - Added ``RingedSystem``, a subclass of ``OblateSystem`` for planets hosting an
   opaque, flat, circular ring bounded by an inner and outer radius, by default lying
   in the planet's equatorial plane. The blocked flux is computed via an exact
