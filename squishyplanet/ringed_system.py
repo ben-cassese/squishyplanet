@@ -261,8 +261,6 @@ class RingedSystem(OblateSystem):
                 )
                 ax.add_patch(patch)
 
-        return
-
 
 @partial(jax.jit, static_argnums=(1,))
 def _ringed_lightcurve(params: dict, oversample: int, state: dict) -> jax.Array:

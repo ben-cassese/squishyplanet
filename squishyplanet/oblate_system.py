@@ -729,8 +729,6 @@ class OblateSystem:
             ylim=(im_center_y - window_size / 2, im_center_y + window_size / 2),
         )
 
-        return
-
     @staticmethod
     def fit_limb_darkening_profile(
         intensities: jax.Array,
