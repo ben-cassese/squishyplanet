@@ -9,6 +9,7 @@ import numpy as np
 from squishyplanet.engine.kepler import kepler, skypos, t0_to_t_peri
 from squishyplanet.engine.parametric_ellipse import (
     cartesian_intersection_to_parametric_angle,
+    ellipse_angle,
     point_in_ellipse,
     poly_to_parametric,
 )
@@ -611,12 +612,7 @@ def outline_prelude(state: dict) -> tuple[dict, dict]:
     yc = pos[1]
 
     # parametric ellipse: identical convention to poly_to_parametric_helper
-    theta = jnp.where(
-        sxx - syy != 0.0,
-        0.5 * jnp.arctan2(sxy, (sxx - syy)) + jnp.pi / 2,
-        0.0,
-    )
-    theta = jnp.where(theta < 0.0, theta + jnp.pi, theta)
+    theta = ellipse_angle(sxx, sxy, syy)
     cosa = jnp.cos(theta)
     sina = jnp.sin(theta)
     aa = sxx * cosa**2 + sxy * cosa * sina + syy * sina**2
