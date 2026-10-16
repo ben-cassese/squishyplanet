@@ -169,8 +169,8 @@ def _Ry(t: object) -> object:
     return mp.matrix([[mp.cos(t), 0, mp.sin(t)], [0, 1, 0], [-mp.sin(t), 0, mp.cos(t)]])
 
 
-def _mp_outline_point(p: dict[str, float], alpha: float) -> tuple[float, float]:
-    """High-precision (x, y) of the outline at one alpha (same convention)."""
+def _mp_outline_geometry(p: dict[str, float]) -> tuple[np.ndarray, np.ndarray]:
+    """Independent high-precision center and projected shape matrix."""
     R = _Rz(p["Omega"]) * _Rx(p["i"]) * _Rz(p["omega"] + p["prec"]) * _Ry(p["obliq"])
     r = mp.mpf(p["r"])
     D = mp.matrix(
@@ -184,14 +184,6 @@ def _mp_outline_point(p: dict[str, float], alpha: float) -> tuple[float, float]:
     axx = M[0, 0] - M[0, 2] * M[2, 0] / M[2, 2]
     ayy = M[1, 1] - M[1, 2] * M[2, 1] / M[2, 2]
     axy = M[0, 1] - M[0, 2] * M[2, 1] / M[2, 2]
-    rho_xx, rho_yy, rho_xy = axx, ayy, 2 * axy
-    theta = mp.mpf("0.5") * mp.atan2(rho_xy, rho_xx - rho_yy) + mp.pi / 2
-    if theta < 0:
-        theta += mp.pi
-    cosa, sina = mp.cos(theta), mp.sin(theta)
-    aa = rho_xx * cosa**2 + rho_xy * cosa * sina + rho_yy * sina**2
-    bb = rho_xx * sina**2 - rho_xy * cosa * sina + rho_yy * cosa**2
-    r1, r2 = 1 / mp.sqrt(aa), 1 / mp.sqrt(bb)
     ome2 = mp.mpf(p["a"]) * (-1 + mp.mpf(p["e"]) ** 2)
     cf = mp.cos(p["f"])
     denom = 1 + p["e"] * cf
@@ -219,18 +211,14 @@ def _mp_outline_point(p: dict[str, float], alpha: float) -> tuple[float, float]:
         )
         / denom
     )
-    cx1, cx2 = r1 * cosa, -r2 * sina
-    cy1, cy2 = r1 * sina, r2 * cosa
-    x = cx1 * mp.cos(alpha) + cx2 * mp.sin(alpha) + xc
-    y = cy1 * mp.cos(alpha) + cy2 * mp.sin(alpha) + yc
-    return float(x), float(y)
+    shape = mp.inverse(mp.matrix([[axx, axy], [axy, ayy]]))
+    return np.array([float(xc), float(yc)]), np.array(shape.tolist(), dtype=float)
 
 
 def test_outline_prelude_matches_mpmath() -> None:
-    """Direct outline_prelude reproduces the ~50-digit reference outline points."""
+    """Check geometry independently of the arbitrary outline-angle convention."""
     rng = np.random.default_rng(7)
     tp = 2 * np.pi
-    alphas = np.linspace(0, tp, 8, endpoint=False)
     worst = 0.0
     for _ in range(12):
         p = {
@@ -249,20 +237,18 @@ def test_outline_prelude_matches_mpmath() -> None:
         state = {k: jnp.array([v]) for k, v in p.items()}
         state["tidally_locked"] = False
         _, para = outline_prelude(state)
-        for alpha in alphas:
-            x = float(
-                para["c_x1"][0] * np.cos(alpha)
-                + para["c_x2"][0] * np.sin(alpha)
-                + para["c_x3"][0]
-            )
-            y = float(
-                para["c_y1"][0] * np.cos(alpha)
-                + para["c_y2"][0] * np.sin(alpha)
-                + para["c_y3"][0]
-            )
-            gx, gy = _mp_outline_point(p, float(alpha))
-            worst = max(worst, float(np.hypot(x - gx, y - gy)))
-    assert worst < 1e-10, f"outline_prelude vs mpmath worst = {worst:.2e}"
+        center = np.array([para["c_x3"][0], para["c_y3"][0]])
+        L = np.array(
+            [[para["c_x1"][0], para["c_x2"][0]], [para["c_y1"][0], para["c_y2"][0]]]
+        )
+        ref_center, ref_shape = _mp_outline_geometry(p)
+        worst = max(worst, float(np.max(np.abs(center - ref_center))))
+        np.testing.assert_allclose(L @ L.T, ref_shape, rtol=1e-12, atol=1e-15)
+        assert np.linalg.det(L) > 0
+        np.testing.assert_allclose(
+            np.linalg.det(L), np.sqrt(np.linalg.det(ref_shape)), rtol=1e-12
+        )
+    assert worst < 1e-10, f"outline_prelude center vs mpmath worst = {worst:.2e}"
 
 
 # ---------------------------------------------------------------------------

@@ -1,8 +1,16 @@
 name: Tests
 
 on:
-  - push
-  - pull_request
+  push:
+    # PR branches are covered by pull_request; avoid running both on each push.
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+
+# Cancel superseded PR runs, but let runs on main finish.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   lint:
