@@ -9,9 +9,7 @@ import numpy as np
 from squishyplanet.engine.kepler import kepler, skypos, t0_to_t_peri
 from squishyplanet.engine.parametric_ellipse import (
     cartesian_intersection_to_parametric_angle,
-    ellipse_angle,
     point_in_ellipse,
-    poly_to_parametric,
 )
 
 # Fixed-grid quadrature for the planet solution-vector integrals, replacing the
@@ -279,7 +277,17 @@ def parameterize_2d_helper(
     #     (cos_t_sq * yc_sq) - (tmp1) + (xc_sq * sin_t_sq)
     # ) / projected_r2_sq
 
-    para = poly_to_parametric(**two)
+    # Keep the supplied orientation even for a circle: recovering principal axes
+    # from the conic would discard the derivative toward a tilted ellipse.
+    ones = jnp.ones_like(xc + yc)
+    para = {
+        "c_x1": ones * projected_r * cos_t,
+        "c_x2": -ones * projected_r2 * sin_t,
+        "c_x3": xc,
+        "c_y1": ones * projected_r * sin_t,
+        "c_y2": ones * projected_r2 * cos_t,
+        "c_y3": yc,
+    }
 
     return two, para
 
@@ -571,7 +579,8 @@ def outline_prelude(state: dict) -> tuple[dict, dict]:
             outline (matching :func:`planet_2d.planet_2d_coeffs`). The second contains
             the parametric coefficients ``c_x1, c_x2, c_x3, c_y1, c_y2, c_y3`` with
             ``x = c_x1 cos(alpha) + c_x2 sin(alpha) + c_x3`` (and similarly for y),
-            matching :func:`parametric_ellipse.poly_to_parametric`. Every leaf is
+            describing the same curve as :func:`parametric_ellipse.poly_to_parametric`
+            with a different outline-angle convention. Every leaf is
             broadcast to the time axis.
     """
     prec = jnp.where(state["tidally_locked"], state["f"], state["prec"])
@@ -611,14 +620,12 @@ def outline_prelude(state: dict) -> tuple[dict, dict]:
     xc = pos[0]
     yc = pos[1]
 
-    # parametric ellipse: identical convention to poly_to_parametric_helper
-    theta = ellipse_angle(sxx, sxy, syy)
-    cosa = jnp.cos(theta)
-    sina = jnp.sin(theta)
-    aa = sxx * cosa**2 + sxy * cosa * sina + syy * sina**2
-    bb = sxx * sina**2 - sxy * cosa * sina + syy * cosa**2
-    r1 = 1 / jnp.sqrt(aa)
-    r2 = 1 / jnp.sqrt(bb)
+    # Q = C C^T; the columns of C^(-T) parameterize the ellipse without
+    # extracting principal axes, whose orientation is undefined at a circle.
+    # Positive diagonal factors preserve counterclockwise traversal.
+    c11 = jnp.sqrt(sxx)
+    c21 = (0.5 * sxy) / c11
+    c22 = jnp.sqrt(syy - c21**2)
 
     # xc/yc always vary with the true anomaly (length n_times); the orientation-only
     # quantities are scalar when prec is fixed. Broadcast them to the time axis so every
@@ -627,11 +634,11 @@ def outline_prelude(state: dict) -> tuple[dict, dict]:
     ones = jnp.ones_like(xc)
 
     para = {
-        "c_x1": ones * (r1 * cosa),
-        "c_x2": ones * (-r2 * sina),
+        "c_x1": ones / c11,
+        "c_x2": -ones * c21 / (c11 * c22),
         "c_x3": xc,
-        "c_y1": ones * (r1 * sina),
-        "c_y2": ones * (r2 * cosa),
+        "c_y1": jnp.zeros_like(xc),
+        "c_y2": ones / c22,
         "c_y3": yc,
     }
 
