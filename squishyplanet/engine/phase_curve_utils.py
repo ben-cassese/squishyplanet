@@ -1073,7 +1073,6 @@ def extended_illumination_reflected_phase_curve(
     `extended_illumination_npts` to anything greater than 1 when initializing an
     :class:`OblateSystem` object.
     """
-    pass
     # def scan_func(carry, scan_over):
     #     two, three = scan_over
     #     return None, reflected_phase_curve(
