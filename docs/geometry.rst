@@ -140,7 +140,7 @@ We use the following forms for $G_0$ and $G_1$:
 
     G_1 = \left\{0, \frac{1}{2} \left(x \sqrt{-x^2-y^2+1}-\left(y^2-1\right) \tan ^{-1}\left(\frac{x}{\sqrt{-x^2-y^2+1}}\right)\right)+\frac{\pi }{12} \right\}
 
-We use an implementation of Gauss-Konrod quadrature in the open source `quadax <https://github.com/f0uriest/quadax/tree/main>`_ package for these integrals. For more, see the `api documentation <https://https://squishyplanet.readthedocs.io/en/latest/engine.html#polynomial_limb_darkened_transit.planet_solution_vec>`_.
+We evaluate these integrals with fixed-grid Gauss-Legendre quadrature, using a cubic reparameterization of the arc for partial transits (which regularizes the square-root singularity at each endpoint) and a periodic trapezoid rule for full transits. For more, see the `api documentation <https://https://squishyplanet.readthedocs.io/en/latest/engine.html#polynomial_limb_darkened_transit.planet_solution_vec>`_.
 
 Putting It Together
 ^^^^^^^^^^^^^^^^^^^

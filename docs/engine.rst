@@ -32,7 +32,7 @@ basis transformation used to convert 2D surface integrals to 1D line integrals.
     :undoc-members:
     :show-inheritance:
 
-.. automodule:: phase_curve_utils
+.. automodule:: illustrate_utils
     :members:
     :undoc-members:
     :show-inheritance:

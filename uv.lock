@@ -166,15 +166,6 @@ wheels = [
 ]
 
 [[package]]
-name = "cachetools"
-version = "5.5.2"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/6c/81/3747dad6b14fa2cf53fcf10548cf5aea6913e96fab41a3c198676f8948a5/cachetools-5.5.2.tar.gz", hash = "sha256:1a661caa9175d26759571b2e19580f9d6393969e5dfca11fdb1f947a23e640d4", size = 28380, upload-time = "2025-02-20T21:01:19.524Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/72/76/20fa66124dbe6be5cafeb312ece67de6b61dd91a0247d1ea13db4ebb33c2/cachetools-5.5.2-py3-none-any.whl", hash = "sha256:d26a22bcc62eb95c3beabd9f1ee5e820d3d2704fe2967cbe350e20c8ffcd3f0a", size = 10080, upload-time = "2025-02-20T21:01:16.647Z" },
-]
-
-[[package]]
 name = "cffi"
 version = "1.17.1"
 source = { registry = "https://pypi.org/simple" }
@@ -238,15 +229,6 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/11/74/539e56497d9bd1d484fd863dd69cbbfa653cd2aa27abfe35653494d85e94/cfgv-3.4.0.tar.gz", hash = "sha256:e52591d4c5f5dead8e0f673fb16db7949d2cfb3f7da4582893288f0ded8fe560", size = 7114, upload-time = "2023-08-12T20:38:17.776Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/c5/55/51844dd50c4fc7a33b653bfaba4c2456f06955289ca770a5dbd5fd267374/cfgv-3.4.0-py2.py3-none-any.whl", hash = "sha256:b7265b1f29fd3316bfcd2b330d63d024f2bfd8bcb8b0272f8e19a504856c48f9", size = 7249, upload-time = "2023-08-12T20:38:16.269Z" },
-]
-
-[[package]]
-name = "chardet"
-version = "5.2.0"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/f3/0d/f7b6ab21ec75897ed80c17d79b15951a719226b9fababf1e40ea74d69079/chardet-5.2.0.tar.gz", hash = "sha256:1b3b6ff479a8c414bc3fa2c0852995695c4a026dcd6d0633b2dd092ca39c1cf7", size = 2069618, upload-time = "2023-08-01T19:23:02.662Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/38/6f/f5fbc992a329ee4e0f288c1fe0e2ad9485ed064cac731ed2fe47dcc38cbf/chardet-5.2.0-py3-none-any.whl", hash = "sha256:e1cf59446890a00105fe7b7912492ea04b6e6f06d4b742b2c788469e34c82970", size = 199385, upload-time = "2023-08-01T19:23:00.661Z" },
 ]
 
 [[package]]
@@ -1444,19 +1426,6 @@ wheels = [
 ]
 
 [[package]]
-name = "pyproject-api"
-version = "1.9.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "packaging" },
-    { name = "tomli", marker = "python_full_version < '3.11'" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/7e/66/fdc17e94486836eda4ba7113c0db9ac7e2f4eea1b968ee09de2fe75e391b/pyproject_api-1.9.0.tar.gz", hash = "sha256:7e8a9854b2dfb49454fae421cb86af43efbb2b2454e5646ffb7623540321ae6e", size = 22714, upload-time = "2025-01-21T18:02:00.923Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/b0/1d/92b7c765df46f454889d9610292b0ccab15362be3119b9a624458455e8d5/pyproject_api-1.9.0-py3-none-any.whl", hash = "sha256:326df9d68dea22d9d98b5243c46e3ca3161b07a1b9b18e213d1e24fd0e605766", size = 13131, upload-time = "2025-01-21T18:01:58.927Z" },
-]
-
-[[package]]
 name = "pytest"
 version = "8.3.5"
 source = { registry = "https://pypi.org/simple" }
@@ -1645,20 +1614,6 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/76/0c/3a633acd762aa6655fcb71fa841907eae0ab1e8582ff494b137266de341d/pyzmq-26.4.0-pp311-pypy311_pp73-manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:43b03c1ceea27c6520124f4fb2ba9c647409b9abdf9a62388117148a90419494", size = 798248, upload-time = "2025-04-04T12:05:17.376Z" },
     { url = "https://files.pythonhosted.org/packages/cd/cc/6c99c84aa60ac1cc56747bed6be8ce6305b9b861d7475772e7a25ce019d3/pyzmq-26.4.0-pp311-pypy311_pp73-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:7731abd23a782851426d4e37deb2057bf9410848a4459b5ede4fe89342e687a9", size = 756757, upload-time = "2025-04-04T12:05:19.19Z" },
     { url = "https://files.pythonhosted.org/packages/13/9c/d8073bd898eb896e94c679abe82e47506e2b750eb261cf6010ced869797c/pyzmq-26.4.0-pp311-pypy311_pp73-win_amd64.whl", hash = "sha256:a222ad02fbe80166b0526c038776e8042cd4e5f0dec1489a006a1df47e9040e0", size = 555371, upload-time = "2025-04-04T12:05:20.702Z" },
-]
-
-[[package]]
-name = "quadax"
-version = "0.2.7"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "equinox" },
-    { name = "jax" },
-    { name = "numpy" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/a0/8e/53c13f6b8e3d1a85607c74b7eef6db0d49865860565f515a9258daf85f37/quadax-0.2.7.tar.gz", hash = "sha256:eed27793689d6ba8fd2f23c4a93d0f9eb39c13247e306564dc621b8a4fac2c79", size = 35441, upload-time = "2025-03-25T19:00:48.17Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/e3/f4/552be19dda755b27358634e40d70068f5b50b49c8e22aeb7cec6c15d1358/quadax-0.2.7-py3-none-any.whl", hash = "sha256:0842048f9c26c1828295fcf5d0ed1248b7cd6c812c558aae62958ac664ecd098", size = 30732, upload-time = "2025-03-25T19:00:46.976Z" },
 ]
 
 [[package]]
@@ -2102,16 +2057,12 @@ wheels = [
 
 [[package]]
 name = "squishyplanet"
-version = "0.5.0"
+version = "0.6.0"
 source = { editable = "." }
 dependencies = [
-    { name = "astropy", version = "6.1.7", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
-    { name = "astropy", version = "7.0.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
+    { name = "jax" },
     { name = "matplotlib" },
     { name = "numpy" },
-    { name = "quadax" },
-    { name = "sympy" },
-    { name = "tqdm" },
 ]
 
 [package.dev-dependencies]
@@ -2125,6 +2076,8 @@ dev = [
     { name = "uv" },
 ]
 tests = [
+    { name = "astropy", version = "6.1.7", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
+    { name = "astropy", version = "7.0.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
     { name = "jaxoplanet" },
     { name = "mpmath" },
     { name = "nbmake" },
@@ -2132,20 +2085,16 @@ tests = [
     { name = "pytest-cov" },
     { name = "pytest-xdist" },
     { name = "shapely" },
-    { name = "tox" },
-    { name = "tox-gh-actions" },
-    { name = "tox-uv" },
+    { name = "sympy" },
+    { name = "tqdm" },
     { name = "uv" },
 ]
 
 [package.metadata]
 requires-dist = [
-    { name = "astropy", specifier = ">=6.1.7" },
+    { name = "jax", specifier = ">=0.4.35" },
     { name = "matplotlib", specifier = ">=3.10.1" },
     { name = "numpy", specifier = ">=2.2.4" },
-    { name = "quadax", specifier = ">=0.2.7" },
-    { name = "sympy", specifier = ">=1.13.3" },
-    { name = "tqdm", specifier = ">=4.67.1" },
 ]
 
 [package.metadata.requires-dev]
@@ -2159,6 +2108,7 @@ dev = [
     { name = "uv", specifier = ">=0.6.15" },
 ]
 tests = [
+    { name = "astropy", specifier = ">=6.1.7" },
     { name = "jaxoplanet", git = "https://github.com/exoplanet-dev/jaxoplanet.git" },
     { name = "mpmath", specifier = ">=1.3.0" },
     { name = "nbmake", specifier = ">=1.5.5" },
@@ -2166,9 +2116,8 @@ tests = [
     { name = "pytest-cov", specifier = ">=6.1.1" },
     { name = "pytest-xdist", specifier = ">=3.6.1" },
     { name = "shapely", specifier = ">=2.1.2" },
-    { name = "tox", specifier = ">=4.25.0" },
-    { name = "tox-gh-actions", specifier = ">=3.3.0" },
-    { name = "tox-uv", specifier = ">=1.25.0" },
+    { name = "sympy", specifier = ">=1.13.3" },
+    { name = "tqdm", specifier = ">=4.67.1" },
     { name = "uv", specifier = ">=0.6.15" },
 ]
 
@@ -2188,14 +2137,14 @@ wheels = [
 
 [[package]]
 name = "sympy"
-version = "1.13.3"
+version = "1.14.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "mpmath" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/11/8a/5a7fd6284fa8caac23a26c9ddf9c30485a48169344b4bd3b0f02fef1890f/sympy-1.13.3.tar.gz", hash = "sha256:b27fd2c6530e0ab39e275fc9b683895367e51d5da91baa8d3d64db2565fec4d9", size = 7533196, upload-time = "2024-09-18T21:54:25.591Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/83/d3/803453b36afefb7c2bb238361cd4ae6125a569b4db67cd9e79846ba2d68c/sympy-1.14.0.tar.gz", hash = "sha256:d3d3fe8df1e5a0b42f0e7bdf50541697dbe7d23746e894990c030e2b05e72517", size = 7793921, upload-time = "2025-04-27T18:05:01.611Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/99/ff/c87e0622b1dadea79d2fb0b25ade9ed98954c9033722eb707053d310d4f3/sympy-1.13.3-py3-none-any.whl", hash = "sha256:54612cf55a62755ee71824ce692986f23c88ffa77207b30c1368eda4a7060f73", size = 6189483, upload-time = "2024-09-18T21:54:23.097Z" },
+    { url = "https://files.pythonhosted.org/packages/a2/09/77d55d46fd61b4a135c444fc97158ef34a095e5681d0a6c10b75bf356191/sympy-1.14.0-py3-none-any.whl", hash = "sha256:e091cc3e99d2141a0ba2847328f5479b05d94a6635cb96148ccb3f34671bd8f5", size = 6299353, upload-time = "2025-04-27T18:04:59.103Z" },
 ]
 
 [[package]]
@@ -2253,54 +2202,6 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/2b/ae/c1b22d4524b0e10da2f29a176fb2890386f7bd1f63aacf186444873a88a0/tornado-6.4.2-cp38-abi3-musllinux_1_2_x86_64.whl", hash = "sha256:932d195ca9015956fa502c6b56af9eb06106140d844a335590c1ec7f5277d10c", size = 437261, upload-time = "2024-11-22T03:06:32.458Z" },
     { url = "https://files.pythonhosted.org/packages/b5/25/36dbd49ab6d179bcfc4c6c093a51795a4f3bed380543a8242ac3517a1751/tornado-6.4.2-cp38-abi3-win32.whl", hash = "sha256:2876cef82e6c5978fde1e0d5b1f919d756968d5b4282418f3146b79b58556482", size = 438463, upload-time = "2024-11-22T03:06:34.71Z" },
     { url = "https://files.pythonhosted.org/packages/61/cc/58b1adeb1bb46228442081e746fcdbc4540905c87e8add7c277540934edb/tornado-6.4.2-cp38-abi3-win_amd64.whl", hash = "sha256:908b71bf3ff37d81073356a5fadcc660eb10c1476ee6e2725588626ce7e5ca38", size = 438907, upload-time = "2024-11-22T03:06:36.71Z" },
-]
-
-[[package]]
-name = "tox"
-version = "4.25.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "cachetools" },
-    { name = "chardet" },
-    { name = "colorama" },
-    { name = "filelock" },
-    { name = "packaging" },
-    { name = "platformdirs" },
-    { name = "pluggy" },
-    { name = "pyproject-api" },
-    { name = "tomli", marker = "python_full_version < '3.11'" },
-    { name = "typing-extensions", marker = "python_full_version < '3.11'" },
-    { name = "virtualenv" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/fe/87/692478f0a194f1cad64803692642bd88c12c5b64eee16bf178e4a32e979c/tox-4.25.0.tar.gz", hash = "sha256:dd67f030317b80722cf52b246ff42aafd3ed27ddf331c415612d084304cf5e52", size = 196255, upload-time = "2025-03-27T15:13:37.519Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/f9/38/33348de6fc4b1afb3d76d8485c8aecbdabcfb3af8da53d40c792332e2b37/tox-4.25.0-py3-none-any.whl", hash = "sha256:4dfdc7ba2cc6fdc6688dde1b21e7b46ff6c41795fb54586c91a3533317b5255c", size = 172420, upload-time = "2025-03-27T15:13:35.703Z" },
-]
-
-[[package]]
-name = "tox-gh-actions"
-version = "3.3.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "tox" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/6d/79/825b2551498a8a339699b87da52ee23fc80cae3f89a5cf7d48b46325fbb3/tox_gh_actions-3.3.0.tar.gz", hash = "sha256:6933775dd7ab98649de5134283277e604fecfd4eb44bf31150c1c6ba2b1092ef", size = 19205, upload-time = "2025-02-22T15:10:44.019Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/77/c7/1cf26c90539746a2bdb8217f13c29e15e33a525f13595b690150bceb5bef/tox_gh_actions-3.3.0-py2.py3-none-any.whl", hash = "sha256:0e1f9db7a775d04b6d94ab801c60d2d482929a934136262969791eb0ccac65a4", size = 9948, upload-time = "2025-02-22T15:10:42.77Z" },
-]
-
-[[package]]
-name = "tox-uv"
-version = "1.25.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "packaging" },
-    { name = "tox" },
-    { name = "uv" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/5d/3a/3e445f25978a716ba6674f33f687d9336d0312086a277a778a5e9e9220d7/tox_uv-1.25.0.tar.gz", hash = "sha256:59ee5e694c41fef7bbcf058f22a5f9b6a8509698def2ea60c08554f4e36b9fcc", size = 21114, upload-time = "2025-02-21T16:37:51.796Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/3c/a7/f5c29e0e6faaccefcab607f672b176927144e9412c8183d21301ea2a6f6c/tox_uv-1.25.0-py3-none-any.whl", hash = "sha256:50cfe7795dcd49b2160d7d65b5ece8717f38cfedc242c852a40ec0a71e159bf7", size = 16431, upload-time = "2025-02-21T16:37:49.657Z" },
 ]
 
 [[package]]

@@ -10,17 +10,17 @@ import jax.numpy as jnp
 import matplotlib.pyplot as plt
 
 from squishyplanet.engine.greens_basis_transform import generate_change_of_basis_matrix
-from squishyplanet.engine.kepler import kepler, skypos, t0_to_t_peri
-from squishyplanet.engine.parametric_ellipse import (
-    poly_to_parametric,
-    poly_to_parametric_helper,
-)
-from squishyplanet.engine.phase_curve_utils import (
+from squishyplanet.engine.illustrate_utils import (
     generate_sample_radii_thetas,
     lambertian_reflection,
     planet_surface_normal,
     sample_surface,
     surface_star_cos_angle,
+)
+from squishyplanet.engine.kepler import kepler, skypos, t0_to_t_peri
+from squishyplanet.engine.parametric_ellipse import (
+    poly_to_parametric,
+    poly_to_parametric_helper,
 )
 from squishyplanet.engine.planet_2d import planet_2d_coeffs
 from squishyplanet.engine.planet_3d import planet_3d_coeffs
@@ -28,6 +28,55 @@ from squishyplanet.engine.polynomial_limb_darkened_transit import (
     lightcurve as poly_lightcurve,
 )
 from squishyplanet.engine.polynomial_limb_darkened_transit import parameterize_2d_helper
+
+
+@partial(jax.jit, static_argnums=(1,))
+def _fit_limb_darkening_profile(
+    intensities: jax.Array,
+    order: int | None = None,
+    mus: jax.Array | None = None,
+    rs: jax.Array | None = None,
+) -> jax.Array:
+    """Convert a stellar limb darkening profile to a polynomial representation.
+
+    Given a set of stellar parameters, one can use a grid of stellar models to compute
+    the limb darkening profile as a function of projected `r` or of
+    `mu = sqrt(1 - r**2)`. These profiles are often then approximated with one of a few
+    common limb darkening "laws", such as the quadratic or 4-parameter non-linear laws.
+    Since `squishyplanet` only supports polynomial limb darkening profiles, but can
+    support nearly arbitrary orders, we can approximate the profile with a polynomial.
+    This is a convenience function for converting between a grid-derived profile and its
+    best-fit polynomial representation in the correct basis for `squishyplanet`.
+
+    Args:
+        intensities (array-like):
+            The relative intensities of the star at a given `mu` or `r`.
+        order (int):
+            The order of the polynomial to fit to the limb darkening profile. Note that
+            in the `squishyplanet` basis, the polynomial is defined as
+            `1 - sum_{i=1}^{order} u_i (1 - mu)^i`, so the number of coefficients is
+            `order`, not `order+1`.
+        mus (array-like, default=None):
+            The `mu` values at which the intensities were computed. If `rs` is not
+            provided, this is required.
+        rs (array-like, default=None):
+            The `r` values at which the intensities were computed. If `mus` is not
+            provided, this is required.
+
+    Returns:
+        array-like:
+            The coefficients of the polynomial representation of the limb darkening
+            profile. These can then be used as the `ld_u_coeffs` parameter in
+            `OblateSystem`.
+
+    """
+    if rs is not None:
+        mus = jnp.sqrt(1 - rs**2)
+    powers = jnp.arange(order + 1)[1:]
+    a = ((1 - mus) ** powers[:, None]).T
+    b = intensities - 1
+    ld_u_coeffs = -jnp.linalg.lstsq(a, b)[0]
+    return ld_u_coeffs
 
 
 class OblateSystem:
@@ -428,12 +477,27 @@ class OblateSystem:
 
         return lightcurve
 
-    def _illustrate_helper(
+    def _resolve_true_anomalies(
         self,
         times: jax.Array | None = None,
         true_anomalies: jax.Array | None = None,
-        nsamples: int = 50_000,
-    ) -> dict:
+    ) -> jax.Array:
+        """Turn the times/true anomalies accepted by ``illustrate`` into an array of
+        true anomalies.
+
+        Args:
+            times (array-like, [Days], default=None):
+                Times at which to illustrate the system. Provide either this or
+                ``true_anomalies`` but not both.
+            true_anomalies (array-like, [Radian], default=None):
+                True anomalies at which to illustrate the system.
+
+        Returns:
+            Array:
+                The true anomalies, defaulting to ``[pi / 2]`` if neither argument was
+                given.
+
+        """
         if (times is not None) & (true_anomalies is not None):
             raise ValueError("Provide either times or true anomalies but not both")
 
@@ -450,13 +514,21 @@ class OblateSystem:
             time_deltas = times - t_peri
             mean_anomalies = 2 * jnp.pi * time_deltas / self._state["period"]
             true_anomalies = kepler(mean_anomalies, self._state["e"])
-        elif true_anomalies is not None:
-            pass
-        else:
+        elif true_anomalies is None:
             true_anomalies = jnp.array([jnp.pi / 2])
 
         if isinstance(true_anomalies, float | int):
             true_anomalies = jnp.array([true_anomalies])
+
+        return true_anomalies
+
+    def _illustrate_helper(
+        self,
+        times: jax.Array | None = None,
+        true_anomalies: jax.Array | None = None,
+        nsamples: int = 50_000,
+    ) -> dict:
+        true_anomalies = self._resolve_true_anomalies(times, true_anomalies)
 
         # the trace of the orbit
         fs = jnp.linspace(0, 2 * jnp.pi, 300)
@@ -664,26 +736,13 @@ class OblateSystem:
         star = plt.Circle((0, 0), 1, color="black", fill=False)
         ax.add_artist(star)
         if star_fill & (not jnp.all(self._state["ld_u_coeffs"] == 0)):
-            # lifted from engine.polynomial_limb_darkened_transit
-            u_coeffs = jnp.ones(self._state["ld_u_coeffs"].shape[0] + 1) * (-1)
-            u_coeffs = u_coeffs.at[1:].set(self._state["ld_u_coeffs"])
-            g_coeffs = jnp.matmul(self._state["greens_basis_transform"], u_coeffs)
-            normalization_constant = 1 / (
-                jnp.pi * (g_coeffs[0] + (2 / 3) * g_coeffs[1])
-            )
-
-            def _star_radial_profile(r: jax.Array) -> jax.Array:
-                us = jnp.ones(self._state["ld_u_coeffs"].shape[0] + 1) * (-1)
-                us = us.at[1:].set(self._state["ld_u_coeffs"])
-                mu = jnp.sqrt(1 - r**2)
-                powers = jnp.arange(len(us))
-                return -jnp.sum(us * (1 - mu) ** powers) * normalization_constant
-
             X = jnp.linspace(-1, 1, 300)
             Y = jnp.linspace(-1, 1, 300)
             X, Y = jnp.meshgrid(X, Y)
             R = jnp.sqrt(X**2 + Y**2)
-            Z = jax.vmap(_star_radial_profile)(R.flatten()).reshape(X.shape)
+            Z = self.limb_darkening_profile(
+                ld_u_coeffs=self._state["ld_u_coeffs"], r=R.flatten()
+            ).reshape(X.shape)
 
             min_val = jnp.max(jnp.array([0, jnp.nanmin(Z)]))
             max_val = jnp.nanmax(Z)
@@ -729,49 +788,7 @@ class OblateSystem:
             ylim=(im_center_y - window_size / 2, im_center_y + window_size / 2),
         )
 
-    @staticmethod
-    def fit_limb_darkening_profile(
-        intensities: jax.Array,
-        order: int | None = None,
-        mus: jax.Array | None = None,
-        rs: jax.Array | None = None,
-    ) -> jax.Array:
-        """Convert a stellar limb darkening profile to a polynomial representation.
-
-        Given a set of stellar parameters, one can use a grid of stellar models to compute
-        the limb darkening profile as a function of projected `r` or of
-        `mu = sqrt(1 - r**2)`. These profiles are often then approximated with one of a few
-        common limb darkening "laws", such as the quadratic or 4-parameter non-linear laws.
-        Since `squishyplanet` only supports polynomial limb darkening profiles, but can
-        support nearly arbitrary orders, we can approximate the profile with a polynomial.
-        This is a convenience function for converting between a grid-derived profile and its
-        best-fit polynomial representation in the correct basis for `squishyplanet`.
-
-        Args:
-            intensities (array-like):
-                The relative intensities of the star at a given `mu` or `r`.
-            order (int):
-                The order of the polynomial to fit to the limb darkening profile. Note that
-                in the `squishyplanet` basis, the polynomial is defined as
-                `1 - sum_{i=1}^{order} u_i (1 - mu)^i`, so the number of coefficients is
-                `order`, not `order+1`.
-            mus (array-like, default=None):
-                The `mu` values at which the intensities were computed. If `rs` is not
-                provided, this is required.
-            rs (array-like, default=None):
-                The `r` values at which the intensities were computed. If `mus` is not
-                provided, this is required.
-
-        Returns:
-            array-like:
-                The coefficients of the polynomial representation of the limb darkening
-                profile. These can then be used as the `ld_u_coeffs` parameter in
-                `OblateSystem`.
-
-        """
-        return _fit_limb_darkening_profile(
-            intensities=intensities, order=order, mus=mus, rs=rs
-        )
+    fit_limb_darkening_profile = staticmethod(_fit_limb_darkening_profile)
 
     @staticmethod
     def limb_darkening_profile(
@@ -871,52 +888,3 @@ def _lightcurve(
     else:
         c = transit
     return c
-
-
-@partial(jax.jit, static_argnums=(1,))
-def _fit_limb_darkening_profile(
-    intensities: jax.Array,
-    order: int | None = None,
-    mus: jax.Array | None = None,
-    rs: jax.Array | None = None,
-) -> jax.Array:
-    """Convert a stellar limb darkening profile to a polynomial representation.
-
-    Given a set of stellar parameters, one can use a grid of stellar models to compute
-    the limb darkening profile as a function of projected `r` or of
-    `mu = sqrt(1 - r**2)`. These profiles are often then approximated with one of a few
-    common limb darkening "laws", such as the quadratic or 4-parameter non-linear laws.
-    Since `squishyplanet` only supports polynomial limb darkening profiles, but can
-    support nearly arbitrary orders, we can approximate the profile with a polynomial.
-    This is a convenience function for converting between a grid-derived profile and its
-    best-fit polynomial representation in the correct basis for `squishyplanet`.
-
-    Args:
-        intensities (array-like):
-            The relative intensities of the star at a given `mu` or `r`.
-        order (int):
-            The order of the polynomial to fit to the limb darkening profile. Note that
-            in the `squishyplanet` basis, the polynomial is defined as
-            `1 - sum_{i=1}^{order} u_i (1 - mu)^i`, so the number of coefficients is
-            `order`, not `order+1`.
-        mus (array-like, default=None):
-            The `mu` values at which the intensities were computed. If `rs` is not
-            provided, this is required.
-        rs (array-like, default=None):
-            The `r` values at which the intensities were computed. If `mus` is not
-            provided, this is required.
-
-    Returns:
-        array-like:
-            The coefficients of the polynomial representation of the limb darkening
-            profile. These can then be used as the `ld_u_coeffs` parameter in
-            `OblateSystem`.
-
-    """
-    if rs is not None:
-        mus = jnp.sqrt(1 - rs**2)
-    powers = jnp.arange(order + 1)[1:]
-    a = ((1 - mus) ** powers[:, None]).T
-    b = intensities - 1
-    ld_u_coeffs = -jnp.linalg.lstsq(a, b)[0]
-    return ld_u_coeffs
