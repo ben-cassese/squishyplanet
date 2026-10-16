@@ -209,16 +209,16 @@ def ring_prelude(state: dict) -> tuple[dict, dict]:
         state["f"],
         ring_prec,
     )
-    shared = dict(
-        a=state["a"],
-        e=state["e"],
-        f=state["f"],
-        Omega=state["Omega"],
-        i=state["i"],
-        omega=state["omega"],
-        ring_obliq=ring_obliq,
-        ring_prec=ring_prec,
-    )
+    shared = {
+        "a": state["a"],
+        "e": state["e"],
+        "f": state["f"],
+        "Omega": state["Omega"],
+        "i": state["i"],
+        "omega": state["omega"],
+        "ring_obliq": ring_obliq,
+        "ring_prec": ring_prec,
+    }
     para_outer = ring_para_coeffs(rRing=state["ring_outer_r"], **shared)
     para_inner = ring_para_coeffs(rRing=state["ring_inner_r"], **shared)
     return para_outer, para_inner

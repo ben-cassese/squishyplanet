@@ -136,22 +136,22 @@ def _build_state(times: jax.Array, **over: object) -> dict:
     replaces any field. ``omega`` is forced to 0 for circular orbits (the validator
     requires it).
     """
-    base = dict(
-        t0=0.0,
-        period=PERIOD,
-        a=SMA,
-        e=0.0,
-        i=jnp.pi / 2,
-        Omega=jnp.pi,
-        omega=0.0,
-        obliq=0.0,
-        prec=0.0,
-        r=R_DEF,
-        f1=0.0,
-        f2=0.0,
-        ld_u_coeffs=jnp.array([0.4, 0.3]),
-        tidally_locked=False,
-    )
+    base = {
+        "t0": 0.0,
+        "period": PERIOD,
+        "a": SMA,
+        "e": 0.0,
+        "i": jnp.pi / 2,
+        "Omega": jnp.pi,
+        "omega": 0.0,
+        "obliq": 0.0,
+        "prec": 0.0,
+        "r": R_DEF,
+        "f1": 0.0,
+        "f2": 0.0,
+        "ld_u_coeffs": jnp.array([0.4, 0.3]),
+        "tidally_locked": False,
+    }
     base.update(over)
     if float(base["e"]) == 0.0:
         base["omega"] = 0.0
@@ -243,35 +243,41 @@ def _assert_continuous(
 # Each entry: (id, overrides). These are the configs where a branch handoff or quartic
 # degeneracy is most likely to leak a discontinuity.
 _CONTINUITY_CASES = [
-    ("central_edge_on", dict(i=jnp.pi / 2)),
-    ("mid_impact", dict(i=_incl_for_b(0.5))),
-    ("grazing_b0.95", dict(i=_incl_for_b(0.95))),
-    ("near_grazing_b0.99", dict(i=_incl_for_b(0.99))),
-    ("deep_planet_r0.3", dict(r=0.3, i=_incl_for_b(0.5))),
-    ("large_planet_r0.25_central", dict(r=0.25, i=jnp.pi / 2)),
-    ("tiny_planet_r1e-3", dict(r=1e-3, i=jnp.pi / 2)),
+    ("central_edge_on", {"i": jnp.pi / 2}),
+    ("mid_impact", {"i": _incl_for_b(0.5)}),
+    ("grazing_b0.95", {"i": _incl_for_b(0.95)}),
+    ("near_grazing_b0.99", {"i": _incl_for_b(0.99)}),
+    ("deep_planet_r0.3", {"r": 0.3, "i": _incl_for_b(0.5)}),
+    ("large_planet_r0.25_central", {"r": 0.25, "i": jnp.pi / 2}),
+    ("tiny_planet_r1e-3", {"r": 1e-3, "i": jnp.pi / 2}),
     # oblate / triaxial -- exercises non-axis-aligned outlines and the sxx-syy guard
-    ("oblate_axis_aligned", dict(f1=0.5, obliq=0.0, prec=0.0, i=_incl_for_b(0.5))),
-    ("oblate_obliq45", dict(f1=0.5, obliq=jnp.pi / 4, i=_incl_for_b(0.5))),
-    ("triaxial", dict(f1=0.4, f2=0.3, obliq=0.7, prec=1.1, i=_incl_for_b(0.6))),
-    ("grazing_oblate", dict(f1=0.5, obliq=jnp.pi / 4, i=_incl_for_b(0.95))),
-    ("pole_on_oblate", dict(f1=0.5, obliq=jnp.pi / 2, i=_incl_for_b(0.4))),
+    (
+        "oblate_axis_aligned",
+        {"f1": 0.5, "obliq": 0.0, "prec": 0.0, "i": _incl_for_b(0.5)},
+    ),
+    ("oblate_obliq45", {"f1": 0.5, "obliq": jnp.pi / 4, "i": _incl_for_b(0.5)}),
+    (
+        "triaxial",
+        {"f1": 0.4, "f2": 0.3, "obliq": 0.7, "prec": 1.1, "i": _incl_for_b(0.6)},
+    ),
+    ("grazing_oblate", {"f1": 0.5, "obliq": jnp.pi / 4, "i": _incl_for_b(0.95)}),
+    ("pole_on_oblate", {"f1": 0.5, "obliq": jnp.pi / 2, "i": _incl_for_b(0.4)}),
     # eccentric -- transit at periastron / off-quadrature arguments of periastron
-    ("ecc_peri", dict(e=0.5, omega=jnp.pi / 2, i=_incl_for_b(0.3))),
-    ("ecc_apo", dict(e=0.7, omega=3 * jnp.pi / 2, i=_incl_for_b(0.4))),
-    ("ecc_oblique_omega", dict(e=0.6, omega=jnp.pi / 3, i=_incl_for_b(0.5))),
+    ("ecc_peri", {"e": 0.5, "omega": jnp.pi / 2, "i": _incl_for_b(0.3)}),
+    ("ecc_apo", {"e": 0.7, "omega": 3 * jnp.pi / 2, "i": _incl_for_b(0.4)}),
+    ("ecc_oblique_omega", {"e": 0.6, "omega": jnp.pi / 3, "i": _incl_for_b(0.5)}),
     # off-axis ascending node
-    ("Omega_pi_over_3", dict(Omega=jnp.pi / 3, i=_incl_for_b(0.6))),
-    ("Omega_zero", dict(Omega=0.0, i=_incl_for_b(0.6))),
+    ("Omega_pi_over_3", {"Omega": jnp.pi / 3, "i": _incl_for_b(0.6)}),
+    ("Omega_zero", {"Omega": 0.0, "i": _incl_for_b(0.6)}),
     # higher-order limb darkening (stresses the (1 - x^2 - y^2)^(n/2) terms)
     (
         "ld_order_8",
-        dict(
-            ld_u_coeffs=jnp.array([0.3, 0.2, 0.1, 0.05, 0.04, 0.03, 0.02, 0.01]),
-            i=_incl_for_b(0.4),
-        ),
+        {
+            "ld_u_coeffs": jnp.array([0.3, 0.2, 0.1, 0.05, 0.04, 0.03, 0.02, 0.01]),
+            "i": _incl_for_b(0.4),
+        },
     ),
-    ("uniform_disk", dict(ld_u_coeffs=jnp.array([0.0, 0.0]), i=_incl_for_b(0.5))),
+    ("uniform_disk", {"ld_u_coeffs": jnp.array([0.0, 0.0]), "i": _incl_for_b(0.5)}),
 ]
 
 
@@ -492,7 +498,7 @@ def test_negative_limb_darkening_overshoots() -> None:
     assert _ld_min_intensity(u) < -1e-3, "this case must have a negative-intensity limb"
 
     r = R_DEF
-    over = dict(r=r, i=_incl_for_b(0.4), ld_u_coeffs=u)
+    over = {"r": r, "i": _incl_for_b(0.4), "ld_u_coeffs": u}
     coarse = _dense_lc(COARSE_N, **over)
     fine = _dense_lc(FINE_N, **over)
 
@@ -521,11 +527,11 @@ def test_negative_limb_darkening_overshoots() -> None:
 # 5. Gradient finiteness on spike-prone geometries
 # ===========================================================================
 _GRAD_CASES = [
-    ("grazing", dict(i=_incl_for_b(0.99))),
-    ("internal_tangency", dict(i=_incl_for_b(1.0 - R_DEF))),
-    ("grazing_oblate", dict(f1=0.5, obliq=jnp.pi / 4, i=_incl_for_b(0.97))),
-    ("ecc_peri", dict(e=0.6, omega=jnp.pi / 2, i=_incl_for_b(0.3))),
-    ("deep_central", dict(r=0.3, i=jnp.pi / 2)),
+    ("grazing", {"i": _incl_for_b(0.99)}),
+    ("internal_tangency", {"i": _incl_for_b(1.0 - R_DEF)}),
+    ("grazing_oblate", {"f1": 0.5, "obliq": jnp.pi / 4, "i": _incl_for_b(0.97)}),
+    ("ecc_peri", {"e": 0.6, "omega": jnp.pi / 2, "i": _incl_for_b(0.3)}),
+    ("deep_central", {"r": 0.3, "i": jnp.pi / 2}),
 ]
 
 _GRAD_PARAMS = ["i", "r", "e", "omega", "obliq", "f1", "a"]
@@ -578,18 +584,18 @@ def test_random_pathological_fuzz() -> None:
         e = float(rng.uniform(0.0, 0.9))
         b = float(rng.uniform(0.0, 1.15))
         order = int(rng.integers(2, 7))
-        over = dict(
-            e=e,
-            omega=(0.0 if e == 0.0 else float(rng.uniform(0, tp))),
-            Omega=float(rng.uniform(0, tp)),
-            i=_incl_for_b(b),
-            obliq=float(rng.uniform(-np.pi / 2, np.pi / 2)),
-            prec=float(rng.uniform(0, tp)),
-            r=float(rng.uniform(0.01, 0.3)),
-            f1=float(rng.uniform(0.0, 0.7)),
-            f2=float(rng.uniform(0.0, 0.5)),
-            ld_u_coeffs=_valid_ld(order, rng, total=float(rng.uniform(0.2, 1.0))),
-        )
+        over = {
+            "e": e,
+            "omega": (0.0 if e == 0.0 else float(rng.uniform(0, tp))),
+            "Omega": float(rng.uniform(0, tp)),
+            "i": _incl_for_b(b),
+            "obliq": float(rng.uniform(-np.pi / 2, np.pi / 2)),
+            "prec": float(rng.uniform(0, tp)),
+            "r": float(rng.uniform(0.01, 0.3)),
+            "f1": float(rng.uniform(0.0, 0.7)),
+            "f2": float(rng.uniform(0.0, 0.5)),
+            "ld_u_coeffs": _valid_ld(order, rng, total=float(rng.uniform(0.2, 1.0))),
+        }
         flux = _dense_lc(FUZZ_N, **over)
         _assert_finite_bounded(flux, f"fuzz[{k}] b={b:.3f} e={e:.2f}")
 
@@ -604,21 +610,21 @@ def _dense_lc_projected(
     period = float(over.get("period", PERIOD))
     e = float(over.get("e", 0.0))
     t = _times(n, a=a, period=period, r=projected_effective_r, e=e)
-    base = dict(
-        t0=0.0,
-        period=PERIOD,
-        a=SMA,
-        e=0.0,
-        i=jnp.pi / 2,
-        Omega=jnp.pi,
-        omega=0.0,
-        parameterize_with_projected_ellipse=True,
-        projected_effective_r=projected_effective_r,
-        projected_f=0.0,
-        projected_theta=0.0,
-        ld_u_coeffs=jnp.array([0.4, 0.3]),
-        tidally_locked=False,
-    )
+    base = {
+        "t0": 0.0,
+        "period": PERIOD,
+        "a": SMA,
+        "e": 0.0,
+        "i": jnp.pi / 2,
+        "Omega": jnp.pi,
+        "omega": 0.0,
+        "parameterize_with_projected_ellipse": True,
+        "projected_effective_r": projected_effective_r,
+        "projected_f": 0.0,
+        "projected_theta": 0.0,
+        "ld_u_coeffs": jnp.array([0.4, 0.3]),
+        "tidally_locked": False,
+    }
     base.update(over)
     if float(base["e"]) == 0.0:
         base["omega"] = 0.0
@@ -650,7 +656,7 @@ def test_projected_theta_special(ang: float) -> None:
 
 def test_projected_branch_no_spikes() -> None:
     """Refinement-continuity check for the projected-ellipse branch (grazing, tilted)."""
-    over = dict(projected_f=0.5, projected_theta=jnp.pi / 4, i=_incl_for_b(0.95))
+    over = {"projected_f": 0.5, "projected_theta": jnp.pi / 4, "i": _incl_for_b(0.95)}
     coarse = _dense_lc_projected(COARSE_N, **over)
     fine = _dense_lc_projected(FINE_N, **over)
     _assert_finite_bounded(coarse, "projected_no_spikes (coarse)")

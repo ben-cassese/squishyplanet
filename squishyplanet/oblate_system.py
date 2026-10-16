@@ -863,8 +863,8 @@ def _lightcurve(
     oversample: int,
     state: dict,
 ) -> jax.Array:
-    for key in params:
-        state[key] = params[key]
+    for key, value in params.items():
+        state[key] = value
     transit = poly_lightcurve(state, parameterize_with_projected_ellipse)
     if oversample > 1:
         c = (transit.reshape(-1, oversample) * state["stencil"][None, :]).sum(axis=1)
