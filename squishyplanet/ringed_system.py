@@ -149,16 +149,16 @@ class RingedSystem(OblateSystem):
                 ring_obliq = self._state["ring_obliq"]
                 ring_prec = self._state["ring_prec"]
 
-            shared = dict(
-                a=self._state["a"],
-                e=self._state["e"],
-                f=f,
-                Omega=self._state["Omega"],
-                i=self._state["i"],
-                omega=self._state["omega"],
-                ring_obliq=ring_obliq,
-                ring_prec=ring_prec,
-            )
+            shared = {
+                "a": self._state["a"],
+                "e": self._state["e"],
+                "f": f,
+                "Omega": self._state["Omega"],
+                "i": self._state["i"],
+                "omega": self._state["omega"],
+                "ring_obliq": ring_obliq,
+                "ring_prec": ring_prec,
+            }
             for rRing, xs, ys in (
                 (self._state["ring_outer_r"], outer_x, outer_y),
                 (self._state["ring_inner_r"], inner_x, inner_y),
@@ -264,8 +264,8 @@ class RingedSystem(OblateSystem):
 
 @partial(jax.jit, static_argnums=(1,))
 def _ringed_lightcurve(params: dict, oversample: int, state: dict) -> jax.Array:
-    for key in params:
-        state[key] = params[key]
+    for key, value in params.items():
+        state[key] = value
     transit = ringed_lightcurve(state)
     if oversample > 1:
         c = (transit.reshape(-1, oversample) * state["stencil"][None, :]).sum(axis=1)

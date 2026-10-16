@@ -50,8 +50,8 @@ def _p_G(n: int, N: int) -> list[Expr]:
     """Return the polynomial basis representation of the Green's polynomial `g`."""
     g = _gtilde(n, z)
     res = [g.subs(z, 0)]
-    for n in range(1, N + 1):
-        res.append(_Coefficient(g, _ptilde(n, z)))
+    for k in range(1, N + 1):
+        res.append(_Coefficient(g, _ptilde(k, z)))
     return res
 
 

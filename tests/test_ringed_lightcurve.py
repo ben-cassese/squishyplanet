@@ -58,34 +58,34 @@ def _make_state(
         if uniform_ld
         else jnp.array(list(rng.uniform(0.05, 0.3, size=2)))
     )
-    state = dict(
-        times=jnp.linspace(-0.3, 0.3, n_times),
-        t_peri=-2.5,  # transit near t=0 for period=10, e=0, omega=0, Omega=pi
-        t0=None,
-        period=10.0,
-        a=float(rng.uniform(4.0, 12.0)),
-        e=0.0,
-        i=float(np.pi / 2 + rng.uniform(-0.05, 0.05)),
-        Omega=np.pi,
-        omega=0.0,
-        r=float(rng.uniform(0.05, 0.2)),
-        f1=float(rng.uniform(0.0, 0.4)),
-        f2=float(rng.uniform(0.0, 0.3)),
-        obliq=float(rng.uniform(-1.0, 1.0)),
-        prec=float(rng.uniform(0, 2 * np.pi)),
-        tidally_locked=False,
-        ld_u_coeffs=ld,
-        greens_basis_transform=generate_change_of_basis_matrix(2),
-        ring_tracks_planet=False,
-        ring_obliq=float(rng.uniform(-np.pi, np.pi)),
-        ring_prec=float(rng.uniform(0, 2 * np.pi)),
-    )
+    state = {
+        "times": jnp.linspace(-0.3, 0.3, n_times),
+        "t_peri": -2.5,  # transit near t=0 for period=10, e=0, omega=0, Omega=pi
+        "t0": None,
+        "period": 10.0,
+        "a": float(rng.uniform(4.0, 12.0)),
+        "e": 0.0,
+        "i": float(np.pi / 2 + rng.uniform(-0.05, 0.05)),
+        "Omega": np.pi,
+        "omega": 0.0,
+        "r": float(rng.uniform(0.05, 0.2)),
+        "f1": float(rng.uniform(0.0, 0.4)),
+        "f2": float(rng.uniform(0.0, 0.3)),
+        "obliq": float(rng.uniform(-1.0, 1.0)),
+        "prec": float(rng.uniform(0, 2 * np.pi)),
+        "tidally_locked": False,
+        "ld_u_coeffs": ld,
+        "greens_basis_transform": generate_change_of_basis_matrix(2),
+        "ring_tracks_planet": False,
+        "ring_obliq": float(rng.uniform(-np.pi, np.pi)),
+        "ring_prec": float(rng.uniform(0, 2 * np.pi)),
+    }
     state["ring_inner_r"] = state["r"] * float(rng.uniform(1.05, 2.0))
     state["ring_outer_r"] = state["ring_inner_r"] * float(rng.uniform(1.05, 2.5))
     state.update(overrides)
-    for k in state:
-        if isinstance(state[k], float) and k != "period":
-            state[k] = jnp.array([state[k]])
+    for k, value in state.items():
+        if isinstance(value, float) and k != "period":
+            state[k] = jnp.array([value])
     return state
 
 
@@ -339,23 +339,23 @@ def test_gradients_finite() -> None:
 def test_ringed_system_frontend() -> None:
     """RingedSystem wires the engine, custom_vjp, params updates, oversampling,
     tracking, validation, state round-trip, and illustrate."""
-    base = dict(
-        times=jnp.linspace(-0.15, 0.15, 100),
-        t_peri=-2.5,
-        period=10.0,
-        a=8.0,
-        e=0.0,
-        i=np.pi / 2 - 0.005,
-        Omega=np.pi,
-        omega=0.0,
-        r=0.1,
-        f1=0.1,
-        f2=0.05,
-        obliq=0.4,
-        prec=0.9,
-        ld_u_coeffs=jnp.array([0.3, 0.2]),
-        tidally_locked=False,
-    )
+    base = {
+        "times": jnp.linspace(-0.15, 0.15, 100),
+        "t_peri": -2.5,
+        "period": 10.0,
+        "a": 8.0,
+        "e": 0.0,
+        "i": np.pi / 2 - 0.005,
+        "Omega": np.pi,
+        "omega": 0.0,
+        "r": 0.1,
+        "f1": 0.1,
+        "f2": 0.05,
+        "obliq": 0.4,
+        "prec": 0.9,
+        "ld_u_coeffs": jnp.array([0.3, 0.2]),
+        "tidally_locked": False,
+    }
     s = RingedSystem(ring_inner_r=0.15, ring_outer_r=0.25, **base)
     lc = s.lightcurve()
     assert not bool(jnp.any(jnp.isnan(lc)))
@@ -403,10 +403,10 @@ def test_ringed_system_frontend() -> None:
 
     # validation
     for bad in (
-        dict(ring_inner_r=0.15),
-        dict(ring_inner_r=0.25, ring_outer_r=0.15),
-        dict(ring_inner_r=0.05, ring_outer_r=0.25),
-        dict(ring_inner_r=0.15, ring_outer_r=0.25, ring_obliq=1.0),
+        {"ring_inner_r": 0.15},
+        {"ring_inner_r": 0.25, "ring_outer_r": 0.15},
+        {"ring_inner_r": 0.05, "ring_outer_r": 0.25},
+        {"ring_inner_r": 0.15, "ring_outer_r": 0.25, "ring_obliq": 1.0},
     ):
         try:
             RingedSystem(**bad, **base)

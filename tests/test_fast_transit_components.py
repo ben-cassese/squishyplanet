@@ -303,22 +303,22 @@ def test_scheme_handoff_is_continuous() -> None:
     the handoff and that the scheme-induced step is far below 1 ppm.
     """
     r = 0.25
-    base = dict(
-        t0=0.0,
-        period=15.0,
-        a=15.0,
-        e=0.0,
-        i=jnp.pi / 2,
-        Omega=jnp.pi,
-        omega=0.0,
-        f1=0.0,
-        f2=0.0,
-        r=r,
-        obliq=0.0,
-        prec=0.0,
-        ld_u_coeffs=jnp.array([0.5, 0.2]),
-        tidally_locked=False,
-    )
+    base = {
+        "t0": 0.0,
+        "period": 15.0,
+        "a": 15.0,
+        "e": 0.0,
+        "i": jnp.pi / 2,
+        "Omega": jnp.pi,
+        "omega": 0.0,
+        "f1": 0.0,
+        "f2": 0.0,
+        "r": r,
+        "obliq": 0.0,
+        "prec": 0.0,
+        "ld_u_coeffs": jnp.array([0.5, 0.2]),
+        "tidally_locked": False,
+    }
 
     # locate the internal-tangency time (d_center = 1 - r) on the ingress side
     tt = jnp.linspace(-1.0, 0.0, 400001)
