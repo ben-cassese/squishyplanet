@@ -1,5 +1,4 @@
 jax
-quadax
 tqdm
 black
 astropy>5

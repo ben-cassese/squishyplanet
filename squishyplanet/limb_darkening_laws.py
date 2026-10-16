@@ -12,6 +12,31 @@ from squishyplanet import OblateSystem
 mu_grid = jnp.linspace(0, 1, 500)
 
 
+def _profile(u_coeffs: jax.Array, true_intensity: jax.Array) -> dict[str, jax.Array]:
+    """Package a set of u coefficients and the law they approximate into a dict.
+
+    Args:
+        u_coeffs (Array): The squishyplanet u coefficients for this law.
+        true_intensity (Array): The law's own intensity profile over ``mu_grid``.
+
+    Returns:
+        dict: The mu grid, both intensity profiles, and the u coefficients.
+
+    """
+    # squishyplanet normalizes intensity profiles so that their integrated flux is 1
+    # but when plotting we need to renormalize to where mu=0
+    norm = OblateSystem.limb_darkening_profile(
+        ld_u_coeffs=u_coeffs, mu=jnp.array([1.0])
+    )
+    poly_model = OblateSystem.limb_darkening_profile(ld_u_coeffs=u_coeffs, mu=mu_grid)
+    return {
+        "mu_grid": mu_grid,
+        "true_intensity_profile": true_intensity,
+        "squishyplanet_intensity_profile": poly_model / norm,
+        "u_coeffs": u_coeffs,
+    }
+
+
 @partial(jax.jit, static_argnames=("return_profile"))
 def linear_ld_law(
     u1: float, return_profile: bool = False
@@ -37,20 +62,7 @@ def linear_ld_law(
     u_coeffs = jnp.array([u1, 0])
 
     if return_profile:
-        # squishyplanet normalizes intensity profiles so that their integrated flux is 1
-        # but when plotting we need to renormalize to where mu=0
-        norm = OblateSystem.limb_darkening_profile(
-            ld_u_coeffs=u_coeffs, mu=jnp.array([1.0])
-        )
-        poly_model = OblateSystem.limb_darkening_profile(
-            ld_u_coeffs=u_coeffs, mu=mu_grid
-        )
-        return {
-            "mu_grid": mu_grid,
-            "true_intensity_profile": 1 - u1 * (1 - mu_grid),
-            "squishyplanet_intensity_profile": poly_model / norm,
-            "u_coeffs": u_coeffs,
-        }
+        return _profile(u_coeffs, 1 - u1 * (1 - mu_grid))
 
     return u_coeffs
 
@@ -82,20 +94,7 @@ def quadratic_ld_law(
     u_coeffs = jnp.array([u1, u2])
 
     if return_profile:
-        # squishyplanet normalizes intensity profiles so that their integrated flux is 1
-        # but when plotting we need to renormalize to where mu=0
-        norm = OblateSystem.limb_darkening_profile(
-            ld_u_coeffs=u_coeffs, mu=jnp.array([1.0])
-        )
-        poly_model = OblateSystem.limb_darkening_profile(
-            ld_u_coeffs=u_coeffs, mu=mu_grid
-        )
-        return {
-            "mu_grid": mu_grid,
-            "true_intensity_profile": 1 - u1 * (1 - mu_grid) - u2 * (1 - mu_grid) ** 2,
-            "squishyplanet_intensity_profile": poly_model / norm,
-            "u_coeffs": u_coeffs,
-        }
+        return _profile(u_coeffs, 1 - u1 * (1 - mu_grid) - u2 * (1 - mu_grid) ** 2)
 
     return u_coeffs
 
@@ -142,20 +141,7 @@ def kipping_ld_law(
     u_coeffs = jnp.array([u1, u2])
 
     if return_profile:
-        # squishyplanet normalizes intensity profiles so that their integrated flux is 1
-        # but when plotting we need to renormalize to where mu=0
-        norm = OblateSystem.limb_darkening_profile(
-            ld_u_coeffs=u_coeffs, mu=jnp.array([1.0])
-        )
-        poly_model = OblateSystem.limb_darkening_profile(
-            ld_u_coeffs=u_coeffs, mu=mu_grid
-        )
-        return {
-            "mu_grid": mu_grid,
-            "true_intensity_profile": 1 - u1 * (1 - mu_grid) - u2 * (1 - mu_grid) ** 2,
-            "squishyplanet_intensity_profile": poly_model / norm,
-            "u_coeffs": u_coeffs,
-        }
+        return _profile(u_coeffs, 1 - u1 * (1 - mu_grid) - u2 * (1 - mu_grid) ** 2)
 
     return u_coeffs
 
@@ -190,20 +176,7 @@ def squareroot_ld_law(
     )
 
     if return_profile:
-        # squishyplanet normalizes intensity profiles so that their integrated flux is 1
-        # but when plotting we need to renormalize to where mu=0
-        norm = OblateSystem.limb_darkening_profile(
-            ld_u_coeffs=u_coeffs, mu=jnp.array([1.0])
-        )
-        poly_model = OblateSystem.limb_darkening_profile(
-            ld_u_coeffs=u_coeffs, mu=mu_grid
-        )
-        return {
-            "mu_grid": mu_grid,
-            "true_intensity_profile": intensity_profile,
-            "squishyplanet_intensity_profile": poly_model / norm,
-            "u_coeffs": u_coeffs,
-        }
+        return _profile(u_coeffs, intensity_profile)
 
     return u_coeffs
 
@@ -241,20 +214,7 @@ def nonlinear_3param_ld_law(
     )
 
     if return_profile:
-        # squishyplanet normalizes intensity profiles so that their integrated flux is 1
-        # but when plotting we need to renormalize to where mu=0
-        norm = OblateSystem.limb_darkening_profile(
-            ld_u_coeffs=u_coeffs, mu=jnp.array([1.0])
-        )
-        poly_model = OblateSystem.limb_darkening_profile(
-            ld_u_coeffs=u_coeffs, mu=mu_grid
-        )
-        return {
-            "mu_grid": mu_grid,
-            "true_intensity_profile": intensity_profile,
-            "squishyplanet_intensity_profile": poly_model / norm,
-            "u_coeffs": u_coeffs,
-        }
+        return _profile(u_coeffs, intensity_profile)
 
     return u_coeffs
 
@@ -302,19 +262,6 @@ def nonlinear_4param_ld_law(
     )
 
     if return_profile:
-        # squishyplanet normalizes intensity profiles so that their integrated flux is 1
-        # but when plotting we need to renormalize to where mu=0
-        norm = OblateSystem.limb_darkening_profile(
-            ld_u_coeffs=u_coeffs, mu=jnp.array([1.0])
-        )
-        poly_model = OblateSystem.limb_darkening_profile(
-            ld_u_coeffs=u_coeffs, mu=mu_grid
-        )
-        return {
-            "mu_grid": mu_grid,
-            "true_intensity_profile": intensity_profile,
-            "squishyplanet_intensity_profile": poly_model / norm,
-            "u_coeffs": u_coeffs,
-        }
+        return _profile(u_coeffs, intensity_profile)
 
     return u_coeffs

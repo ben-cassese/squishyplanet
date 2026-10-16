@@ -10,7 +10,6 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import PathPatch
 from matplotlib.path import Path
 
-from squishyplanet.engine.kepler import kepler, t0_to_t_peri
 from squishyplanet.engine.ringed_transit import ringed_lightcurve
 from squishyplanet.engine.rings import ring_para_coeffs
 from squishyplanet.oblate_system import OblateSystem
@@ -215,27 +214,7 @@ class RingedSystem(OblateSystem):
         super().illustrate(times=times, true_anomalies=true_anomalies, **kwargs)
         ax = plt.gca()
 
-        # resolve times/true anomalies the same way the parent helper does
-        if (times is not None) & (true_anomalies is not None):
-            raise ValueError("Provide either times or true anomalies but not both")
-        if times is not None:
-            t_peri = self._state.get("t_peri", None)
-            if t_peri is None:
-                t_peri = t0_to_t_peri(
-                    e=self._state["e"],
-                    i=self._state["i"],
-                    omega=self._state["omega"],
-                    period=self._state["period"],
-                    t0=self._state["t0"],
-                )
-            time_deltas = times - t_peri
-            mean_anomalies = 2 * jnp.pi * time_deltas / self._state["period"]
-            true_anomalies = kepler(mean_anomalies, self._state["e"])
-        elif true_anomalies is None:
-            true_anomalies = jnp.array([jnp.pi / 2])
-        if isinstance(true_anomalies, float | int):
-            true_anomalies = jnp.array([true_anomalies])
-
+        true_anomalies = self._resolve_true_anomalies(times, true_anomalies)
         outer_x, outer_y, inner_x, inner_y = self._ring_edge_outlines(true_anomalies)
 
         for i in range(len(true_anomalies)):

@@ -1,36 +1,68 @@
 Changelog
 ++++++++++
 
-.. next release
+**0.6.0**
+
+- Fixed the projected-ellipse orientation when the quadratic coefficients along
+  the two sky axes are equal. Tilted ellipses at 45 degrees now retain their
+  orientation instead of being treated as axis-aligned.
+- Fixed JAX derivatives at zero flattening in both the projected 2D and physical
+  3D planet parameterizations. The transit engine now constructs the boundary
+  directly from the shape parameters, avoiding the undefined major-axis angle of
+  a circle. Added regression tests for circular-limit gradients.
+- Replaced SymPy-based construction of the limb-darkening change-of-basis matrix
+  with a NumPy linear solve. SymPy is now a test-only dependency, with regression
+  comparisons against the original symbolic calculation at orders up to 50.
+- Removed the remaining unused phase-curve and extended-illumination internals.
+  The surface-sampling and illumination helpers used by ``illustrate`` now live
+  in ``engine.illustrate_utils``; direct imports from the removed
+  ``engine.phase_curve_utils`` module must be updated.
+- Consolidated repeated limb-darkening profile and illustration code, and
+  simplified the 3D-to-2D projection helpers without changing their formulas.
+- Reduced runtime dependencies to JAX, NumPy, and Matplotlib. Removed quadax,
+  moved Astropy and tqdm to the test dependency group, and removed unused tox
+  tooling. JAX is now declared directly as a dependency.
+- Updated integration-method documentation and lint compatibility. CI now avoids
+  duplicate push and pull-request runs and cancels superseded pull-request runs.
+
 **0.5.0**
-- **Breaking:** Removed ``OblateSystem.loglike``. Likelihood computation is no longer
-  built into the class; users should now compute their own (e.g. Gaussian) likelihood
-  by comparing the output of ``OblateSystem.lightcurve`` against their data. The
-  associated constructor arguments ``data``, ``uncertainties``, ``log_jitter``, and
-  ``systematic_trend_coeffs`` have been removed as well. See the updated
-  "Fit a transit of an oblate planet" tutorial for an example of the new pattern.
-- **Breaking:** Removed the phase-curve, emission, and reflected-light phase-curve
-  machinery, along with the constructor flags that enabled it
-  (``compute_reflected_phase_curve``, ``compute_emitted_phase_curve``,
-  ``compute_stellar_ellipsoidal_variations``, ``compute_stellar_doppler_variations``,
-  ``phase_curve_nsamples``, ``extended_illumination_npts``, and ``random_seed``).
-  ``OblateSystem.illustrate`` keeps its ``reflected`` option for visualization.
+
 - Added ``RingedSystem``, a subclass of ``OblateSystem`` for planets hosting an
-  opaque, flat, circular ring bounded by an inner and outer radius, by default lying
-  in the planet's equatorial plane. The blocked flux is computed via an exact
-  inclusion-exclusion decomposition into intersections of convex regions, each
-  evaluated with the same Green's-theorem boundary integrals as the planet-only model
-  (see ``engine.ringed_transit``). ``RingedSystem.illustrate`` overlays the projected
-  ring edges and a filled annulus.
-- Generalized the transit engine's limb-crossing logic (``ellipse_star_term``): the
-  outline and the stellar limb are now split into arcs at *all* crossings instead of
-  assuming exactly two. This fixes incorrect light curves for long, thin projected
-  ellipses that cross the stellar limb four times ("skewering" the star), which
-  matter for nearly edge-on rings and extreme projected-ellipse parameterizations.
-- Dropped support for Python 3.9, keeping up with jaxoplanet for testing.
-- Added pre-commit requirements, most notably the ruff linter to check for common
-python code style issues. Many flags still not checked, especially those related to docstrings.
-- Switched to uv for dependency management, not yet building though.
+  opaque, flat, circular ring bounded by an inner and outer radius. Rings lie in
+  the planet's equatorial plane by default, with options for independent
+  orientation. Blocked flux is computed by inclusion-exclusion of overlapping
+  regions using Green's-theorem boundary integrals. ``RingedSystem.illustrate``
+  overlays the projected ring edges and a filled annulus.
+- Generalized the transit engine's limb-crossing logic to split the planet
+  outline and stellar limb at all crossings, including four-intersection cases.
+  This fixes light curves for long, thin projected ellipses crossing the star,
+  including nearly edge-on rings and extreme projected planet shapes.
+- Added ring geometry, flux, and gradient tests, with independent Monte Carlo
+  and Shapely comparisons, plus stress tests for grazing transits, tangencies,
+  extreme flattening, and higher-order limb darkening.
+- Expanded type annotations and updated tutorials, including examples for ringed
+  planets and performance comparisons.
+
+**0.4.0**
+
+- **Breaking:** Removed ``OblateSystem.loglike``. Users now compute their own
+  likelihood by comparing ``OblateSystem.lightcurve`` with their data. Removed
+  the constructor arguments ``data``, ``uncertainties``, ``log_jitter``, and
+  ``systematic_trend_coeffs``. The transit-fitting tutorial demonstrates this
+  pattern.
+- **Breaking:** Removed phase-curve and stellar-variation calculations from
+  ``OblateSystem``, together with ``compute_reflected_phase_curve``,
+  ``compute_emitted_phase_curve``, ``compute_stellar_ellipsoidal_variations``,
+  ``compute_stellar_doppler_variations``, ``phase_curve_nsamples``,
+  ``extended_illumination_npts``, and ``random_seed``.
+  ``OblateSystem.illustrate`` retains its ``reflected`` visualization option.
+- Replaced adaptive quadax integration with fixed-grid quadrature: a
+  reparameterized Gauss-Legendre rule for partial transits and a periodic
+  trapezoid rule for full transits. Added numerical stability and performance
+  improvements to the transit engine.
+- Removed the separate Fortran implementation.
+- Dropped Python 3.9 support, adopted uv for dependency management, and added
+  pre-commit linting, formatting, and spelling checks.
 
 **0.3.1 (10/2024)**
 
