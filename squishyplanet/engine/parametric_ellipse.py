@@ -4,6 +4,25 @@ jax.config.update("jax_enable_x64", True)
 import jax.numpy as jnp
 
 
+def ellipse_angle(rho_xx: jax.Array, rho_xy: jax.Array, rho_yy: jax.Array) -> jax.Array:
+    """Rotation angle, in [0, pi), of the centered conic
+    ``rho_xx x^2 + rho_xy x y + rho_yy y^2 = 1``.
+
+    The only genuinely degenerate input is a circle (``rho_xx == rho_yy`` *and*
+    ``rho_xy == 0``), where any angle is valid and ``arctan2(0, 0)`` has a NaN gradient. A
+    tilted ellipse with ``rho_xx == rho_yy`` (e.g. a major axis at exactly 45 degrees) is not
+    degenerate: ``arctan2(rho_xy, 0) = +-pi/2`` is well defined and must not be zeroed.
+    """
+    dxx = rho_xx - rho_yy
+    is_circle = (dxx == 0.0) & (rho_xy == 0.0)
+    # the substituted arguments keep the gradient of the unused branch finite
+    angle = 0.5 * jnp.arctan2(
+        jnp.where(is_circle, 1.0, rho_xy), jnp.where(is_circle, 1.0, dxx)
+    )
+    theta = jnp.where(is_circle, 0.0, angle + jnp.pi / 2)
+    return jnp.where(theta < 0.0, theta + jnp.pi, theta)
+
+
 @jax.jit
 def poly_to_parametric_helper(
     rho_xx: jax.Array,
@@ -102,13 +121,7 @@ def poly_to_parametric_helper(
         )
     )
 
-    # get the rotation angle (edge case gives you nans if there's no rotation)
-    theta = jnp.where(
-        rho_xx_shift - rho_yy_shift != 0.0,
-        0.5 * jnp.arctan2(rho_xy_shift, (rho_xx_shift - rho_yy_shift)) + jnp.pi / 2,
-        0.0,
-    )
-    theta = jnp.where(theta < 0.0, theta + jnp.pi, theta)
+    theta = ellipse_angle(rho_xx_shift, rho_xy_shift, rho_yy_shift)
     # jax.debug.print("{x}", x=theta)
     cosa = jnp.cos(theta)
     sina = jnp.sin(theta)
